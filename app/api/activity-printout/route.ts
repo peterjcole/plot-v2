@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     // Capture browser console for debugging
     const pageLogs: string[] = [];
     page.on('console', (msg) => pageLogs.push(`[${msg.type()}] ${msg.text()}`));
-    page.on('pageerror', (err) => pageLogs.push(`[error] ${err.message}`));
+    page.on('pageerror', (err) => pageLogs.push(`[error] ${String(err)}`));
 
     // Build the URL for the render page
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
