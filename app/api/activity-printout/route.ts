@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const host = request.headers.get('host') || 'localhost:3000';
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}` : '';
+    const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}${bypassParam}`;
 
     await page.goto(renderUrl, {
