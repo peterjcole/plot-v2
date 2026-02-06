@@ -24,12 +24,18 @@ export async function GET(request: NextRequest) {
     4096
   );
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';
+  const debug = searchParams.get('debug') === 'true';
 
   try {
     const browser = await getBrowser();
     const page = await browser.newPage();
 
     await page.setViewport({ width, height });
+
+    // Capture browser console for debugging
+    const pageLogs: string[] = [];
+    page.on('console', (msg) => pageLogs.push(`[${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', (err) => pageLogs.push(`[error] ${err.message}`));
 
     // Build the URL for the render page
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
@@ -59,6 +65,12 @@ export async function GET(request: NextRequest) {
       type: format,
       ...(format === 'jpeg' && { quality: 90 }),
     });
+
+    if (debug) {
+      const html = await page.content();
+      await page.close();
+      return NextResponse.json({ logs: pageLogs, url: renderUrl, html: html.substring(0, 5000) });
+    }
 
     await page.close();
 
