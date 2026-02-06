@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
@@ -17,6 +18,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// EPSG:27700 British National Grid CRS
+const crs = new L.Proj.CRS(
+  'EPSG:27700',
+  '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +datum=OSGB36 +units=m +no_defs',
+  {
+    resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
+    origin: [-238375.0, 1376256.0],
+  }
+);
+
 interface ActivityMapProps {
   activity: ActivityData;
   width: number;
@@ -29,7 +40,7 @@ function MapController({ route }: { route: [number, number][] }) {
   useEffect(() => {
     if (route.length > 0) {
       const bounds = L.latLngBounds(route.map(([lat, lng]) => [lat, lng]));
-      map.fitBounds(bounds, { padding: [40, 40] });
+      map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [map, route]);
 
@@ -79,26 +90,31 @@ function TileLoadHandler() {
 export default function ActivityMap({ activity, width, height }: ActivityMapProps) {
   const center: [number, number] = activity.route.length > 0
     ? activity.route[Math.floor(activity.route.length / 2)]
-    : [37.7749, -122.4194];
+    : [54.4, -2.9];
 
   return (
     <div style={{ width, height, position: 'relative' }}>
       <MapContainer
         center={center}
-        zoom={13}
+        zoom={7}
+        minZoom={6}
+        maxZoom={9}
+        crs={crs}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="/api/maps?z={z}&x={x}&y={y}"
+          maxNativeZoom={9}
+          minNativeZoom={8}
         />
         <Polyline
           positions={activity.route}
           pathOptions={{
-            color: '#FF4500',
+            color: '#080357',
             weight: 4,
-            opacity: 0.8,
+            opacity: 0.5,
           }}
         />
         <MapController route={activity.route} />
