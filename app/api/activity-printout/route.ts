@@ -34,17 +34,9 @@ export async function GET(request: NextRequest) {
     // Build the URL for the render page
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const host = request.headers.get('host') || 'localhost:3000';
-    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}`;
-
-    // Bypass Vercel deployment protection
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    if (bypassSecret) {
-      await page.setCookie({
-        name: 'x-vercel-protection-bypass',
-        value: bypassSecret,
-        domain: host,
-      });
-    }
+    const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}` : '';
+    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',
