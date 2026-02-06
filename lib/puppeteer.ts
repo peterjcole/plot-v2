@@ -7,29 +7,15 @@ export async function getBrowser(): Promise<Browser> {
     return cachedBrowser;
   }
 
-  const isDev = process.env.NODE_ENV === 'development';
+  const puppeteerCore = await import('puppeteer-core');
+  const chromium = await import('@sparticuz/chromium');
 
-  if (isDev) {
-    // Development: use full puppeteer with bundled Chromium
-    const puppeteer = await import('puppeteer');
-    cachedBrowser = await puppeteer.default.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-  } else {
-    // Production: use puppeteer-core with external Chromium
-    const puppeteerCore = await import('puppeteer-core');
-    const chromium = await import('@sparticuz/chromium-min');
-
-    cachedBrowser = await puppeteerCore.default.launch({
-      args: chromium.default.args,
-      defaultViewport: { width: 1200, height: 630 },
-      executablePath: await chromium.default.executablePath(
-        'https://github.com/nickarellano/chromium/raw/refs/heads/main/chromium-v130.0.1-pack.tar'
-      ),
-      headless: true,
-    });
-  }
+  cachedBrowser = await puppeteerCore.default.launch({
+    args: chromium.default.args,
+    defaultViewport: { width: 1200, height: 630 },
+    executablePath: await chromium.default.executablePath(),
+    headless: true,
+  });
 
   return cachedBrowser;
 }

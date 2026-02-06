@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     4096
   );
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';
+  const debug = searchParams.get('debug') === 'true';
 
   try {
     const browser = await getBrowser();
@@ -31,10 +32,17 @@ export async function GET(request: NextRequest) {
 
     await page.setViewport({ width, height });
 
+    // Capture browser console for debugging
+    const pageLogs: string[] = [];
+    page.on('console', (msg) => pageLogs.push(`[${msg.type()}] ${msg.text()}`));
+    page.on('pageerror', (err) => pageLogs.push(`[error] ${String(err)}`));
+
     // Build the URL for the render page
     const protocol = request.headers.get('x-forwarded-proto') || 'http';
     const host = request.headers.get('host') || 'localhost:3000';
-    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}`;
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
+    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',
@@ -57,6 +65,12 @@ export async function GET(request: NextRequest) {
       type: format,
       ...(format === 'jpeg' && { quality: 90 }),
     });
+
+    if (debug) {
+      const html = await page.content();
+      await page.close();
+      return NextResponse.json({ logs: pageLogs, url: renderUrl, html: html.substring(0, 5000) });
+    }
 
     await page.close();
 
