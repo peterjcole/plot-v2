@@ -50,7 +50,7 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
         bottom: 0,
         left: 0,
         right: 0,
-        background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+        background: 'linear-gradient(transparent, rgba(8,3,87,0.75))',
         color: 'white',
         padding: '40px 20px 20px',
         zIndex: 1000,
