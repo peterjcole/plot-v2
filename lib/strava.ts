@@ -12,10 +12,10 @@ export async function refreshTokenIfNeeded(session: SessionData): Promise<boolea
 
   const res = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID,
-      client_secret: process.env.STRAVA_CLIENT_SECRET,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: process.env.STRAVA_CLIENT_ID ?? '',
+      client_secret: process.env.STRAVA_CLIENT_SECRET ?? '',
       refresh_token: session.refreshToken,
       grant_type: 'refresh_token',
     }),
