@@ -23,6 +23,16 @@ export interface ActivityData {
   stats: ActivityStats;
 }
 
+export interface ActivitySummary {
+  id: number;
+  name: string;
+  type: string;
+  startDate: string;
+  distance: number; // in meters
+  movingTime: number; // in seconds
+  elevationGain: number; // in meters
+}
+
 declare global {
   interface Window {
     __MAP_READY__?: boolean;

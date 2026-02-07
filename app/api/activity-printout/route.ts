@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBrowser } from '@/lib/puppeteer';
+import { getSession } from '@/lib/auth';
+import { refreshTokenIfNeeded } from '@/lib/strava';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+
+  if (!session.accessToken) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  if (await refreshTokenIfNeeded(session)) {
+    await session.save();
+  }
+
   const searchParams = request.nextUrl.searchParams;
 
   const activityId = searchParams.get('activityId');
@@ -42,7 +54,8 @@ export async function GET(request: NextRequest) {
     const host = request.headers.get('host') || 'localhost:3000';
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
-    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}${bypassParam}`;
+    const token = encodeURIComponent(session.accessToken);
+    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}&token=${token}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',
@@ -69,7 +82,9 @@ export async function GET(request: NextRequest) {
     if (debug) {
       const html = await page.content();
       await page.close();
-      return NextResponse.json({ logs: pageLogs, url: renderUrl, html: html.substring(0, 5000) });
+      // Strip token from URL before exposing in debug response
+      const safeUrl = renderUrl.replace(/&token=[^&]+/, '&token=[REDACTED]');
+      return NextResponse.json({ logs: pageLogs, url: safeUrl, html: html.substring(0, 5000) });
     }
 
     await page.close();

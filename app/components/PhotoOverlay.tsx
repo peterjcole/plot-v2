@@ -41,14 +41,14 @@ export default function PhotoOverlay({ photos }: PhotoOverlayProps) {
           position={[photo.lat, photo.lng]}
           icon={photoIcon}
         >
-          <Popup>
-            <div style={{ textAlign: 'center' }}>
+          <Popup maxWidth={220} minWidth={220}>
+            <div style={{ textAlign: 'center', margin: '-1px' }}>
               <img
                 src={photo.url}
                 alt={photo.caption || 'Activity photo'}
                 style={{
-                  maxWidth: '150px',
-                  maxHeight: '150px',
+                  width: '100%',
+                  display: 'block',
                   borderRadius: '4px',
                 }}
               />
