@@ -13,8 +13,15 @@ export interface SessionData {
   oauthState?: string;
 }
 
+const sessionSecret = process.env.SESSION_SECRET;
+if (!sessionSecret || sessionSecret.length < 32) {
+  throw new Error(
+    'SESSION_SECRET env var is required and must be at least 32 characters',
+  );
+}
+
 const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET!,
+  password: sessionSecret,
   cookieName: 'plotv2_session',
   cookieOptions: {
     secure: process.env.NODE_ENV === 'production',

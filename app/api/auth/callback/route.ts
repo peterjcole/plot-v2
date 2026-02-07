@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   // Clear the state so it can't be replayed
   delete session.oauthState;
+  await session.save();
 
   const tokenRes = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',

@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     await session.save();
   }
 
-  const page = parseInt(request.nextUrl.searchParams.get('page') || '1', 10);
-  const perPage = parseInt(request.nextUrl.searchParams.get('perPage') || '20', 10);
+  const page = Math.max(1, parseInt(request.nextUrl.searchParams.get('page') || '1', 10) || 1);
+  const perPage = Math.min(200, Math.max(1, parseInt(request.nextUrl.searchParams.get('perPage') || '20', 10) || 20));
 
   const activities = await getAthleteActivities(session.accessToken, page, perPage);
 
