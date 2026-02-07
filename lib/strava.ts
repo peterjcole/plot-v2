@@ -5,6 +5,10 @@ const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 
 /** Refreshes the token in-place if near expiry. Returns true if a refresh occurred. */
 export async function refreshTokenIfNeeded(session: SessionData): Promise<boolean> {
+  if (!session.expiresAt || !session.refreshToken) {
+    return false;
+  }
+
   // Refresh if within 5 minutes of expiry
   if (session.expiresAt > Date.now() / 1000 + 300) {
     return false;

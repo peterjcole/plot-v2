@@ -3,6 +3,14 @@ import { randomBytes } from 'crypto';
 import { getSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const clientId = process.env.STRAVA_CLIENT_ID;
+  if (!clientId) {
+    return NextResponse.json(
+      { error: 'STRAVA_CLIENT_ID is not configured' },
+      { status: 500 },
+    );
+  }
+
   const session = await getSession();
   const state = randomBytes(32).toString('hex');
   session.oauthState = state;
@@ -11,7 +19,7 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${request.nextUrl.origin}/api/auth/callback`;
 
   const params = new URLSearchParams({
-    client_id: process.env.STRAVA_CLIENT_ID!,
+    client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: 'activity:read_all',

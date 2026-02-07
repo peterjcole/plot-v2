@@ -2,10 +2,10 @@ import { getIronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 
 export interface SessionData {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-  athlete: {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  athlete?: {
     id: number;
     firstname: string;
     lastname: string;

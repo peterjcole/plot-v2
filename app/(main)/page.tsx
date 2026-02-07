@@ -17,7 +17,7 @@ export default async function Home() {
               </h1>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {session.athlete.firstname} {session.athlete.lastname}
+                  {session.athlete?.firstname} {session.athlete?.lastname}
                 </span>
                 <form action="/api/auth/logout" method="POST" className="inline">
                   <button

@@ -136,7 +136,7 @@ export default function ActivityList() {
       <div className="mt-4 flex items-center justify-between">
         <button
           onClick={() => { setLoading(true); setPage((p) => Math.max(1, p - 1)); }}
-          disabled={page === 1}
+          disabled={loading || page === 1}
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Previous
@@ -146,7 +146,7 @@ export default function ActivityList() {
         </span>
         <button
           onClick={() => { setLoading(true); setPage((p) => p + 1); }}
-          disabled={!hasMore}
+          disabled={loading || !hasMore}
           className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
         >
           Next

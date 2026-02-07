@@ -6,7 +6,7 @@ export default function RenderLayout({
   return (
     <html>
       <head>
-        <meta httpEquiv="Referrer-Policy" content="no-referrer" />
+        <meta name="referrer" content="no-referrer" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
