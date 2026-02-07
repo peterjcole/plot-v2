@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBrowser } from '@/lib/puppeteer';
+import { getSession } from '@/lib/auth';
+import { refreshTokenIfNeeded } from '@/lib/strava';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
+  const session = await getSession();
+
+  if (!session.accessToken) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  if (await refreshTokenIfNeeded(session)) {
+    await session.save();
+  }
+
   const searchParams = request.nextUrl.searchParams;
 
   const activityId = searchParams.get('activityId');
@@ -38,11 +50,11 @@ export async function GET(request: NextRequest) {
     page.on('pageerror', (err) => pageLogs.push(`[error] ${String(err)}`));
 
     // Build the URL for the render page
-    const protocol = request.headers.get('x-forwarded-proto') || 'http';
-    const host = request.headers.get('host') || 'localhost:3000';
+    const origin = request.nextUrl.origin;
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
-    const renderUrl = `${protocol}://${host}/render/${activityId}?width=${width}&height=${height}${bypassParam}`;
+    const token = encodeURIComponent(session.accessToken);
+    const renderUrl = `${origin}/render/${activityId}?width=${width}&height=${height}&token=${token}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',
@@ -69,7 +81,14 @@ export async function GET(request: NextRequest) {
     if (debug) {
       const html = await page.content();
       await page.close();
-      return NextResponse.json({ logs: pageLogs, url: renderUrl, html: html.substring(0, 5000) });
+      // Strip sensitive params from URL before exposing in debug response
+      const debugUrl = new URL(renderUrl);
+      debugUrl.searchParams.set('token', '[REDACTED]');
+      if (debugUrl.searchParams.has('x-vercel-protection-bypass')) {
+        debugUrl.searchParams.set('x-vercel-protection-bypass', '[REDACTED]');
+      }
+      const safeUrl = debugUrl.toString();
+      return NextResponse.json({ logs: pageLogs, url: safeUrl, html: html.substring(0, 5000) });
     }
 
     await page.close();
