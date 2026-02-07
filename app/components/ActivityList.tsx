@@ -79,13 +79,13 @@ export default function ActivityList() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-zinc-200 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2 text-right">Distance</th>
-              <th className="px-3 py-2 text-right">Time</th>
-              <th className="px-3 py-2 text-right">Elevation</th>
-              <th className="px-3 py-2"></th>
+              <th scope="col" className="px-3 py-2">Date</th>
+              <th scope="col" className="px-3 py-2">Name</th>
+              <th scope="col" className="px-3 py-2">Type</th>
+              <th scope="col" className="px-3 py-2 text-right">Distance</th>
+              <th scope="col" className="px-3 py-2 text-right">Time</th>
+              <th scope="col" className="px-3 py-2 text-right">Elevation</th>
+              <th scope="col" className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
