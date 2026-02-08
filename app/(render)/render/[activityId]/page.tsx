@@ -11,8 +11,8 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
   const { width: widthParam, height: heightParam, fixed, token } = await searchParams;
 
   const useFixedSize = fixed === 'true';
-  const fixedWidth = useFixedSize ? parseInt(widthParam || '1720', 10) : undefined;
-  const fixedHeight = useFixedSize ? parseInt(heightParam || '1080', 10) : undefined;
+  const fixedWidth = useFixedSize ? parseInt(widthParam || '860', 10) : undefined;
+  const fixedHeight = useFixedSize ? parseInt(heightParam || '540', 10) : undefined;
 
   if (!token && !activityId.startsWith('mock-')) {
     return <div>Missing access token</div>;

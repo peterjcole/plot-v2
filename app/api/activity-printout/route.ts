@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { getBrowser } from '@/lib/puppeteer';
 import { getSession } from '@/lib/auth';
 import { refreshTokenIfNeeded } from '@/lib/strava';
@@ -28,11 +29,11 @@ export async function GET(request: NextRequest) {
   }
 
   const width = Math.min(
-    Math.max(parseInt(searchParams.get('width') || '1720', 10), 100),
+    Math.max(parseInt(searchParams.get('width') || '860', 10), 100),
     4096
   );
   const height = Math.min(
-    Math.max(parseInt(searchParams.get('height') || '1080', 10), 100),
+    Math.max(parseInt(searchParams.get('height') || '540', 10), 100),
     4096
   );
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     const browser = await getBrowser();
     const page = await browser.newPage();
 
-    await page.setViewport({ width, height });
+    await page.setViewport({ width, height, deviceScaleFactor: 2 });
 
     // Capture browser console for debugging
     const pageLogs: string[] = [];
@@ -73,10 +74,13 @@ export async function GET(request: NextRequest) {
     // Small delay for any final rendering
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    const screenshot = await page.screenshot({
-      type: format,
-      ...(format === 'jpeg' && { quality: 90 }),
-    });
+    const screenshot = await page.screenshot({ type: 'png' });
+
+    // Downscale 2x render back to requested dimensions (supersampling)
+    const resized = await sharp(Buffer.from(screenshot))
+      // .resize(width, height)
+      .toFormat(format, { ...(format === 'jpeg' && { quality: 90 }) })
+      .toBuffer();
 
     if (debug) {
       const html = await page.content();
@@ -95,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     const contentType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
 
-    return new NextResponse(Buffer.from(screenshot), {
+    return new NextResponse(new Uint8Array(resized), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600, s-maxage=3600',

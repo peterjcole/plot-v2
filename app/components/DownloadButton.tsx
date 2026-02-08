@@ -12,7 +12,7 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
   async function handleDownload() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}`, {
+      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}&format=jpeg`, {
         cache: 'no-store',
       });
       if (!res.ok) throw new Error('Download failed');
@@ -20,7 +20,7 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `activity-${activityId}.png`;
+      a.download = `activity-${activityId}.jpg`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -47,7 +47,7 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
         </svg>
       )}
       <span aria-live="polite">
-        {loading ? 'Generating...' : 'Download PNG'}
+        {loading ? 'Generating...' : 'Download JPEG'}
       </span>
     </button>
   );

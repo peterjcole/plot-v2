@@ -84,7 +84,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
               marginBottom: 8,
               borderRadius: 4,
               overflow: 'hidden',
-              border: '2px solid #333333',
+              border: '1px solid #333333',
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             }}
           >
