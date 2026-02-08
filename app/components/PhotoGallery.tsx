@@ -33,7 +33,7 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
           key={photo.id}
           ref={(el) => { itemRefs.current[index] = el; }}
           className="relative break-inside-avoid"
-          style={{ marginBottom: 4 }}
+          style={{ marginBottom: 4, display: 'inline-block', width: '100%', marginTop: 0 }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
