@@ -12,7 +12,9 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
   async function handleDownload() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}`);
+      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

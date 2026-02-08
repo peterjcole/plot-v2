@@ -65,10 +65,101 @@ export async function getAthleteActivities(
   }));
 }
 
+function getMockGalleryActivity(): ActivityData {
+  // A loop route around the Lake District
+  const route: [number, number][] = [
+    [54.4500, -3.0000],
+    [54.4550, -2.9900],
+    [54.4600, -2.9750],
+    [54.4650, -2.9600],
+    [54.4700, -2.9500],
+    [54.4720, -2.9350],
+    [54.4700, -2.9200],
+    [54.4650, -2.9100],
+    [54.4580, -2.9050],
+    [54.4500, -2.9100],
+    [54.4420, -2.9150],
+    [54.4380, -2.9300],
+    [54.4400, -2.9500],
+    [54.4430, -2.9700],
+    [54.4470, -2.9850],
+    [54.4500, -3.0000],
+  ];
+
+  // Mix of landscape, portrait, and square aspect ratios
+  const photoSizes = [
+    '600/400', // 1 - landscape
+    '400/600', // 2 - portrait
+    '600/400', // 3 - landscape
+    '500/500', // 4 - square
+    '400/600', // 5 - portrait
+    '600/400', // 6 - landscape
+    '600/400', // 7 - landscape
+    '400/600', // 8 - portrait
+    '500/500', // 9 - square
+    '600/400', // 10 - landscape
+  ];
+
+  // Place photos 3-6 close together to test clustering
+  const photoPositions: [number, number][] = [
+    route[1],                  // 1 - near start
+    route[3],                  // 2 - along the way
+    [54.4700, -2.9480],        // 3 - clustered
+    [54.4705, -2.9460],        // 4 - clustered
+    [54.4695, -2.9500],        // 5 - clustered
+    [54.4710, -2.9470],        // 6 - clustered
+    route[8],                  // 7 - mid route
+    route[10],                 // 8 - later
+    route[12],                 // 9 - near end
+    route[14],                 // 10 - near finish
+  ];
+
+  const photos = photoPositions.map((pos, i) => ({
+    id: `mock-photo-${i + 1}`,
+    url: `https://picsum.photos/seed/hike${i * 7 + 3}/${photoSizes[i]}`,
+    lat: pos[0],
+    lng: pos[1],
+    caption: `Photo ${i + 1}`,
+  }));
+
+  return {
+    id: 'mock-gallery',
+    name: 'Lake District Loop',
+    route,
+    photos,
+    stats: {
+      distance: 18500,
+      movingTime: 7200,
+      elevationGain: 850,
+      averageSpeed: 2.57,
+      maxSpeed: 4.1,
+      startDate: '2025-06-15T09:00:00Z',
+    },
+  };
+}
+
+function getMockSmallGalleryActivity(): ActivityData {
+  const base = getMockGalleryActivity();
+  return {
+    ...base,
+    id: 'mock-small-gallery',
+    name: 'Lake District Loop (3 photos)',
+    photos: [base.photos[0], base.photos[2], base.photos[3]],
+  };
+}
+
 export async function getActivityDetail(
   accessToken: string,
   activityId: string,
 ): Promise<ActivityData> {
+  if (activityId === 'mock-gallery') {
+    return getMockGalleryActivity();
+  }
+
+  if (activityId === 'mock-small-gallery') {
+    return getMockSmallGalleryActivity();
+  }
+
   const res = await fetch(`${STRAVA_API_BASE}/activities/${activityId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });

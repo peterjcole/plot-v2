@@ -10,72 +10,81 @@ import { ActivityPhoto } from '@/lib/types';
 
 interface PhotoOverlayProps {
   photos: ActivityPhoto[];
+  onPinClick?: (index: number) => void;
 }
 
-// Pin/teardrop SVG with camera icon
-const pinIconHtml = `
-  <svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15 38 C15 38, 2 22, 2 14 C2 6.82 7.82 1 15 1 C22.18 1 28 6.82 28 14 C28 22 15 38 15 38Z"
-      fill="white" stroke="#080357" stroke-width="2"/>
-    <g transform="translate(8, 7)">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="#080357">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0-6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9-2h-3.17L15 2H9L6.17 4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H3V6h4.05l2.83-2h6.24l2.83 2H21v14z"/>
-      </svg>
-    </g>
-  </svg>
-`;
+function createNumberedIcon(number: number) {
+  return L.divIcon({
+    className: 'photo-numbered-pin',
+    html: `<div style="
+      width: 28px;
+      height: 28px;
+      background: rgba(8, 3, 87, 0.75);
+      border: 2px solid rgba(51, 51, 51, 0.9);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+    ">${number}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
 
-const photoIcon = L.divIcon({
-  className: 'photo-marker-pin',
-  html: pinIconHtml,
-  iconSize: [30, 40],
-  iconAnchor: [15, 40],
-  popupAnchor: [0, -40],
-});
-
-export default function PhotoOverlay({ photos }: PhotoOverlayProps) {
+export default function PhotoOverlay({ photos, onPinClick }: PhotoOverlayProps) {
   const map = useMap();
 
   useEffect(() => {
     const clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 40,
       iconCreateFunction: (cluster) => {
-        const count = cluster.getChildCount();
+        const markers = cluster.getAllChildMarkers();
+        const numbers = markers
+          .map((m) => (m as L.Marker & { _photoNumber?: number })._photoNumber)
+          .filter((n): n is number => n !== undefined)
+          .sort((a, b) => a - b);
+        const label = numbers.join(', ');
+        const width = Math.max(34, label.length * 8 + 10);
         return L.divIcon({
           html: `<div style="
-            width: 34px;
+            min-width: 34px;
+            width: ${width}px;
             height: 34px;
-            background: white;
-            border: 2px solid #080357;
-            border-radius: 50%;
+            background: rgba(8, 3, 87, 0.75);
+            border: 2px solid rgba(51, 51, 51, 0.9);
+            border-radius: 17px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            color: #080357;
+            color: white;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-          ">${count}</div>`,
+            padding: 0 4px;
+            white-space: nowrap;
+          ">${label}</div>`,
           className: 'photo-cluster-icon',
-          iconSize: L.point(34, 34),
-          iconAnchor: L.point(17, 17),
+          iconSize: L.point(width, 34),
+          iconAnchor: L.point(width / 2, 17),
         });
       },
     });
 
-    photos.forEach((photo) => {
-      const marker = L.marker([photo.lat, photo.lng], { icon: photoIcon });
-      const popupContent = `
-        <div style="text-align: center; margin: -1px;">
-          <img
-            src="${photo.url}"
-            alt="${photo.caption || 'Activity photo'}"
-            style="width: 100%; display: block; border-radius: 4px;"
-          />
-          ${photo.caption ? `<p style="margin: 8px 0 0; font-size: 12px;">${photo.caption}</p>` : ''}
-        </div>
-      `;
-      marker.bindPopup(popupContent, { maxWidth: 220, minWidth: 220 });
+    photos.forEach((photo, index) => {
+      const marker = L.marker([photo.lat, photo.lng], {
+        icon: createNumberedIcon(index + 1),
+      }) as L.Marker & { _photoNumber?: number };
+      marker._photoNumber = index + 1;
+
+      if (onPinClick) {
+        marker.on('click', () => onPinClick(index));
+      }
+
       clusterGroup.addLayer(marker);
     });
 
@@ -84,7 +93,7 @@ export default function PhotoOverlay({ photos }: PhotoOverlayProps) {
     return () => {
       map.removeLayer(clusterGroup);
     };
-  }, [map, photos]);
+  }, [map, photos, onPinClick]);
 
   return null;
 }
