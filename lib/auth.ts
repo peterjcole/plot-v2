@@ -20,7 +20,7 @@ if (!sessionSecret || sessionSecret.length < 32) {
   );
 }
 
-const sessionOptions: SessionOptions = {
+export const sessionOptions: SessionOptions = {
   password: sessionSecret,
   cookieName: 'plotv2_session',
   cookieOptions: {
