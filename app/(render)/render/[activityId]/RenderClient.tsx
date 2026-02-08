@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ActivityData } from '@/lib/types';
 import PhotoBadge from '@/app/components/PhotoBadge';
@@ -22,11 +23,25 @@ const ActivityMap = dynamic(() => import('@/app/components/ActivityMap'), {
 
 interface RenderClientProps {
   activity: ActivityData;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 
-export default function RenderClient({ activity, width, height }: RenderClientProps) {
+export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight }: RenderClientProps) {
+  const [viewportSize, setViewportSize] = useState({ w: fixedWidth ?? 0, h: fixedHeight ?? 0 });
+
+  useEffect(() => {
+    if (fixedWidth && fixedHeight) return;
+    const update = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [fixedWidth, fixedHeight]);
+
+  const width = fixedWidth ?? viewportSize.w;
+  const height = fixedHeight ?? viewportSize.h;
+
+  if (!width || !height) return null;
   const hasPhotos = activity.photos.length > 0;
 
   if (!hasPhotos) {
@@ -34,7 +49,7 @@ export default function RenderClient({ activity, width, height }: RenderClientPr
   }
 
   const columnCount = activity.photos.length <= 3 ? 1 : 2;
-  const galleryRatio = columnCount === 1 ? 0.2 : 0.4;
+  const galleryRatio = columnCount === 1 ? 0.25 : 0.4;
   const galleryWidth = Math.round(width * galleryRatio);
 
   return (

@@ -3,15 +3,16 @@ import RenderClient from './RenderClient';
 
 interface RenderPageProps {
   params: Promise<{ activityId: string }>;
-  searchParams: Promise<{ width?: string; height?: string; token?: string }>;
+  searchParams: Promise<{ width?: string; height?: string; fixed?: string; token?: string }>;
 }
 
 export default async function RenderPage({ params, searchParams }: RenderPageProps) {
   const { activityId } = await params;
-  const { width: widthParam, height: heightParam, token } = await searchParams;
+  const { width: widthParam, height: heightParam, fixed, token } = await searchParams;
 
-  const width = parseInt(widthParam || '1200', 10);
-  const height = parseInt(heightParam || '630', 10);
+  const useFixedSize = fixed === 'true';
+  const fixedWidth = useFixedSize ? parseInt(widthParam || '1720', 10) : undefined;
+  const fixedHeight = useFixedSize ? parseInt(heightParam || '1080', 10) : undefined;
 
   if (!token && !activityId.startsWith('mock-')) {
     return <div>Missing access token</div>;
@@ -20,8 +21,12 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
   const activity = await getActivityDetail(token || '', activityId);
 
   return (
-    <div style={{ width, height, overflow: 'hidden' }}>
-      <RenderClient activity={activity} width={width} height={height} />
+    <div style={{
+      width: fixedWidth ?? '100vw',
+      height: fixedHeight ?? '100vh',
+      overflow: 'hidden',
+    }}>
+      <RenderClient activity={activity} width={fixedWidth} height={fixedHeight} />
     </div>
   );
 }
