@@ -19,8 +19,8 @@ function createNumberedIcon(number: number) {
     html: `<div style="
       width: 28px;
       height: 28px;
-      background: rgba(8, 3, 87, 0.75);
-      border: 2px solid rgba(51, 51, 51, 0.9);
+      background: rgba(74, 90, 43, 0.82);
+      border: 2px solid rgba(58, 71, 34, 0.9);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -28,7 +28,7 @@ function createNumberedIcon(number: number) {
       font-size: 13px;
       font-weight: 700;
       color: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 6px rgba(44,44,36,0.3);
       cursor: pointer;
     ">${number}</div>`,
     iconSize: [28, 28],
@@ -55,8 +55,8 @@ export default function PhotoOverlay({ photos, onPinClick }: PhotoOverlayProps) 
             min-width: 34px;
             width: ${width}px;
             height: 34px;
-            background: rgba(8, 3, 87, 0.75);
-            border: 2px solid rgba(51, 51, 51, 0.9);
+            background: rgba(74, 90, 43, 0.82);
+            border: 2px solid rgba(58, 71, 34, 0.9);
             border-radius: 17px;
             display: flex;
             align-items: center;
@@ -64,7 +64,7 @@ export default function PhotoOverlay({ photos, onPinClick }: PhotoOverlayProps) 
             font-size: 12px;
             font-weight: 600;
             color: white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 6px rgba(44,44,36,0.3);
             padding: 0 4px;
             white-space: nowrap;
           ">${label}</div>`,

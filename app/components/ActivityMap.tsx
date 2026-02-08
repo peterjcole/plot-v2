@@ -47,7 +47,7 @@ function RouteOutlineFilter() {
       // Find the route polyline by stroke color
       const paths = svg.querySelectorAll('path.leaflet-interactive');
       const routePath = Array.from(paths).find(
-        (p) => p.getAttribute('stroke') === '#080357'
+        (p) => p.getAttribute('stroke') === '#4A5A2B'
       );
       if (!routePath) return;
 
@@ -70,7 +70,7 @@ function RouteOutlineFilter() {
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
           '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
-          '<feFlood flood-color="#333333" flood-opacity="0.9" result="color"/>',
+          '<feFlood flood-color="#3A4722" flood-opacity="0.85" result="color"/>',
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
           // Subtract original stroke area so outline only appears outside
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
@@ -164,7 +164,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
     : [54.4, -2.9];
 
   return (
-    <div style={{ width, height, position: 'relative' }}>
+    <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
       <MapContainer
         center={center}
         zoom={7}
@@ -183,9 +183,9 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         <Polyline
           positions={route}
           pathOptions={{
-            color: '#080357',
-            weight: 4,
-            opacity: 0.2,
+            color: '#4A5A2B',
+            weight: 5,
+            opacity: 0.35,
           }}
         />
         <RouteOutlineFilter />

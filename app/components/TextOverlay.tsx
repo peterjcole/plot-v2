@@ -50,9 +50,9 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
         bottom: 0,
         left: 0,
         right: 0,
-        background: 'linear-gradient(transparent, rgba(8,3,87,0.75))',
-        color: 'white',
-        padding: '40px 20px 20px',
+        background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
+        color: '#1C1814',
+        padding: '60px 24px 20px',
         zIndex: 1000,
       }}
     >
@@ -61,7 +61,8 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
           margin: '0 0 8px',
           fontSize: '24px',
           fontWeight: 'bold',
-          textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+          letterSpacing: '-0.01em',
+          textShadow: '0 1px 2px rgba(255,248,236,0.6)',
         }}
       >
         {activity.name}
@@ -69,8 +70,8 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
       <p
         style={{
           margin: '0 0 12px',
-          fontSize: '14px',
-          opacity: 0.9,
+          fontSize: '13px',
+          fontWeight: 400,
         }}
       >
         {formatDate(activity.stats.startDate)}
@@ -83,28 +84,28 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
         }}
       >
         <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
             {formatDistance(activity.stats.distance)}
           </div>
-          <div style={{ fontSize: '12px', opacity: 0.8 }}>Distance</div>
+          <div style={{ fontSize: '13px', fontWeight: 400 }}>Distance</div>
         </div>
         <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
             {formatDuration(activity.stats.movingTime)}
           </div>
-          <div style={{ fontSize: '12px', opacity: 0.8 }}>Time</div>
+          <div style={{ fontSize: '13px', fontWeight: 400 }}>Time</div>
         </div>
         <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
             {formatPace(activity.stats.averageSpeed)}
           </div>
-          <div style={{ fontSize: '12px', opacity: 0.8 }}>Pace</div>
+          <div style={{ fontSize: '13px', fontWeight: 400 }}>Pace</div>
         </div>
         <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
             {activity.stats.elevationGain} m
           </div>
-          <div style={{ fontSize: '12px', opacity: 0.8 }}>Elevation</div>
+          <div style={{ fontSize: '13px', fontWeight: 400 }}>Elevation</div>
         </div>
       </div>
     </div>

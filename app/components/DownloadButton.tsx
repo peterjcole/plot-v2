@@ -38,7 +38,7 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
       onClick={handleDownload}
       disabled={loading}
       aria-busy={loading}
-      className="inline-flex items-center gap-2 rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+      className="inline-flex items-center gap-2 rounded-md bg-primary dark:bg-primary-dark px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark dark:hover:bg-primary disabled:opacity-60"
     >
       {loading && (
         <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
