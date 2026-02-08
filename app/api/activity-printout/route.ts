@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const token = encodeURIComponent(session.accessToken);
-    const renderUrl = `${origin}/render/${activityId}?width=${width}&height=${height}&token=${token}${bypassParam}`;
+    const renderUrl = `${origin}/render/${activityId}?token=${token}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',
