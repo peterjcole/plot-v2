@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ActivitySummary } from '@/lib/types';
 
@@ -30,6 +30,32 @@ export default function ActivityList() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const fetchIdRef = useRef(0);
+  const [downloading, setDownloading] = useState<Set<number>>(new Set());
+
+  const handleDownload = useCallback(async (activityId: number) => {
+    setDownloading((prev) => new Set(prev).add(activityId));
+    try {
+      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}`);
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activity-${activityId}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error:', err);
+    } finally {
+      setDownloading((prev) => {
+        const next = new Set(prev);
+        next.delete(activityId);
+        return next;
+      });
+    }
+  }, []);
 
   const perPage = 20;
 
@@ -119,13 +145,21 @@ export default function ActivityList() {
                   >
                     View
                   </Link>
-                  <a
-                    href={`/api/activity-printout?activityId=${a.id}`}
-                    className="text-sm font-medium text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-300"
-                    download
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(a.id)}
+                    disabled={downloading.has(a.id)}
+                    aria-busy={downloading.has(a.id)}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-300"
                   >
-                    Download
-                  </a>
+                    {downloading.has(a.id) && (
+                      <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                    {downloading.has(a.id) ? 'Generating...' : 'Download'}
+                  </button>
                 </td>
               </tr>
             ))}
