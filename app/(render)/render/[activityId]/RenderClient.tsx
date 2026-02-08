@@ -33,7 +33,9 @@ export default function RenderClient({ activity, width, height }: RenderClientPr
     return <ActivityMap activity={activity} width={width} height={height} />;
   }
 
-  const mapWidth = Math.round(width * 0.6);
+  const fewPhotos = activity.photos.length <= 3;
+  const mapRatio = fewPhotos ? 0.8 : 0.6;
+  const mapWidth = Math.round(width * mapRatio);
 
   return (
     <div className="flex bg-zinc-100" style={{ width, height, gap: 4 }}>
@@ -43,7 +45,7 @@ export default function RenderClient({ activity, width, height }: RenderClientPr
       <div className="flex-1 overflow-hidden">
         <PhotoGallery
           photos={activity.photos}
-          columnCount={activity.photos.length <= 2 ? 1 : 2}
+          columnCount={fewPhotos ? 1 : 2}
         />
       </div>
     </div>
