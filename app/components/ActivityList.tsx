@@ -105,13 +105,16 @@ export default function ActivityList() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-zinc-200 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-              <th scope="col" className="px-3 py-2">Date</th>
-              <th scope="col" className="px-3 py-2">Name</th>
-              <th scope="col" className="px-3 py-2">Type</th>
-              <th scope="col" className="px-3 py-2 text-right">Distance</th>
-              <th scope="col" className="px-3 py-2 text-right">Time</th>
-              <th scope="col" className="px-3 py-2 text-right">Elevation</th>
-              <th scope="col" className="px-3 py-2"></th>
+              {/* Mobile: combined column */}
+              <th scope="col" className="px-2 py-1.5 sm:hidden">Activity</th>
+              {/* Desktop: separate columns */}
+              <th scope="col" className="hidden px-3 py-2 sm:table-cell">Date</th>
+              <th scope="col" className="hidden px-3 py-2 sm:table-cell">Name</th>
+              <th scope="col" className="hidden px-3 py-2 sm:table-cell">Type</th>
+              <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Distance</th>
+              <th scope="col" className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Time</th>
+              <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Elevation</th>
+              <th scope="col" className="px-2 py-1.5 sm:px-3 sm:py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -120,25 +123,33 @@ export default function ActivityList() {
                 key={a.id}
                 className="border-b border-zinc-100 dark:border-zinc-800"
               >
-                <td className="whitespace-nowrap px-3 py-2 text-zinc-500 dark:text-zinc-400">
+                {/* Mobile: stacked cell */}
+                <td className="px-2 py-1.5 sm:hidden">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100">{a.name}</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {formatDate(a.startDate)} · {formatDistance(a.distance)}
+                  </div>
+                </td>
+                {/* Desktop: separate cells */}
+                <td className="hidden whitespace-nowrap px-3 py-2 text-zinc-500 sm:table-cell dark:text-zinc-400">
                   {formatDate(a.startDate)}
                 </td>
-                <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-100">
+                <td className="hidden px-3 py-2 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">
                   {a.name}
                 </td>
-                <td className="px-3 py-2 text-zinc-500 dark:text-zinc-400">
+                <td className="hidden px-3 py-2 text-zinc-500 sm:table-cell dark:text-zinc-400">
                   {a.type}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right text-zinc-700 dark:text-zinc-300">
+                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-zinc-700 sm:table-cell dark:text-zinc-300">
                   {formatDistance(a.distance)}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right text-zinc-700 dark:text-zinc-300">
+                <td className="whitespace-nowrap px-2 py-1.5 text-right text-zinc-700 sm:px-3 sm:py-2 dark:text-zinc-300">
                   {formatDuration(a.movingTime)}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right text-zinc-700 dark:text-zinc-300">
+                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-zinc-700 sm:table-cell dark:text-zinc-300">
                   {a.elevationGain.toFixed(0)}m
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right">
+                <td className="whitespace-nowrap px-2 py-1.5 text-right sm:px-3 sm:py-2">
                   <Link
                     href={`/activity/${a.id}`}
                     className="mr-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"

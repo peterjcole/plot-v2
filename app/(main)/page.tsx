@@ -8,10 +8,10 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="w-full max-w-4xl px-6 py-12">
+      <main className="w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
         {isLoggedIn ? (
           <>
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
               <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
                 Activities
               </h1>

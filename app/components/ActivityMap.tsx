@@ -68,7 +68,7 @@ function RouteOutlineFilter() {
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
           '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
-          '<feFlood flood-color="#333333" flood-opacity="0.8" result="color"/>',
+          '<feFlood flood-color="#333333" flood-opacity="0.9" result="color"/>',
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
           // Subtract original stroke area so outline only appears outside
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
