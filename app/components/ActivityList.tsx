@@ -35,13 +35,13 @@ export default function ActivityList() {
   const handleDownload = useCallback(async (activityId: number) => {
     setDownloading((prev) => new Set(prev).add(activityId));
     try {
-      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}`);
+      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}&format=jpeg`);
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `activity-${activityId}.png`;
+      a.download = `activity-${activityId}.jpg`;
       document.body.appendChild(a);
       a.click();
       a.remove();
