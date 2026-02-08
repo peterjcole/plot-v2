@@ -26,14 +26,14 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
     <div
       ref={containerRef}
       className="overflow-y-auto"
-      style={{ columns: columnCount, columnGap: 4 }}
+      style={{ columns: columnCount, columnGap: 4, fontSize: 0 }}
     >
       {photos.map((photo, index) => (
         <div
           key={photo.id}
           ref={(el) => { itemRefs.current[index] = el; }}
           className="relative break-inside-avoid"
-          style={{ marginBottom: 4, display: 'inline-block', width: '100%', marginTop: 0 }}
+          style={{ marginBottom: 4 }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
