@@ -28,22 +28,26 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
       className="overflow-y-auto"
       style={{ columns: columnCount, columnGap: 4, fontSize: 0, lineHeight: 0 }}
     >
-      {photos.map((photo, index) => (
-        <div
-          key={photo.id}
-          ref={(el) => { itemRefs.current[index] = el; }}
-          className="relative break-inside-avoid"
-          style={{ marginBottom: 4 }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photo.url}
-            alt={photo.caption || `Photo ${index + 1}`}
-            className="block w-full"
-          />
-          <PhotoBadge number={index + 1} />
-        </div>
-      ))}
+      {photos.map((photo, index) => {
+        // Don't apply marginBottom to last item (Safari fix)
+        const isLast = index === photos.length - 1;
+        return (
+          <div
+            key={photo.id}
+            ref={(el) => { itemRefs.current[index] = el; }}
+            className="relative break-inside-avoid"
+            style={{ marginBottom: isLast ? 0 : 4 }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photo.url}
+              alt={photo.caption || `Photo ${index + 1}`}
+              className="block w-full"
+            />
+            <PhotoBadge number={index + 1} />
+          </div>
+        );
+      })}
     </div>
   );
 }

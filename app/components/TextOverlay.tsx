@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ActivityData } from '@/lib/types';
 
 interface TextOverlayProps {
@@ -44,213 +44,126 @@ function formatDate(isoString: string): string {
 }
 
 export default function TextOverlay({ activity }: TextOverlayProps) {
-  const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    
-    let timeoutId: NodeJS.Timeout;
-    const debouncedCheck = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(checkMobile, 150);
-    };
-    
-    window.addEventListener('resize', debouncedCheck);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', debouncedCheck);
-    };
-  }, []);
-
-  // Don't render anything until we know if it's mobile or desktop (prevents hydration mismatch)
-  if (isMobile === null) {
-    return null;
-  }
-
-  // On mobile, show minimal info at top or full info when button clicked
-  if (isMobile) {
-    return (
-      <>
-        {/* Minimal distance at top */}
-        <div
+  return (
+    <>
+      {/* Mobile: Minimal distance at top with toggle button */}
+      <div
+        className="md:hidden absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 z-[1000]"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(255,248,236,0.88) 0%, rgba(255,248,236,0.5) 70%, transparent 100%)',
+          color: '#1C1814',
+        }}
+      >
+        <div className="text-sm font-semibold">
+          {formatDistance(activity.stats.distance)}
+        </div>
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="px-3 py-1.5 text-[13px] font-medium rounded cursor-pointer border-none"
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            background: 'linear-gradient(to bottom, rgba(255,248,236,0.88) 0%, rgba(255,248,236,0.5) 70%, transparent 100%)',
-            color: '#1C1814',
-            padding: '12px 16px',
-            zIndex: 1000,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            background: '#4A5A2B',
+            color: '#FFF8EC',
           }}
         >
-          <div style={{ fontSize: '14px', fontWeight: 600 }}>
-            {formatDistance(activity.stats.distance)}
-          </div>
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            style={{
-              background: '#4A5A2B',
-              color: '#FFF8EC',
-              border: 'none',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            {showDetails ? 'Hide Info' : 'More Info'}
-          </button>
-        </div>
+          {showDetails ? 'Hide Info' : 'More Info'}
+        </button>
+      </div>
 
-        {/* Full details overlay when button clicked */}
-        {showDetails && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
-              color: '#1C1814',
-              padding: '60px 16px 20px',
-              zIndex: 1000,
-            }}
-          >
-            <h1
-              style={{
-                margin: '0 0 6px',
-                fontSize: '20px',
-                fontWeight: 'bold',
-                letterSpacing: '-0.01em',
-                textShadow: '0 1px 2px rgba(255,248,236,0.6)',
-              }}
-            >
-              {activity.name}
-            </h1>
-            <p
-              style={{
-                margin: '0 0 12px',
-                fontSize: '12px',
-                fontWeight: 400,
-              }}
-            >
-              {formatDate(activity.stats.startDate)}
-            </p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '16px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-                  {formatDistance(activity.stats.distance)}
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 400 }}>Distance</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-                  {formatDuration(activity.stats.movingTime)}
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 400 }}>Time</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-                  {formatPace(activity.stats.averageSpeed)}
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 400 }}>Pace</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-                  {activity.stats.elevationGain} m
-                </div>
-                <div style={{ fontSize: '12px', fontWeight: 400 }}>Elevation</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  // Desktop: show full overlay at bottom (original behavior)
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
-        color: '#1C1814',
-        padding: '60px 24px 20px',
-        zIndex: 1000,
-      }}
-    >
-      <h1
-        style={{
-          margin: '0 0 8px',
-          fontSize: '24px',
-          fontWeight: 'bold',
-          letterSpacing: '-0.01em',
-          textShadow: '0 1px 2px rgba(255,248,236,0.6)',
-        }}
-      >
-        {activity.name}
-      </h1>
-      <p
-        style={{
-          margin: '0 0 12px',
-          fontSize: '13px',
-          fontWeight: 400,
-        }}
-      >
-        {formatDate(activity.stats.startDate)}
-      </p>
+      {/* Mobile: Full details overlay when button clicked */}
       <div
+        className={`md:hidden absolute bottom-0 left-0 right-0 px-4 pt-[60px] pb-5 z-[1000] ${showDetails ? 'block' : 'hidden'}`}
         style={{
-          display: 'flex',
-          gap: '24px',
-          flexWrap: 'wrap',
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
+          color: '#1C1814',
         }}
       >
-        <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-            {formatDistance(activity.stats.distance)}
+        <h1
+          className="m-0 mb-1.5 text-[20px] font-bold tracking-tight"
+          style={{
+            textShadow: '0 1px 2px rgba(255,248,236,0.6)',
+          }}
+        >
+          {activity.name}
+        </h1>
+        <p className="m-0 mb-3 text-xs">
+          {formatDate(activity.stats.startDate)}
+        </p>
+        <div className="flex gap-4 flex-wrap">
+          <div>
+            <div className="text-lg font-bold tracking-tight">
+              {formatDistance(activity.stats.distance)}
+            </div>
+            <div className="text-xs">Distance</div>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 400 }}>Distance</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-            {formatDuration(activity.stats.movingTime)}
+          <div>
+            <div className="text-lg font-bold tracking-tight">
+              {formatDuration(activity.stats.movingTime)}
+            </div>
+            <div className="text-xs">Time</div>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 400 }}>Time</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-            {formatPace(activity.stats.averageSpeed)}
+          <div>
+            <div className="text-lg font-bold tracking-tight">
+              {formatPace(activity.stats.averageSpeed)}
+            </div>
+            <div className="text-xs">Pace</div>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 400 }}>Pace</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-            {activity.stats.elevationGain} m
+          <div>
+            <div className="text-lg font-bold tracking-tight">
+              {activity.stats.elevationGain} m
+            </div>
+            <div className="text-xs">Elevation</div>
           </div>
-          <div style={{ fontSize: '13px', fontWeight: 400 }}>Elevation</div>
         </div>
       </div>
-    </div>
+
+      {/* Desktop: Full overlay at bottom (always visible) */}
+      <div
+        className="hidden md:block absolute bottom-0 left-0 right-0 px-6 pt-[60px] pb-5 z-[1000]"
+        style={{
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
+          color: '#1C1814',
+        }}
+      >
+        <h1
+          className="m-0 mb-2 text-2xl font-bold tracking-tight"
+          style={{
+            textShadow: '0 1px 2px rgba(255,248,236,0.6)',
+          }}
+        >
+          {activity.name}
+        </h1>
+        <p className="m-0 mb-3 text-[13px]">
+          {formatDate(activity.stats.startDate)}
+        </p>
+        <div className="flex gap-6 flex-wrap">
+          <div>
+            <div className="text-xl font-bold tracking-tight">
+              {formatDistance(activity.stats.distance)}
+            </div>
+            <div className="text-[13px]">Distance</div>
+          </div>
+          <div>
+            <div className="text-xl font-bold tracking-tight">
+              {formatDuration(activity.stats.movingTime)}
+            </div>
+            <div className="text-[13px]">Time</div>
+          </div>
+          <div>
+            <div className="text-xl font-bold tracking-tight">
+              {formatPace(activity.stats.averageSpeed)}
+            </div>
+            <div className="text-[13px]">Pace</div>
+          </div>
+          <div>
+            <div className="text-xl font-bold tracking-tight">
+              {activity.stats.elevationGain} m
+            </div>
+            <div className="text-[13px]">Elevation</div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
