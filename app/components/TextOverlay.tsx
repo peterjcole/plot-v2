@@ -44,7 +44,7 @@ function formatDate(isoString: string): string {
 }
 
 export default function TextOverlay({ activity }: TextOverlayProps) {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
@@ -53,10 +53,25 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
     };
     
     checkMobile();
-    window.addEventListener('resize', checkMobile);
     
-    return () => window.removeEventListener('resize', checkMobile);
+    let timeoutId: NodeJS.Timeout;
+    const debouncedCheck = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(checkMobile, 150);
+    };
+    
+    window.addEventListener('resize', debouncedCheck);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', debouncedCheck);
+    };
   }, []);
+
+  // Don't render anything until we know if it's mobile or desktop (prevents hydration mismatch)
+  if (isMobile === null) {
+    return null;
+  }
 
   // On mobile, show minimal info at top or full info when button clicked
   if (isMobile) {
