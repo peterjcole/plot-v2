@@ -32,6 +32,7 @@ interface ActivityMapProps {
   activity: ActivityData;
   width: number;
   height: number;
+  paddingRight?: number;
   onPinClick?: (index: number) => void;
 }
 
@@ -97,15 +98,18 @@ function RouteOutlineFilter() {
   return null;
 }
 
-function MapController({ route }: { route: [number, number][] }) {
+function MapController({ route, paddingRight = 0 }: { route: [number, number][]; paddingRight?: number }) {
   const map = useMap();
 
   useEffect(() => {
     if (route.length > 0) {
       const bounds = L.latLngBounds(route.map(([lat, lng]) => [lat, lng]));
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, {
+        paddingTopLeft: [50, 50] as L.PointExpression,
+        paddingBottomRight: [paddingRight + 50, 50] as L.PointExpression,
+      });
     }
-  }, [map, route]);
+  }, [map, route, paddingRight]);
 
   return null;
 }
@@ -150,7 +154,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, onPinClick }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -185,7 +189,7 @@ export default function ActivityMap({ activity, width, height, onPinClick }: Act
           }}
         />
         <RouteOutlineFilter />
-        <MapController route={route} />
+        <MapController route={route} paddingRight={paddingRight} />
         <TileLoadHandler />
         <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} />
       </MapContainer>

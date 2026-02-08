@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { ActivityPhoto } from '@/lib/types';
+import PhotoBadge from './PhotoBadge';
 
 interface PhotoGalleryProps {
   photos: ActivityPhoto[];
@@ -40,21 +41,7 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
             alt={photo.caption || `Photo ${index + 1}`}
             className="block w-full"
           />
-          <div
-            className="absolute left-1 top-1 flex items-center justify-center rounded-full"
-            style={{
-              width: 22,
-              height: 22,
-              background: 'rgba(8, 3, 87, 0.75)',
-              border: '2px solid white',
-              fontSize: 11,
-              fontWeight: 700,
-              color: 'white',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-            }}
-          >
-            {index + 1}
-          </div>
+          <PhotoBadge number={index + 1} />
         </div>
       ))}
     </div>

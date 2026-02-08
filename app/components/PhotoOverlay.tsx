@@ -20,7 +20,7 @@ function createNumberedIcon(number: number) {
       width: 28px;
       height: 28px;
       background: rgba(8, 3, 87, 0.75);
-      border: 2px solid white;
+      border: 2px solid rgba(51, 51, 51, 0.9);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -56,7 +56,7 @@ export default function PhotoOverlay({ photos, onPinClick }: PhotoOverlayProps) 
             width: ${width}px;
             height: 34px;
             background: rgba(8, 3, 87, 0.75);
-            border: 2px solid white;
+            border: 2px solid rgba(51, 51, 51, 0.9);
             border-radius: 17px;
             display: flex;
             align-items: center;
