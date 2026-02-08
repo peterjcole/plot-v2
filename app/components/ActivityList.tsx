@@ -45,7 +45,7 @@ export default function ActivityList() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (err) {
       console.error('Download error:', err);
     } finally {

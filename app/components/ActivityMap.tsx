@@ -83,9 +83,14 @@ function RouteOutlineFilter() {
       routePath.setAttribute('filter', 'url(#route-outline)');
     };
 
-    // Delay to ensure the polyline has rendered
+    // Apply after initial render and reapply on zoom/pan (Leaflet recreates SVG paths)
     const timer = setTimeout(apply, 500);
-    return () => clearTimeout(timer);
+    map.on('moveend', apply);
+
+    return () => {
+      clearTimeout(timer);
+      map.off('moveend', apply);
+    };
   }, [map]);
 
   return null;
