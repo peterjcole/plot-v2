@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
   }
 
   const width = Math.min(
-    Math.max(parseInt(searchParams.get('width') || '1200', 10), 100),
+    Math.max(parseInt(searchParams.get('width') || '1720', 10), 100),
     4096
   );
   const height = Math.min(
-    Math.max(parseInt(searchParams.get('height') || '630', 10), 100),
+    Math.max(parseInt(searchParams.get('height') || '1080', 10), 100),
     4096
   );
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';

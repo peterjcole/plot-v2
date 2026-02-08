@@ -34,6 +34,68 @@ interface ActivityMapProps {
   height: number;
 }
 
+function RouteOutlineFilter() {
+  const map = useMap();
+
+  useEffect(() => {
+    const apply = () => {
+      const svg = map.getContainer().querySelector('svg');
+      if (!svg) return;
+
+      // Find the route polyline by stroke color
+      const paths = svg.querySelectorAll('path.leaflet-interactive');
+      const routePath = Array.from(paths).find(
+        (p) => p.getAttribute('stroke') === '#080357'
+      );
+      if (!routePath) return;
+
+      // Inject filter defs into Leaflet's SVG
+      let defs = svg.querySelector('defs');
+      if (!defs) {
+        defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        svg.insertBefore(defs, svg.firstChild);
+      }
+
+      if (!defs.querySelector('#route-outline')) {
+        const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+        filter.setAttribute('id', 'route-outline');
+        filter.setAttribute('x', '-20%');
+        filter.setAttribute('y', '-20%');
+        filter.setAttribute('width', '140%');
+        filter.setAttribute('height', '140%');
+        filter.innerHTML = [
+          '<feComponentTransfer in="SourceAlpha" result="opaque-alpha">',
+          '  <feFuncA type="linear" slope="100" intercept="0"/>',
+          '</feComponentTransfer>',
+          '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
+          '<feFlood flood-color="#333333" flood-opacity="0.9" result="color"/>',
+          '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
+          // Subtract original stroke area so outline only appears outside
+          '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
+          '<feMerge>',
+          '  <feMergeNode in="border-only"/>',
+          '  <feMergeNode in="SourceGraphic"/>',
+          '</feMerge>',
+        ].join('');
+        defs.appendChild(filter);
+      }
+
+      routePath.setAttribute('filter', 'url(#route-outline)');
+    };
+
+    // Apply after initial render and reapply on zoom/pan (Leaflet recreates SVG paths)
+    const timer = setTimeout(apply, 500);
+    map.on('moveend', apply);
+
+    return () => {
+      clearTimeout(timer);
+      map.off('moveend', apply);
+    };
+  }, [map]);
+
+  return null;
+}
+
 function MapController({ route }: { route: [number, number][] }) {
   const map = useMap();
 
@@ -88,8 +150,12 @@ function TileLoadHandler() {
 }
 
 export default function ActivityMap({ activity, width, height }: ActivityMapProps) {
-  const center: [number, number] = activity.route.length > 0
-    ? activity.route[Math.floor(activity.route.length / 2)]
+  const route = activity.route.filter(
+    ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
+  );
+
+  const center: [number, number] = route.length > 0
+    ? route[Math.floor(route.length / 2)]
     : [54.4, -2.9];
 
   return (
@@ -110,14 +176,15 @@ export default function ActivityMap({ activity, width, height }: ActivityMapProp
           minNativeZoom={8}
         />
         <Polyline
-          positions={activity.route}
+          positions={route}
           pathOptions={{
             color: '#080357',
             weight: 4,
-            opacity: 0.5,
+            opacity: 0.2,
           }}
         />
-        <MapController route={activity.route} />
+        <RouteOutlineFilter />
+        <MapController route={route} />
         <TileLoadHandler />
         <PhotoOverlay photos={activity.photos} />
       </MapContainer>

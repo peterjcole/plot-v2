@@ -25,9 +25,9 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-8">
+        <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-6">
             <Link
               href="/"
               className="text-sm font-medium text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-300"
@@ -38,7 +38,9 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
               {activity.name}
             </h1>
           </div>
-          <DownloadButton activityId={id} />
+          <div className="self-start sm:self-auto">
+            <DownloadButton activityId={id} />
+          </div>
         </div>
         <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
           <ActivityViewClient activity={activity} />
