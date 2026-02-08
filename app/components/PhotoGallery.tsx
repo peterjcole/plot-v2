@@ -26,24 +26,28 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
     <div
       ref={containerRef}
       className="overflow-y-auto"
-      style={{ columns: columnCount, columnGap: 4 }}
+      style={{ columns: columnCount, columnGap: 4, fontSize: 0, lineHeight: 0 }}
     >
-      {photos.map((photo, index) => (
-        <div
-          key={photo.id}
-          ref={(el) => { itemRefs.current[index] = el; }}
-          className="relative break-inside-avoid"
-          style={{ marginBottom: index < photos.length - 1 ? 4 : 0 }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={photo.url}
-            alt={photo.caption || `Photo ${index + 1}`}
-            className="block w-full"
-          />
-          <PhotoBadge number={index + 1} />
-        </div>
-      ))}
+      {photos.map((photo, index) => {
+        const isLast = index === photos.length - 1;
+        return (
+          <div
+            key={photo.id}
+            ref={(el) => { itemRefs.current[index] = el; }}
+            className="relative break-inside-avoid"
+          >
+            <div style={{ paddingBottom: isLast ? 0 : 4 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.url}
+                alt={photo.caption || `Photo ${index + 1}`}
+                className="block w-full"
+              />
+              <PhotoBadge number={index + 1} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

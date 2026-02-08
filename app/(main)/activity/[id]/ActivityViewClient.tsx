@@ -53,7 +53,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
       } else {
         setMaxContainerHeight(null);
         const viewportHeight = hasPhotos
-          ? Math.max(300, window.innerHeight * 0.5)
+          ? Math.max(350, window.innerHeight * 0.7)
           : Math.max(500, window.innerHeight * 0.75);
         setDimensions({ width: containerWidth, height: Math.round(viewportHeight) });
       }
