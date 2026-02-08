@@ -30,23 +30,23 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
+    <div className="min-h-screen bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8">
         <div className="mb-3 flex items-center justify-between sm:mb-6">
           <div>
             <Link
               href="/"
-              className="text-sm font-medium text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-300"
+              className="text-sm font-medium text-primary hover:text-primary-light transition-colors"
             >
               &larr; Back to activities
             </Link>
-            <h1 className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+            <h1 className="mt-1 text-xl font-semibold text-text-primary">
               {activity.name}
             </h1>
           </div>
           <DownloadButton activityId={id} />
         </div>
-        <div className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+        <div className="overflow-hidden rounded-lg border border-border">
           <ActivityViewClient activity={activity} />
         </div>
       </div>

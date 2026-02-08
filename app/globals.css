@@ -1,26 +1,88 @@
 @import "tailwindcss";
 
+/* ===== Light Mode Tokens ===== */
+/* Inspired by Ordnance Survey maps: footpath green (#01A751) and contour orange (#F78F47) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FFF8EC;
+  --foreground: #1C1814;
+
+  --surface: #FFF8EC;
+  --surface-raised: #FFFFFF;
+  --surface-muted: #F5E2C6;
+
+  --border: #E8CCA8;
+  --border-strong: #D4B696;
+
+  --text-primary: #1C1814;
+  --text-secondary: #4D463D;
+  --text-tertiary: #7A7168;
+
+  --primary: #4A5A2B;
+  --primary-light: #6B7F3F;
+  --primary-lighter: #8FA45A;
+  --primary-dark: #3A4722;
+
+  --accent: #D4872B;
+  --accent-light: #E09B45;
 }
 
+/* ===== Dark Mode Tokens ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1C1008;
+    --foreground: #F0ECE6;
+
+    --surface: #1C1008;
+    --surface-raised: #2A1810;
+    --surface-muted: #382414;
+
+    --border: #4A3420;
+    --border-strong: #604830;
+
+    --text-primary: #F0ECE6;
+    --text-secondary: #C0B8AC;
+    --text-tertiary: #8E857A;
+
+    --primary: #A3B86E;
+    --primary-light: #B8CC83;
+    --primary-lighter: #CDDF9C;
+    --primary-dark: #8FA45A;
+
+    --accent: #E09B45;
+    --accent-light: #EBAF62;
+  }
+}
+
+/* ===== Tailwind Theme Integration ===== */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-lighter: var(--primary-lighter);
+  --color-primary-dark: var(--primary-dark);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Pin map rendering to light mode so dark mode never affects route line, pins, or overlay */
+.leaflet-container {
+  color-scheme: only light;
+  color: #1C1814;
 }

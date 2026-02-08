@@ -14,7 +14,7 @@ const ActivityMap = dynamic(() => import('@/app/components/ActivityMap'), {
       justifyContent: 'center',
       width: '100%',
       height: '100%',
-      background: '#f0f0f0',
+      background: '#FFF8EC',
     }}>
       Loading map...
     </div>
@@ -84,8 +84,8 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
               marginBottom: 8,
               borderRadius: 4,
               overflow: 'hidden',
-              border: '1px solid #333333',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              border: '2px solid #5C5C50',
+              boxShadow: '0 2px 8px rgba(44,44,36,0.18)',
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}

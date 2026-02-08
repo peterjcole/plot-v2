@@ -88,7 +88,7 @@ export default function ActivityList() {
   }, [page]);
 
   if (loading) {
-    return <p className="text-zinc-500">Loading activities...</p>;
+    return <p className="text-text-secondary">Loading activities...</p>;
   }
 
   if (error) {
@@ -96,7 +96,7 @@ export default function ActivityList() {
   }
 
   if (activities.length === 0 && page === 1) {
-    return <p className="text-zinc-500">No activities found.</p>;
+    return <p className="text-text-secondary">No activities found.</p>;
   }
 
   return (
@@ -104,7 +104,7 @@ export default function ActivityList() {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+            <tr className="border-b border-border text-xs font-medium uppercase tracking-wider text-text-tertiary">
               {/* Mobile: combined column */}
               <th scope="col" className="px-2 py-1.5 sm:hidden">Activity</th>
               {/* Desktop: separate columns */}
@@ -121,38 +121,38 @@ export default function ActivityList() {
             {activities.map((a) => (
               <tr
                 key={a.id}
-                className="border-b border-zinc-100 dark:border-zinc-800"
+                className="border-b border-border"
               >
                 {/* Mobile: stacked cell */}
                 <td className="px-2 py-1.5 sm:hidden">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100">{a.name}</div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                  <div className="font-medium text-text-primary">{a.name}</div>
+                  <div className="text-xs text-text-secondary">
                     {formatDate(a.startDate)} · {formatDistance(a.distance)}
                   </div>
                 </td>
                 {/* Desktop: separate cells */}
-                <td className="hidden whitespace-nowrap px-3 py-2 text-zinc-500 sm:table-cell dark:text-zinc-400">
+                <td className="hidden whitespace-nowrap px-3 py-2 text-text-secondary sm:table-cell">
                   {formatDate(a.startDate)}
                 </td>
-                <td className="hidden px-3 py-2 font-medium text-zinc-900 sm:table-cell dark:text-zinc-100">
+                <td className="hidden px-3 py-2 font-medium text-text-primary sm:table-cell">
                   {a.name}
                 </td>
-                <td className="hidden px-3 py-2 text-zinc-500 sm:table-cell dark:text-zinc-400">
+                <td className="hidden px-3 py-2 text-text-secondary sm:table-cell">
                   {a.type}
                 </td>
-                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-zinc-700 sm:table-cell dark:text-zinc-300">
+                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
                   {formatDistance(a.distance)}
                 </td>
-                <td className="whitespace-nowrap px-2 py-1.5 text-right text-zinc-700 sm:px-3 sm:py-2 dark:text-zinc-300">
+                <td className="whitespace-nowrap px-2 py-1.5 text-right text-text-secondary sm:px-3 sm:py-2">
                   {formatDuration(a.movingTime)}
                 </td>
-                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-zinc-700 sm:table-cell dark:text-zinc-300">
+                <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
                   {a.elevationGain.toFixed(0)}m
                 </td>
                 <td className="whitespace-nowrap px-2 py-1.5 text-right sm:px-3 sm:py-2">
                   <Link
                     href={`/activity/${a.id}`}
-                    className="mr-2 text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="mr-2 text-sm font-medium text-primary hover:text-primary-light transition-colors"
                   >
                     View
                   </Link>
@@ -161,7 +161,7 @@ export default function ActivityList() {
                     onClick={() => handleDownload(a.id)}
                     disabled={downloading.has(a.id)}
                     aria-busy={downloading.has(a.id)}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-300"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
                   >
                     {downloading.has(a.id) && (
                       <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -182,17 +182,17 @@ export default function ActivityList() {
         <button
           onClick={() => { setLoading(true); setPage((p) => Math.max(1, p - 1)); }}
           disabled={loading || page === 1}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+        <span className="text-sm text-text-secondary">
           Page {page}
         </span>
         <button
           onClick={() => { setLoading(true); setPage((p) => p + 1); }}
           disabled={loading || !hasMore}
-          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>
