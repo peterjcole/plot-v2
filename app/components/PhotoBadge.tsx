@@ -23,7 +23,7 @@ export default function PhotoBadge({ number }: PhotoBadgeProps) {
         boxShadow: '0 2px 6px rgba(44,44,36,0.3)',
       }}
     >
-      {number}
+      <span style={{ fontSize: 11 }}>{number}</span>
     </div>
   );
 }

@@ -26,7 +26,7 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
     <div
       ref={containerRef}
       className="overflow-y-auto"
-      style={{ columns: columnCount, columnGap: 4, fontSize: 0 }}
+      style={{ columns: columnCount, columnGap: 4, fontSize: 0, lineHeight: 0 }}
     >
       {photos.map((photo, index) => (
         <div
