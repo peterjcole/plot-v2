@@ -32,6 +32,7 @@ interface ActivityMapProps {
   activity: ActivityData;
   width: number;
   height: number;
+  onPinClick?: (index: number) => void;
 }
 
 function RouteOutlineFilter() {
@@ -149,7 +150,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, onPinClick }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -186,7 +187,7 @@ export default function ActivityMap({ activity, width, height }: ActivityMapProp
         <RouteOutlineFilter />
         <MapController route={route} />
         <TileLoadHandler />
-        <PhotoOverlay photos={activity.photos} />
+        <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} />
       </MapContainer>
       <TextOverlay activity={activity} />
     </div>

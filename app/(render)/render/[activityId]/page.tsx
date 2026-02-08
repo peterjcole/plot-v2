@@ -13,11 +13,11 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
   const width = parseInt(widthParam || '1200', 10);
   const height = parseInt(heightParam || '630', 10);
 
-  if (!token) {
+  if (!token && !activityId.startsWith('mock-')) {
     return <div>Missing access token</div>;
   }
 
-  const activity = await getActivityDetail(token, activityId);
+  const activity = await getActivityDetail(token || '', activityId);
 
   return (
     <div style={{ width, height, overflow: 'hidden' }}>
