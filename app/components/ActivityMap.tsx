@@ -6,6 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
+import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -20,11 +21,11 @@ L.Icon.Default.mergeOptions({
 
 // EPSG:27700 British National Grid CRS
 const crs = new L.Proj.CRS(
-  'EPSG:27700',
-  '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +datum=OSGB36 +units=m +no_defs',
+  OS_PROJECTION.code,
+  OS_PROJECTION.proj4,
   {
-    resolutions: [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 1.75],
-    origin: [-238375.0, 1376256.0],
+    resolutions: OS_PROJECTION.resolutions,
+    origin: OS_PROJECTION.origin,
   }
 );
 
@@ -161,7 +162,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
 
   const center: [number, number] = route.length > 0
     ? route[Math.floor(route.length / 2)]
-    : [54.4, -2.9];
+    : [OS_DEFAULT_CENTER.lat, OS_DEFAULT_CENTER.lng];
 
   return (
     <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
@@ -176,7 +177,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         attributionControl={false}
       >
         <TileLayer
-          url="/api/maps?z={z}&x={x}&y={y}"
+          url={OS_TILE_URL}
           maxNativeZoom={9}
           minNativeZoom={8}
         />
