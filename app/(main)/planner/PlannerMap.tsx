@@ -2,6 +2,7 @@
 
 import { useRef, useEffect } from 'react';
 import Map from 'ol/Map';
+import Overlay from 'ol/Overlay';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
@@ -19,6 +20,7 @@ interface PlannerMapProps {
   waypoints: Waypoint[];
   dispatch: React.Dispatch<RouteAction>;
   onMapReady?: (map: Map) => void;
+  addPointsEnabled: boolean;
 }
 
 function waypointStyle(index: number) {
@@ -76,16 +78,32 @@ function syncFeatures(
   }
 }
 
-export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerMapProps) {
+export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsEnabled }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const map = useOpenLayersMap(mapTargetRef);
   const waypointSourceRef = useRef<VectorSource | null>(null);
   const routeSourceRef = useRef<VectorSource | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waypointsRef = useRef(waypoints);
+  const addPointsRef = useRef(addPointsEnabled);
+
   useEffect(() => {
     waypointsRef.current = waypoints;
   }, [waypoints]);
+
+  useEffect(() => {
+    addPointsRef.current = addPointsEnabled;
+  }, [addPointsEnabled]);
+
+  // Update cursor when addPointsEnabled changes
+  useEffect(() => {
+    if (!map) return;
+    const viewport = map.getViewport();
+    // If add-points is off and cursor is currently crosshair, reset it
+    if (!addPointsEnabled && viewport.style.cursor === 'crosshair') {
+      viewport.style.cursor = '';
+    }
+  }, [map, addPointsEnabled]);
 
   // Initialize vector layers once the map is ready
   useEffect(() => {
@@ -111,6 +129,45 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
     waypointSourceRef.current = waypointSource;
     routeSourceRef.current = routeSource;
 
+    // Delete popup overlay
+    const popupEl = document.createElement('div');
+    popupEl.className = 'ol-delete-popup';
+    popupEl.innerHTML = '<button class="ol-delete-btn" title="Delete waypoint">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<polyline points="3 6 5 6 21 6"/>' +
+      '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' +
+      '</svg></button>';
+
+    const deleteOverlay = new Overlay({
+      element: popupEl,
+      positioning: 'bottom-center',
+      offset: [0, -20],
+      stopEvent: true,
+    });
+    map.addOverlay(deleteOverlay);
+
+    let deleteTargetIndex: number | null = null;
+
+    const showDeletePopup = (coordinate: number[], index: number) => {
+      deleteTargetIndex = index;
+      deleteOverlay.setPosition(coordinate);
+      navigator.vibrate?.(40);
+    };
+
+    const hideDeletePopup = () => {
+      deleteTargetIndex = null;
+      deleteOverlay.setPosition(undefined);
+    };
+
+    popupEl.querySelector('.ol-delete-btn')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (deleteTargetIndex !== null) {
+        dispatch({ type: 'REMOVE_WAYPOINT', index: deleteTargetIndex });
+        navigator.vibrate?.(30);
+      }
+      hideDeletePopup();
+    });
+
     // Route line modify — added FIRST so it has LOWER priority than waypoint modify.
     // Handles insert-by-dragging on line edges.
     const routeModify = new Modify({
@@ -123,6 +180,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
           stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
         }),
       }),
+      condition: (e) => (e.originalEvent as PointerEvent).pointerType !== 'touch',
     });
 
     routeModify.on('modifyend', (e) => {
@@ -153,6 +211,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
         if (insertIndex >= 0) {
           const [lng, lat] = toLonLat(newCoords[insertIndex], OS_PROJECTION.code);
           dispatch({ type: 'INSERT_WAYPOINT', index: insertIndex, waypoint: { lat, lng } });
+          navigator.vibrate?.(15);
         }
       } else if (newCoords.length === current.length) {
         // An existing vertex was moved — find which one changed
@@ -201,20 +260,43 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
 
     map.addInteraction(waypointModify);
 
-    // Click to add waypoint
+    // Click handler: waypoint hit → show delete popup, empty click → hide popup + optionally add waypoint
     map.on('click', (e) => {
-      // Ignore clicks on existing waypoints or on the route line
-      const hit = map.forEachFeatureAtPixel(e.pixel, () => true, {
-        layerFilter: (layer) => layer === waypointLayer || layer === routeLayer,
+      // Check for waypoint hit first
+      const waypointFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
+        layerFilter: (layer) => layer === waypointLayer,
+      });
+      if (waypointFeature) {
+        const index = waypointFeature.get('waypointIndex') as number;
+        if (typeof index === 'number') {
+          const geom = waypointFeature.getGeometry() as Point;
+          showDeletePopup(geom.getCoordinates(), index);
+        }
+        return;
+      }
+
+      // Hide popup on any non-waypoint click
+      if (deleteTargetIndex !== null) {
+        hideDeletePopup();
+        return;
+      }
+
+      // Ignore clicks on the route line
+      const routeHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+        layerFilter: (layer) => layer === routeLayer,
         hitTolerance: 6,
       });
-      if (hit) return;
+      if (routeHit) return;
+
+      // Add waypoint only if toggle is on
+      if (!addPointsRef.current) return;
 
       const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
       dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng } });
+      navigator.vibrate?.(15);
     });
 
-    // Right-click to delete waypoint (desktop)
+    // Right-click on waypoint → show delete popup
     map.getViewport().addEventListener('contextmenu', (e) => {
       e.preventDefault();
       const pixel = map.getEventPixel(e);
@@ -224,12 +306,13 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       if (feature) {
         const index = feature.get('waypointIndex') as number;
         if (typeof index === 'number') {
-          dispatch({ type: 'REMOVE_WAYPOINT', index });
+          const geom = feature.getGeometry() as Point;
+          showDeletePopup(geom.getCoordinates(), index);
         }
       }
     });
 
-    // Long-press to delete waypoint (mobile)
+    // Long-press on waypoint → show delete popup (mobile)
     map.getViewport().addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch') return;
       const pixel = map.getEventPixel(e);
@@ -241,7 +324,8 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       longPressTimerRef.current = setTimeout(() => {
         const index = feature.get('waypointIndex') as number;
         if (typeof index === 'number') {
-          dispatch({ type: 'REMOVE_WAYPOINT', index });
+          const geom = feature.getGeometry() as Point;
+          showDeletePopup(geom.getCoordinates(), index);
         }
       }, 500);
     });
@@ -270,7 +354,11 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
         layerFilter: (layer) => layer === routeLayer,
         hitTolerance: 6,
       });
-      viewport.style.cursor = routeHit ? 'copy' : '';
+      if (routeHit) {
+        viewport.style.cursor = 'copy';
+        return;
+      }
+      viewport.style.cursor = addPointsRef.current ? 'crosshair' : '';
     });
 
     // Initial sync for waypoints loaded from localStorage before map was ready
@@ -283,6 +371,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       map.removeLayer(waypointLayer);
       map.removeInteraction(waypointModify);
       map.removeInteraction(routeModify);
+      map.removeOverlay(deleteOverlay);
       waypointSourceRef.current = null;
       routeSourceRef.current = null;
     };
