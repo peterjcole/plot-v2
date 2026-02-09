@@ -86,3 +86,34 @@ body {
   color-scheme: only light;
   color: #1C1814;
 }
+
+/* Delete waypoint popup (imperative DOM, outside React) */
+.ol-delete-popup {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+}
+
+.ol-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #b91c1c;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ol-delete-btn:hover {
+  background: #fca5a5;
+}
+
+.ol-delete-btn:active {
+  background: #f87171;
+  color: #fff;
+}

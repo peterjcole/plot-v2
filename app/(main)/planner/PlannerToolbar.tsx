@@ -12,6 +12,8 @@ interface PlannerToolbarProps {
   canRedo: boolean;
   dispatch: React.Dispatch<RouteAction>;
   onGeolocate: () => void;
+  addPointsEnabled: boolean;
+  onToggleAddPoints: () => void;
 }
 
 function formatDistance(meters: number): string {
@@ -29,6 +31,8 @@ export default function PlannerToolbar({
   canRedo,
   dispatch,
   onGeolocate,
+  addPointsEnabled,
+  onToggleAddPoints,
 }: PlannerToolbarProps) {
   const handleUndo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const handleRedo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);
@@ -47,9 +51,30 @@ export default function PlannerToolbar({
 
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
+      {/* Add-points toggle */}
+      <button
+        onClick={onToggleAddPoints}
+        title={addPointsEnabled ? 'Disable add mode' : 'Enable add mode'}
+        className={`flex items-center justify-center w-11 h-11 rounded-lg transition-colors ${
+          addPointsEnabled
+            ? 'bg-accent-light/20 text-accent'
+            : 'text-text-primary hover:bg-surface-muted'
+        }`}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="16" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+        </svg>
+      </button>
+
       {/* Distance display — hidden on very small screens */}
       <div className="hidden sm:block text-text-primary font-medium text-sm whitespace-nowrap px-2">
-        {distance > 0 ? formatDistance(distance) : 'Click map to start'}
+        {distance > 0
+          ? formatDistance(distance)
+          : addPointsEnabled
+            ? 'Click map to start'
+            : 'Click + to start'}
       </div>
       {/* Compact distance for mobile */}
       <div className="sm:hidden text-text-primary font-medium text-xs whitespace-nowrap px-1">

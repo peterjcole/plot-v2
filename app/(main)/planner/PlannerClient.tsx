@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import type Map from 'ol/Map';
 import { fromLonLat } from 'ol/proj';
@@ -15,6 +15,7 @@ const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
 
 export default function PlannerClient() {
   const { waypoints, canUndo, canRedo, dispatch } = useRouteHistory();
+  const [addPointsEnabled, setAddPointsEnabled] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -83,6 +84,7 @@ export default function PlannerClient() {
         waypoints={waypoints}
         dispatch={dispatch}
         onMapReady={handleMapReady}
+        addPointsEnabled={addPointsEnabled}
       />
       <PlannerToolbar
         waypoints={waypoints}
@@ -91,6 +93,8 @@ export default function PlannerClient() {
         canRedo={canRedo}
         dispatch={dispatch}
         onGeolocate={handleGeolocate}
+        addPointsEnabled={addPointsEnabled}
+        onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
       />
     </div>
   );

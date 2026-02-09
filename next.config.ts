@@ -5,6 +5,15 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/activity-printout': ['./node_modules/@sparticuz/chromium/bin/**'],
   },
+  async redirects() {
+    return [
+      {
+        source: '/plan',
+        destination: '/planner',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

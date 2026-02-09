@@ -10,6 +10,7 @@ import XYZ from 'ol/source/XYZ';
 import { get as getProjection, fromLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
+import OSM from 'ol/source/OSM';
 import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM } from '@/lib/map-config';
 
 export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | null>) {
@@ -26,17 +27,43 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
 
     const projection = getProjection(OS_PROJECTION.code)!;
 
-    const tileGrid = new TileGrid({
+    // 1:25k tile grid — minZoom 8 means OL upscales zoom-8 tiles for lower views
+    const hiResTileGrid = new TileGrid({
+      resolutions: OS_PROJECTION.resolutions,
+      origin: OS_PROJECTION.origin,
+      minZoom: 8,
+    });
+
+    // Regular tile grid for overview-style OS tiles at lower zoom levels
+    const overviewTileGrid = new TileGrid({
       resolutions: OS_PROJECTION.resolutions,
       origin: OS_PROJECTION.origin,
     });
 
-    const tileLayer = new TileLayer({
+    // OSM base layer for geographic context when zoomed out beyond OS tile range
+    const osmLayer = new TileLayer({
+      source: new OSM(),
+      maxZoom: 3,
+    });
+
+    // OS overview tiles at low-to-mid zooms
+    const osOverviewLayer = new TileLayer({
       source: new XYZ({
         url: OS_TILE_URL,
         projection: projection,
-        tileGrid: tileGrid,
+        tileGrid: overviewTileGrid,
       }),
+      maxZoom: 6,
+    });
+
+    // OS 1:25k tiles — upscaled at zoom 6-7, native at 8-9
+    const os25kLayer = new TileLayer({
+      source: new XYZ({
+        url: OS_TILE_URL,
+        projection: projection,
+        tileGrid: hiResTileGrid,
+      }),
+      minZoom: 6,
     });
 
     const center = fromLonLat(
@@ -47,7 +74,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     const olMap = new Map({
       target: targetRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [tileLayer],
+      layers: [osmLayer, osOverviewLayer, os25kLayer],
       view: new View({
         projection: projection,
         center: center,
