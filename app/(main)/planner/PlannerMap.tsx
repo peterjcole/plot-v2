@@ -25,12 +25,12 @@ function waypointStyle(index: number) {
   return new Style({
     image: new CircleStyle({
       radius: 14,
-      fill: new Fill({ color: '#4A5A2B' }),
-      stroke: new Stroke({ color: '#FFFFFF', width: 2.5 }),
+      fill: new Fill({ color: 'rgba(74, 90, 43, 0.8)' }),
+      stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }),
     }),
     text: new Text({
       text: String(index + 1),
-      fill: new Fill({ color: '#FFFFFF' }),
+      fill: new Fill({ color: 'rgba(255, 255, 255, 0.95)' }),
       font: 'bold 12px sans-serif',
       offsetY: 1,
     }),
@@ -39,53 +39,41 @@ function waypointStyle(index: number) {
 
 const routeStyle = new Style({
   stroke: new Stroke({
-    color: '#4A5A2B',
-    width: 4,
-    lineDash: [8, 6],
+    color: 'rgba(74, 90, 43, 0.8)',
+    width: 3.5,
+    lineDash: [6, 8],
   }),
 });
 
-function findNearestSegmentIndex(
-  coord: number[],
-  waypoints: Waypoint[],
-  map: Map
-): number | null {
-  if (waypoints.length < 2) return null;
 
-  const pixel = map.getPixelFromCoordinate(coord);
-  if (!pixel) return null;
+function syncFeatures(
+  waypointSource: VectorSource | null,
+  routeSource: VectorSource | null,
+  waypoints: Waypoint[]
+) {
+  if (!waypointSource || !routeSource) return;
 
-  let bestDist = Infinity;
-  let bestIndex: number | null = null;
+  waypointSource.clear();
+  waypoints.forEach((wp, i) => {
+    const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
+    const feature = new Feature({
+      geometry: new Point(coord),
+      waypointIndex: i,
+    });
+    feature.setStyle(waypointStyle(i));
+    waypointSource.addFeature(feature);
+  });
 
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const a = map.getPixelFromCoordinate(
-      fromLonLat([waypoints[i].lng, waypoints[i].lat], OS_PROJECTION.code)
+  routeSource.clear();
+  if (waypoints.length >= 2) {
+    const coords = waypoints.map((wp) =>
+      fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
     );
-    const b = map.getPixelFromCoordinate(
-      fromLonLat([waypoints[i + 1].lng, waypoints[i + 1].lat], OS_PROJECTION.code)
-    );
-    if (!a || !b) continue;
-
-    const dist = pointToSegmentDistance(pixel, a, b);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestIndex = i + 1;
-    }
+    const lineFeature = new Feature({
+      geometry: new LineString(coords),
+    });
+    routeSource.addFeature(lineFeature);
   }
-
-  // Only insert if click is within 20px of a segment
-  return bestDist < 20 ? bestIndex : null;
-}
-
-function pointToSegmentDistance(p: number[], a: number[], b: number[]): number {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
-  let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
 }
 
 export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerMapProps) {
@@ -123,8 +111,72 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
     waypointSourceRef.current = waypointSource;
     routeSourceRef.current = routeSource;
 
-    // Modify interaction for dragging waypoints
-    const modify = new Modify({
+    // Route line modify — added FIRST so it has LOWER priority than waypoint modify.
+    // Handles insert-by-dragging on line edges.
+    const routeModify = new Modify({
+      source: routeSource,
+      pixelTolerance: 10,
+      style: new Style({
+        image: new CircleStyle({
+          radius: 8,
+          fill: new Fill({ color: 'rgba(74, 90, 43, 0.5)' }),
+          stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
+        }),
+      }),
+    });
+
+    routeModify.on('modifyend', (e) => {
+      const feature = e.features.getArray()[0];
+      if (!feature) return;
+      const geom = feature.getGeometry() as LineString;
+      const newCoords = geom.getCoordinates();
+      const current = waypointsRef.current;
+
+      if (newCoords.length === current.length + 1) {
+        // A vertex was inserted — find which index is new
+        const oldCoords = current.map((wp) =>
+          fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
+        );
+        let insertIndex = -1;
+        let j = 0;
+        for (let i = 0; i < newCoords.length; i++) {
+          if (
+            j < oldCoords.length &&
+            Math.abs(newCoords[i][0] - oldCoords[j][0]) < 1 &&
+            Math.abs(newCoords[i][1] - oldCoords[j][1]) < 1
+          ) {
+            j++;
+          } else {
+            insertIndex = i;
+          }
+        }
+        if (insertIndex >= 0) {
+          const [lng, lat] = toLonLat(newCoords[insertIndex], OS_PROJECTION.code);
+          dispatch({ type: 'INSERT_WAYPOINT', index: insertIndex, waypoint: { lat, lng } });
+        }
+      } else if (newCoords.length === current.length) {
+        // An existing vertex was moved — find which one changed
+        const oldCoords = current.map((wp) =>
+          fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
+        );
+        for (let i = 0; i < newCoords.length; i++) {
+          if (
+            Math.abs(newCoords[i][0] - oldCoords[i][0]) > 1 ||
+            Math.abs(newCoords[i][1] - oldCoords[i][1]) > 1
+          ) {
+            const [lng, lat] = toLonLat(newCoords[i], OS_PROJECTION.code);
+            dispatch({ type: 'MOVE_WAYPOINT', index: i, waypoint: { lat, lng } });
+          }
+        }
+      }
+    });
+
+    map.addInteraction(routeModify);
+
+    // Waypoint modify — added SECOND so it has HIGHER priority.
+    // When dragging a waypoint marker, this grabs it and stops propagation
+    // so routeModify doesn't also try to handle the line vertex.
+    const waypointModify = new Modify({
       source: waypointSource,
       hitDetection: true,
       style: new Style({
@@ -136,7 +188,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       }),
     });
 
-    modify.on('modifyend', (e) => {
+    waypointModify.on('modifyend', (e) => {
       const features = e.features.getArray();
       for (const feature of features) {
         const index = feature.get('waypointIndex') as number;
@@ -147,30 +199,19 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       }
     });
 
-    map.addInteraction(modify);
+    map.addInteraction(waypointModify);
 
     // Click to add waypoint
     map.on('click', (e) => {
-      // Check if clicking on an existing waypoint
-      const hit = map.forEachFeatureAtPixel(e.pixel, (feature) => feature, {
-        layerFilter: (layer) => layer === waypointLayer,
+      // Ignore clicks on existing waypoints or on the route line
+      const hit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+        layerFilter: (layer) => layer === waypointLayer || layer === routeLayer,
+        hitTolerance: 6,
       });
       if (hit) return;
 
       const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
-      const waypoint = { lat, lng };
-
-      // Check if near an existing segment for insertion
-      const insertIndex = findNearestSegmentIndex(
-        e.coordinate,
-        waypointsRef.current,
-        map
-      );
-      if (insertIndex !== null) {
-        dispatch({ type: 'INSERT_WAYPOINT', index: insertIndex, waypoint });
-      } else {
-        dispatch({ type: 'ADD_WAYPOINT', waypoint });
-      }
+      dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng } });
     });
 
     // Right-click to delete waypoint (desktop)
@@ -232,12 +273,16 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
       viewport.style.cursor = routeHit ? 'copy' : '';
     });
 
+    // Initial sync for waypoints loaded from localStorage before map was ready
+    syncFeatures(waypointSource, routeSource, waypointsRef.current);
+
     onMapReady?.(map);
 
     return () => {
       map.removeLayer(routeLayer);
       map.removeLayer(waypointLayer);
-      map.removeInteraction(modify);
+      map.removeInteraction(waypointModify);
+      map.removeInteraction(routeModify);
       waypointSourceRef.current = null;
       routeSourceRef.current = null;
     };
@@ -245,33 +290,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady }: PlannerM
 
   // Sync waypoints to OL features
   useEffect(() => {
-    const waypointSource = waypointSourceRef.current;
-    const routeSource = routeSourceRef.current;
-    if (!waypointSource || !routeSource) return;
-
-    // Update waypoint features
-    waypointSource.clear();
-    waypoints.forEach((wp, i) => {
-      const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
-      const feature = new Feature({
-        geometry: new Point(coord),
-        waypointIndex: i,
-      });
-      feature.setStyle(waypointStyle(i));
-      waypointSource.addFeature(feature);
-    });
-
-    // Update route line
-    routeSource.clear();
-    if (waypoints.length >= 2) {
-      const coords = waypoints.map((wp) =>
-        fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
-      );
-      const lineFeature = new Feature({
-        geometry: new LineString(coords),
-      });
-      routeSource.addFeature(lineFeature);
-    }
+    syncFeatures(waypointSourceRef.current, routeSourceRef.current, waypoints);
   }, [waypoints]);
 
   return <div ref={mapTargetRef} className="w-full h-full" />;
