@@ -33,6 +33,12 @@ export interface ActivitySummary {
   elevationGain: number; // in meters
 }
 
+export interface Waypoint {
+  lat: number;
+  lng: number;
+  ele?: number;
+}
+
 declare global {
   interface Window {
     __MAP_READY__?: boolean;

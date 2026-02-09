@@ -1,0 +1,11 @@
+import type { Metadata } from 'next';
+import PlannerClient from './PlannerClient';
+
+export const metadata: Metadata = {
+  title: 'Route Planner',
+  description: 'Plan walking and cycling routes on OS maps',
+};
+
+export default function PlannerPage() {
+  return <PlannerClient />;
+}
