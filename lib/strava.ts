@@ -65,7 +65,9 @@ export async function getAthleteActivities(
   }));
 }
 
-function getMockGalleryActivity(): ActivityData {
+export type MockOrientation = 'landscape' | 'portrait' | 'mixed';
+
+function getMockActivity(photoCount: number, orientation: MockOrientation): ActivityData {
   // A loop route around the Lake District
   const route: [number, number][] = [
     [54.4500, -3.0000],
@@ -86,45 +88,32 @@ function getMockGalleryActivity(): ActivityData {
     [54.4500, -3.0000],
   ];
 
-  // Mix of landscape, portrait, and square aspect ratios
-  const photoSizes = [
-    '600/400', // 1 - landscape
-    '400/600', // 2 - portrait
-    '600/400', // 3 - landscape
-    '500/500', // 4 - square
-    '400/600', // 5 - portrait
-    '600/400', // 6 - landscape
-    '600/400', // 7 - landscape
-    '400/600', // 8 - portrait
-    '500/500', // 9 - square
-    '600/400', // 10 - landscape
-  ];
+  const mixedSizes = ['600/400', '400/600', '600/400', '500/500', '400/600', '600/400', '600/400', '400/600', '500/500', '600/400'];
 
-  // Place photos 3-6 close together to test clustering
-  const photoPositions: [number, number][] = [
-    route[1],                  // 1 - near start
-    route[3],                  // 2 - along the way
-    [54.4700, -2.9480],        // 3 - clustered
-    [54.4705, -2.9460],        // 4 - clustered
-    [54.4695, -2.9500],        // 5 - clustered
-    [54.4710, -2.9470],        // 6 - clustered
-    route[8],                  // 7 - mid route
-    route[10],                 // 8 - later
-    route[12],                 // 9 - near end
-    route[14],                 // 10 - near finish
-  ];
+  function getPhotoSize(index: number): string {
+    switch (orientation) {
+      case 'landscape': return '600/400';
+      case 'portrait': return '400/600';
+      case 'mixed': return mixedSizes[index % mixedSizes.length];
+    }
+  }
 
-  const photos = photoPositions.map((pos, i) => ({
-    id: `mock-photo-${i + 1}`,
-    url: `https://picsum.photos/seed/hike${i * 7 + 3}/${photoSizes[i]}`,
-    lat: pos[0],
-    lng: pos[1],
-    caption: `Photo ${i + 1}`,
-  }));
+  // Distribute photos evenly along the route
+  const photos = Array.from({ length: photoCount }, (_, i) => {
+    const routeIndex = Math.round((i / Math.max(photoCount - 1, 1)) * (route.length - 1));
+    const pos = route[routeIndex];
+    return {
+      id: `mock-photo-${i + 1}`,
+      url: `https://picsum.photos/seed/hike${i * 7 + 3}/${getPhotoSize(i)}`,
+      lat: pos[0],
+      lng: pos[1],
+      caption: `Photo ${i + 1}`,
+    };
+  });
 
   return {
-    id: 'mock-gallery',
-    name: 'Lake District Loop',
+    id: 'mock',
+    name: `Lake District Loop (${photoCount} photo${photoCount !== 1 ? 's' : ''}, ${orientation})`,
     route,
     photos,
     stats: {
@@ -138,26 +127,15 @@ function getMockGalleryActivity(): ActivityData {
   };
 }
 
-function getMockSmallGalleryActivity(): ActivityData {
-  const base = getMockGalleryActivity();
-  return {
-    ...base,
-    id: 'mock-small-gallery',
-    name: 'Lake District Loop (3 photos)',
-    photos: [base.photos[0], base.photos[2], base.photos[3]],
-  };
-}
-
 export async function getActivityDetail(
   accessToken: string,
   activityId: string,
+  mockOptions?: { photos?: number; orientation?: MockOrientation },
 ): Promise<ActivityData> {
-  if (activityId === 'mock-gallery') {
-    return getMockGalleryActivity();
-  }
-
-  if (activityId === 'mock-small-gallery') {
-    return getMockSmallGalleryActivity();
+  if (activityId === 'mock') {
+    const photoCount = mockOptions?.photos ?? 3;
+    const orientation = mockOptions?.orientation ?? 'mixed';
+    return getMockActivity(photoCount, orientation);
   }
 
   const res = await fetch(`${STRAVA_API_BASE}/activities/${activityId}`, {

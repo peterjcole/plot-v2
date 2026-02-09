@@ -1,20 +1,26 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getActivityDetail } from '@/lib/strava';
+import { getActivityDetail, MockOrientation } from '@/lib/strava';
 import ActivityViewClient from './ActivityViewClient';
 import DownloadButton from '@/app/components/DownloadButton';
 
 interface ActivityPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ photos?: string; orientation?: string }>;
 }
 
-export default async function ActivityPage({ params }: ActivityPageProps) {
+export default async function ActivityPage({ params, searchParams }: ActivityPageProps) {
   const { id } = await params;
+  const { photos, orientation } = await searchParams;
 
   let activity;
-  if (id.startsWith('mock-')) {
-    activity = await getActivityDetail('', id);
+  if (id === 'mock') {
+    const mockOptions = {
+      photos: photos ? parseInt(photos, 10) : undefined,
+      orientation: (['landscape', 'portrait', 'mixed'].includes(orientation ?? '') ? orientation : undefined) as MockOrientation | undefined,
+    };
+    activity = await getActivityDetail('', id, mockOptions);
   } else {
     const session = await getSession();
 

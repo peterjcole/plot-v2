@@ -43,7 +43,9 @@ export default function PhotoGallery({ photos, activeIndex, columnCount = 2 }: P
                 alt={photo.caption || `Photo ${index + 1}`}
                 className="block w-full"
               />
-              <PhotoBadge number={index + 1} />
+              <div style={{ position: 'absolute', left: 6, top: 6 }}>
+                <PhotoBadge number={index + 1} />
+              </div>
             </div>
           </div>
         );
