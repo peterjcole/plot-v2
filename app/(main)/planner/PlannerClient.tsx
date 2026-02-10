@@ -7,6 +7,7 @@ import { fromLonLat } from 'ol/proj';
 import { useRouteHistory } from './useRouteHistory';
 import { calculateDistance } from './route-utils';
 import PlannerToolbar from './PlannerToolbar';
+import LayersPanel from './LayersPanel';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION } from '@/lib/map-config';
 import 'ol/ol.css';
@@ -16,8 +17,38 @@ const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
 export default function PlannerClient() {
   const { waypoints, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
+  const [heatmapEnabled, setHeatmapEnabled] = useState(false);
+  const [heatmapSport, setHeatmapSport] = useState<string>('all');
+  const [heatmapColor, setHeatmapColor] = useState<string>('blue');
+  const [dimBaseMap, setDimBaseMap] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load saved heatmap preferences on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('plotv2-heatmap-prefs');
+      if (raw) {
+        const prefs = JSON.parse(raw);
+        if (typeof prefs.enabled === 'boolean') setHeatmapEnabled(prefs.enabled);
+        if (prefs.sport) setHeatmapSport(prefs.sport);
+        if (prefs.color) setHeatmapColor(prefs.color);
+        if (typeof prefs.dimBaseMap === 'boolean') setDimBaseMap(prefs.dimBaseMap);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Persist heatmap preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem('plotv2-heatmap-prefs', JSON.stringify({
+        enabled: heatmapEnabled,
+        sport: heatmapSport,
+        color: heatmapColor,
+        dimBaseMap,
+      }));
+    } catch { /* ignore */ }
+  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap]);
 
   // Load saved route on mount
   useEffect(() => {
@@ -85,6 +116,20 @@ export default function PlannerClient() {
         dispatch={dispatch}
         onMapReady={handleMapReady}
         addPointsEnabled={addPointsEnabled}
+        heatmapEnabled={heatmapEnabled}
+        heatmapSport={heatmapSport}
+        heatmapColor={heatmapColor}
+        dimBaseMap={dimBaseMap}
+      />
+      <LayersPanel
+        heatmapEnabled={heatmapEnabled}
+        onHeatmapEnabledChange={setHeatmapEnabled}
+        heatmapSport={heatmapSport}
+        onHeatmapSportChange={setHeatmapSport}
+        heatmapColor={heatmapColor}
+        onHeatmapColorChange={setHeatmapColor}
+        dimBaseMap={dimBaseMap}
+        onDimBaseMapChange={setDimBaseMap}
       />
       <PlannerToolbar
         waypoints={waypoints}

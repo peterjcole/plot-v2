@@ -13,6 +13,8 @@ import { Modify } from 'ol/interaction';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import type { EventsKey } from 'ol/events';
+import TileLayer from 'ol/layer/Tile';
+import XYZ from 'ol/source/XYZ';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint } from '@/lib/types';
@@ -23,6 +25,10 @@ interface PlannerMapProps {
   dispatch: React.Dispatch<RouteAction>;
   onMapReady?: (map: Map) => void;
   addPointsEnabled: boolean;
+  heatmapEnabled: boolean;
+  heatmapSport: string;
+  heatmapColor: string;
+  dimBaseMap: boolean;
 }
 
 function pinSvg(index: number): string {
@@ -112,7 +118,7 @@ function syncFeatures(
   }
 }
 
-export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsEnabled }: PlannerMapProps) {
+export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsEnabled, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const map = useOpenLayersMap(mapTargetRef);
   const waypointSourceRef = useRef<VectorSource | null>(null);
@@ -120,6 +126,8 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waypointsRef = useRef(waypoints);
   const addPointsRef = useRef(addPointsEnabled);
+  const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
 
   useEffect(() => {
     waypointsRef.current = waypoints;
@@ -128,6 +136,77 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
   useEffect(() => {
     addPointsRef.current = addPointsEnabled;
   }, [addPointsEnabled]);
+
+  // Manage heatmap tile layer
+  useEffect(() => {
+    if (!map) return;
+
+    // Remove existing heatmap layer
+    if (heatmapLayerRef.current) {
+      map.removeLayer(heatmapLayerRef.current);
+      heatmapLayerRef.current = null;
+    }
+
+    if (!heatmapEnabled) return;
+
+    const heatmapLayer = new TileLayer({
+      source: new XYZ({
+        url: `/api/heatmap?sport=${heatmapSport}&color=${heatmapColor}&z={z}&x={x}&y={y}`,
+        projection: 'EPSG:3857',
+      }),
+      opacity: 0.6,
+      zIndex: 3,
+    });
+
+    map.addLayer(heatmapLayer);
+    heatmapLayerRef.current = heatmapLayer;
+
+    return () => {
+      if (heatmapLayerRef.current) {
+        map.removeLayer(heatmapLayerRef.current);
+        heatmapLayerRef.current = null;
+      }
+    };
+  }, [map, heatmapEnabled, heatmapSport, heatmapColor]);
+
+  // Manage dim base map overlay
+  useEffect(() => {
+    if (!map) return;
+
+    if (dimLayerRef.current) {
+      map.removeLayer(dimLayerRef.current);
+      dimLayerRef.current = null;
+    }
+
+    if (!heatmapEnabled || !dimBaseMap) return;
+
+    const dimLayer = new TileLayer({
+      source: new XYZ({
+        url: 'data:image/png;base64,',
+        tileLoadFunction: (tile) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d')!;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.fillRect(0, 0, 256, 256);
+          (tile as unknown as { getImage: () => HTMLImageElement }).getImage().src = canvas.toDataURL();
+        },
+        projection: 'EPSG:3857',
+      }),
+      zIndex: 2,
+    });
+
+    map.addLayer(dimLayer);
+    dimLayerRef.current = dimLayer;
+
+    return () => {
+      if (dimLayerRef.current) {
+        map.removeLayer(dimLayerRef.current);
+        dimLayerRef.current = null;
+      }
+    };
+  }, [map, heatmapEnabled, dimBaseMap]);
 
   // Update cursor when addPointsEnabled changes
   useEffect(() => {
