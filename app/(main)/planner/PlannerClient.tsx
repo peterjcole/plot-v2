@@ -17,26 +17,21 @@ const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
 export default function PlannerClient() {
   const { waypoints, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
-  const [heatmapEnabled, setHeatmapEnabled] = useState(false);
-  const [heatmapSport, setHeatmapSport] = useState<string>('all');
-  const [heatmapColor, setHeatmapColor] = useState<string>('blue');
-  const [dimBaseMap, setDimBaseMap] = useState(false);
-  const mapInstanceRef = useRef<Map | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load saved heatmap preferences on mount
-  useEffect(() => {
+  const savedHeatmapPrefs = useMemo(() => {
     try {
       const raw = localStorage.getItem('plotv2-heatmap-prefs');
-      if (raw) {
-        const prefs = JSON.parse(raw);
-        if (typeof prefs.enabled === 'boolean') setHeatmapEnabled(prefs.enabled);
-        if (prefs.sport) setHeatmapSport(prefs.sport);
-        if (prefs.color) setHeatmapColor(prefs.color);
-        if (typeof prefs.dimBaseMap === 'boolean') setDimBaseMap(prefs.dimBaseMap);
-      }
+      if (raw) return JSON.parse(raw);
     } catch { /* ignore */ }
+    return null;
   }, []);
+
+  const [heatmapEnabled, setHeatmapEnabled] = useState(() => savedHeatmapPrefs?.enabled ?? false);
+  const [heatmapSport, setHeatmapSport] = useState<string>(() => savedHeatmapPrefs?.sport ?? 'all');
+  const [heatmapColor, setHeatmapColor] = useState<string>(() => savedHeatmapPrefs?.color ?? 'blue');
+  const [dimBaseMap, setDimBaseMap] = useState(() => savedHeatmapPrefs?.dimBaseMap ?? false);
+  const mapInstanceRef = useRef<Map | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persist heatmap preferences
   useEffect(() => {
