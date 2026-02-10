@@ -8,9 +8,11 @@ import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { Style, Circle as CircleStyle, Fill, Stroke, Text } from 'ol/style';
+import { Style, Circle as CircleStyle, Fill, Stroke, Icon } from 'ol/style';
 import { Modify } from 'ol/interaction';
 import { fromLonLat, toLonLat } from 'ol/proj';
+import { unByKey } from 'ol/Observable';
+import type { EventsKey } from 'ol/events';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint } from '@/lib/types';
@@ -23,18 +25,24 @@ interface PlannerMapProps {
   addPointsEnabled: boolean;
 }
 
+function pinSvg(index: number): string {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">' +
+    '<path d="M16 44c-3-10-14-18-14-28a14 14 0 1 1 28 0c0 10-11 18-14 28Z" ' +
+    'fill="rgba(74,90,43,0.7)" stroke="rgba(255,255,255,0.75)" stroke-width="2.5"/>' +
+    '<text x="16" y="15" text-anchor="middle" dominant-baseline="central" ' +
+    `fill="rgba(255,255,255,0.95)" font-size="13" font-weight="bold" font-family="sans-serif">${index + 1}</text>` +
+    '</svg>'
+  );
+}
+
 function waypointStyle(index: number) {
   return new Style({
-    image: new CircleStyle({
-      radius: 14,
-      fill: new Fill({ color: 'rgba(74, 90, 43, 0.8)' }),
-      stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }),
-    }),
-    text: new Text({
-      text: String(index + 1),
-      fill: new Fill({ color: 'rgba(255, 255, 255, 0.95)' }),
-      font: 'bold 12px sans-serif',
-      offsetY: 1,
+    image: new Icon({
+      src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pinSvg(index))}`,
+      anchor: [0.5, 1],
+      anchorXUnits: 'fraction',
+      anchorYUnits: 'fraction',
     }),
   });
 }
@@ -47,6 +55,32 @@ const routeStyle = new Style({
   }),
 });
 
+function distToSegment(p: number[], a: number[], b: number[]): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / lenSq));
+  const projX = a[0] + t * dx;
+  const projY = a[1] + t * dy;
+  return Math.hypot(p[0] - projX, p[1] - projY);
+}
+
+function findInsertionIndex(tapCoord: number[], waypoints: Waypoint[]): number {
+  if (waypoints.length < 2) return waypoints.length;
+  let bestDist = Infinity;
+  let bestIdx = 1;
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = fromLonLat([waypoints[i].lng, waypoints[i].lat], OS_PROJECTION.code);
+    const b = fromLonLat([waypoints[i + 1].lng, waypoints[i + 1].lat], OS_PROJECTION.code);
+    const d = distToSegment(tapCoord, a, b);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i + 1;
+    }
+  }
+  return bestIdx;
+}
 
 function syncFeatures(
   waypointSource: VectorSource | null,
@@ -141,10 +175,44 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     const deleteOverlay = new Overlay({
       element: popupEl,
       positioning: 'bottom-center',
-      offset: [0, -20],
+      offset: [0, -46],
       stopEvent: true,
     });
     map.addOverlay(deleteOverlay);
+
+    // Insert popup overlay (for touch route taps)
+    const insertPopupEl = document.createElement('div');
+    insertPopupEl.className = 'ol-insert-popup';
+    insertPopupEl.innerHTML = '<button class="ol-insert-btn" title="Add waypoint here">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>' +
+      '</svg></button>';
+
+    const insertOverlay = new Overlay({
+      element: insertPopupEl,
+      positioning: 'bottom-center',
+      offset: [0, -10],
+      stopEvent: true,
+    });
+    map.addOverlay(insertOverlay);
+
+    let insertCoord: number[] | null = null;
+
+    const hideInsertPopup = () => {
+      insertCoord = null;
+      insertOverlay.setPosition(undefined);
+    };
+
+    insertPopupEl.querySelector('.ol-insert-btn')!.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (insertCoord) {
+        const index = findInsertionIndex(insertCoord, waypointsRef.current);
+        const [lng, lat] = toLonLat(insertCoord, OS_PROJECTION.code);
+        dispatch({ type: 'INSERT_WAYPOINT', index, waypoint: { lat, lng } });
+        navigator.vibrate?.(15);
+      }
+      hideInsertPopup();
+    });
 
     let deleteTargetIndex: number | null = null;
 
@@ -235,19 +303,60 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     // Waypoint modify — added SECOND so it has HIGHER priority.
     // When dragging a waypoint marker, this grabs it and stops propagation
     // so routeModify doesn't also try to handle the line vertex.
+    const pinHighlightSvg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="38" height="50" viewBox="-3 -3 38 50">' +
+      '<path d="M16 44c-3-10-14-18-14-28a14 14 0 1 1 28 0c0 10-11 18-14 28Z" ' +
+      'fill="none" stroke="rgba(74,90,43,0.4)" stroke-width="5"/>' +
+      '</svg>';
+
     const waypointModify = new Modify({
       source: waypointSource,
-      hitDetection: true,
+      hitDetection: waypointLayer,
       style: new Style({
-        image: new CircleStyle({
-          radius: 16,
-          fill: new Fill({ color: 'rgba(74, 90, 43, 0.5)' }),
-          stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
+        image: new Icon({
+          src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pinHighlightSvg)}`,
+          anchor: [0.5, 47 / 50],
+          anchorXUnits: 'fraction',
+          anchorYUnits: 'fraction',
         }),
       }),
     });
 
+    let geometryChangeKey: EventsKey | null = null;
+
+    waypointModify.on('modifystart', (e) => {
+      const feature = e.features.getArray()[0];
+      if (!feature) return;
+      const dragIndex = feature.get('waypointIndex') as number;
+      if (typeof dragIndex !== 'number') return;
+
+      const geom = feature.getGeometry() as Point;
+      geometryChangeKey = geom.on('change', () => {
+        const newCoord = geom.getCoordinates();
+
+        // Fix 2: update line live during drag
+        const lineFeature = routeSource.getFeatures()[0];
+        if (lineFeature) {
+          const lineGeom = lineFeature.getGeometry() as LineString;
+          const coords = waypointsRef.current.map((wp, i) => {
+            if (i === dragIndex) return newCoord;
+            return fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
+          });
+          lineGeom.setCoordinates(coords);
+        }
+
+        // Fix 4: track delete overlay if open for this waypoint
+        if (deleteTargetIndex === dragIndex) {
+          deleteOverlay.setPosition(newCoord);
+        }
+      });
+    });
+
     waypointModify.on('modifyend', (e) => {
+      if (geometryChangeKey) {
+        unByKey(geometryChangeKey);
+        geometryChangeKey = null;
+      }
       const features = e.features.getArray();
       for (const feature of features) {
         const index = feature.get('waypointIndex') as number;
@@ -267,6 +376,8 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
         layerFilter: (layer) => layer === waypointLayer,
       });
       if (waypointFeature) {
+        const origEvent = e.originalEvent as PointerEvent;
+        if (origEvent.pointerType === 'touch') return; // mobile: long-press only
         const index = waypointFeature.get('waypointIndex') as number;
         if (typeof index === 'number') {
           const geom = waypointFeature.getGeometry() as Point;
@@ -275,18 +386,27 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
         return;
       }
 
-      // Hide popup on any non-waypoint click
-      if (deleteTargetIndex !== null) {
-        hideDeletePopup();
-        return;
-      }
+      // Hide popups on any non-waypoint click
+      const hadPopup = deleteTargetIndex !== null || insertCoord !== null;
+      if (deleteTargetIndex !== null) hideDeletePopup();
+      if (insertCoord !== null) hideInsertPopup();
+      if (hadPopup) return;
 
-      // Ignore clicks on the route line
+      // Check for route line hit
       const routeHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
         layerFilter: (layer) => layer === routeLayer,
         hitTolerance: 6,
       });
-      if (routeHit) return;
+      if (routeHit) {
+        // Touch tap on route line → show insert popup
+        const origEvent = e.originalEvent as PointerEvent;
+        if (origEvent.pointerType === 'touch') {
+          insertCoord = e.coordinate;
+          insertOverlay.setPosition(e.coordinate);
+          navigator.vibrate?.(15);
+        }
+        return;
+      }
 
       // Add waypoint only if toggle is on
       if (!addPointsRef.current) return;
@@ -345,6 +465,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       const viewport = map.getViewport();
       const waypointHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
         layerFilter: (layer) => layer === waypointLayer,
+        hitTolerance: 8,
       });
       if (waypointHit) {
         viewport.style.cursor = 'move';
@@ -372,6 +493,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       map.removeInteraction(waypointModify);
       map.removeInteraction(routeModify);
       map.removeOverlay(deleteOverlay);
+      map.removeOverlay(insertOverlay);
       waypointSourceRef.current = null;
       routeSourceRef.current = null;
     };

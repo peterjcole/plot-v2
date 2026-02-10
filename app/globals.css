@@ -109,11 +109,54 @@ body {
   transition: background 0.15s;
 }
 
-.ol-delete-btn:hover {
-  background: #fca5a5;
+@media (hover: hover) {
+  .ol-delete-btn:hover {
+    background: #fca5a5;
+  }
 }
 
 .ol-delete-btn:active {
   background: #f87171;
   color: #fff;
+}
+
+.ol-delete-btn:focus {
+  outline: none;
+}
+
+/* Insert waypoint popup (imperative DOM, outside React) */
+.ol-insert-popup {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+}
+
+.ol-insert-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: #dcfce7;
+  color: var(--primary-dark, #3A4722);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+@media (hover: hover) {
+  .ol-insert-btn:hover {
+    background: #bbf7d0;
+  }
+}
+
+.ol-insert-btn:active {
+  background: #86efac;
+  color: #fff;
+}
+
+.ol-insert-btn:focus {
+  outline: none;
 }
