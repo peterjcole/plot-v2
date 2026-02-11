@@ -87,12 +87,52 @@ body {
   color: #1C1814;
 }
 
-/* Delete waypoint popup (imperative DOM, outside React) */
-.ol-delete-popup {
+/* Waypoint popup (delete + snap toggles, imperative DOM, outside React) */
+.ol-waypoint-popup {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   padding: 4px;
+}
+
+.ol-snap-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ol-snap-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.ol-snap-btn.ol-snap-active {
+  background: #dcfce7;
+  color: #3A4722;
+}
+
+@media (hover: hover) {
+  .ol-snap-btn:not(:disabled):hover {
+    background: #e5e7eb;
+  }
+  .ol-snap-btn.ol-snap-active:not(:disabled):hover {
+    background: #bbf7d0;
+  }
+}
+
+.ol-snap-btn:focus {
+  outline: none;
 }
 
 .ol-delete-btn {
