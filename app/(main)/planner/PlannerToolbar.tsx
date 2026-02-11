@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -19,7 +19,6 @@ interface PlannerToolbarProps {
   onToggleAddPoints: () => void;
   snapEnabled: boolean;
   onToggleSnap: () => void;
-  isRouting: boolean;
   elevationData: ElevationPoint[] | null;
   isLoadingElevation: boolean;
   onElevationHover?: (point: ElevationHoverPoint | null) => void;
@@ -77,16 +76,10 @@ export default function PlannerToolbar({
   onToggleAddPoints,
   snapEnabled,
   onToggleSnap,
-  isRouting,
   elevationData,
   isLoadingElevation,
   onElevationHover,
 }: PlannerToolbarProps) {
-  // Hold previous distance + elevation gain until everything has settled.
-  // Only commit new values when elevation is not loading — this ensures
-  // distance, elevation gain, and chart all update together in one frame.
-  const stableDistanceRef = useRef(distance);
-  const stableGainRef = useRef<number | null>(null);
   const elevationGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
     let gain = 0;
@@ -96,13 +89,6 @@ export default function PlannerToolbar({
     }
     return Math.round(gain);
   }, [elevationData]);
-
-  useEffect(() => {
-    if (!isRouting && !isLoadingElevation) {
-      stableDistanceRef.current = distance;
-      stableGainRef.current = elevationGain;
-    }
-  }, [isRouting, isLoadingElevation, distance, elevationGain]);
 
   const handleUndo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const handleRedo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);
@@ -188,27 +174,29 @@ export default function PlannerToolbar({
         }`}
       >
         <div className="relative flex items-center gap-3 bg-surface-raised/80 backdrop-blur-sm rounded-lg shadow-md border border-border px-4 py-1.5">
-          <div className={`flex items-center gap-2 shrink-0 transition-opacity ${isRouting ? 'opacity-40' : ''}`}>
-            <span className="text-sm font-semibold text-text-primary tabular-nums">
-              {formatDistance(stableDistanceRef.current)}
-            </span>
-            {stableGainRef.current != null && (
-              <span className="inline-flex items-center gap-0.5 text-sm text-text-secondary tabular-nums">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                  <path d="m8 3 4 8 5-5 5 15H2L8 3z"/>
-                </svg>
-                {stableGainRef.current}m
-              </span>
-            )}
-          </div>
-          {elevationData ? (
-            <ElevationChart data={elevationData} onHover={onElevationHover} />
-          ) : isLoadingElevation ? (
-            <div className="min-w-[120px] max-w-[200px] h-[50px]" />
-          ) : null}
-          {isLoadingElevation && (
-            <div className="absolute inset-0 flex items-center justify-center bg-surface-raised/50 rounded-lg">
-              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-semibold text-text-primary tabular-nums shrink-0">
+            {formatDistance(distance)}
+          </span>
+          {(elevationGain != null || elevationData || isLoadingElevation) && (
+            <div className="relative flex items-center gap-2">
+              {elevationGain != null && (
+                <span className="inline-flex items-center gap-0.5 text-sm text-text-secondary tabular-nums shrink-0">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                    <path d="m8 3 4 8 5-5 5 15H2L8 3z"/>
+                  </svg>
+                  {elevationGain}m
+                </span>
+              )}
+              {elevationData ? (
+                <ElevationChart data={elevationData} onHover={onElevationHover} />
+              ) : isLoadingElevation ? (
+                <div className="min-w-[120px] max-w-[200px] h-[50px]" />
+              ) : null}
+              {isLoadingElevation && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-raised/80 backdrop-blur-sm rounded-lg">
+                  <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
             </div>
           )}
         </div>

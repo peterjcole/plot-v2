@@ -161,7 +161,7 @@ export default function ElevationChart({ data, onHover }: ElevationChartProps) {
   if (!data || data.length < 2) return null;
 
   return (
-    <div className="relative flex-1 min-w-[120px] max-w-[200px] h-[50px]">
+    <div className="relative flex-1 min-w-[120px] max-w-[200px] h-[50px] pl-1">
       <div ref={containerRef} className="w-full h-full" />
 
       {/* Min/max labels */}

@@ -23,6 +23,22 @@ function haversineDistance(a: Waypoint, b: Waypoint): number {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+/** Interpolate points along a straight line between two waypoints at ~50m intervals. */
+function interpolateSegment(a: Waypoint, b: Waypoint): Waypoint[] {
+  const dist = haversineDistance(a, b);
+  const INTERVAL = 50; // meters
+  const numPoints = Math.max(2, Math.ceil(dist / INTERVAL) + 1);
+  const points: Waypoint[] = [];
+  for (let i = 0; i < numPoints; i++) {
+    const t = i / (numPoints - 1);
+    points.push({
+      lat: a.lat + t * (b.lat - a.lat),
+      lng: a.lng + t * (b.lng - a.lng),
+    });
+  }
+  return points;
+}
+
 function buildPolyline(
   waypoints: Waypoint[],
   segments: RouteSegment[]
@@ -36,7 +52,7 @@ function buildPolyline(
     const segCoords =
       seg.coordinates.length >= 2
         ? seg.coordinates
-        : [waypoints[i], waypoints[i + 1]];
+        : interpolateSegment(waypoints[i], waypoints[i + 1]);
 
     if (!segCoords || segCoords.length < 2) continue;
 

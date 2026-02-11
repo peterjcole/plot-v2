@@ -22,7 +22,7 @@ export default function PlannerClient() {
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
 
-  const { isRouting } = useRouteSnapping({ waypoints, segments, dispatch });
+  useRouteSnapping({ waypoints, segments, dispatch });
   const { elevationData, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
   const [hoveredElevationPoint, setHoveredElevationPoint] = useState<ElevationHoverPoint | null>(null);
 
@@ -157,7 +157,6 @@ export default function PlannerClient() {
         onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
         snapEnabled={snapEnabled}
         onToggleSnap={() => setSnapEnabled((v) => !v)}
-        isRouting={isRouting}
         elevationData={elevationData}
         isLoadingElevation={isLoadingElevation}
         onElevationHover={setHoveredElevationPoint}
