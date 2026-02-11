@@ -42,8 +42,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const sampled = downsample(body.coordinates, MAX_COORDS);
-    console.log(`Elevation API: ${body.coordinates.length} input coords, ${sampled.length} after downsample`);
-
     const res = await fetch(
       'https://api.openrouteservice.org/elevation/line',
       {
@@ -78,8 +76,6 @@ export async function POST(request: NextRequest) {
         { status: 502 }
       );
     }
-
-    console.log(`Elevation API: ${coords.length} coords returned from ORS`);
 
     // ORS returns [lng, lat, ele]
     const coordinates = coords.map((c: number[]) => ({
