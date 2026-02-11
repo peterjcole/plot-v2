@@ -478,7 +478,7 @@ export default function PlannerMap({
 
     const viewport = map.getViewport();
 
-    viewport.addEventListener('pointerdown', (e) => {
+    const onDragPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
 
       const pixel = map.getEventPixel(e);
@@ -511,9 +511,9 @@ export default function PlannerMap({
       map.getInteractions().forEach((i) => {
         if (i instanceof DragPan) i.setActive(false);
       });
-    });
+    };
 
-    viewport.addEventListener('pointermove', (e) => {
+    const onDragPointerMove = (e: PointerEvent) => {
       if (dragInsertSegIdx === null || !dragInsertFeature) return;
       if (!e.buttons) {
         // Mouse released outside viewport — clean up
@@ -529,9 +529,9 @@ export default function PlannerMap({
       const pixel = map.getEventPixel(e);
       const coord = map.getCoordinateFromPixel(pixel);
       (dragInsertFeature.getGeometry() as Point).setCoordinates(coord);
-    });
+    };
 
-    viewport.addEventListener('pointerup', () => {
+    const onDragPointerUp = () => {
       if (dragInsertSegIdx === null) return;
 
       // Re-enable map panning
@@ -565,7 +565,11 @@ export default function PlannerMap({
         snap: isSnapped,
       });
       navigator.vibrate?.(15);
-    });
+    };
+
+    viewport.addEventListener('pointerdown', onDragPointerDown);
+    viewport.addEventListener('pointermove', onDragPointerMove);
+    viewport.addEventListener('pointerup', onDragPointerUp);
 
     // Waypoint modify — added SECOND so it has HIGHER priority.
     const pinHighlightSvg =
@@ -783,6 +787,9 @@ export default function PlannerMap({
     onMapReady?.(map);
 
     return () => {
+      viewport.removeEventListener('pointerdown', onDragPointerDown);
+      viewport.removeEventListener('pointermove', onDragPointerMove);
+      viewport.removeEventListener('pointerup', onDragPointerUp);
       map.removeLayer(routeLayer);
       map.removeLayer(waypointLayer);
       map.removeInteraction(waypointModify);

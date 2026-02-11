@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -97,10 +97,12 @@ export default function PlannerToolbar({
     return Math.round(gain);
   }, [elevationData]);
 
-  if (!isRouting && !isLoadingElevation) {
-    stableDistanceRef.current = distance;
-    stableGainRef.current = elevationGain;
-  }
+  useEffect(() => {
+    if (!isRouting && !isLoadingElevation) {
+      stableDistanceRef.current = distance;
+      stableGainRef.current = elevationGain;
+    }
+  }, [isRouting, isLoadingElevation, distance, elevationGain]);
 
   const handleUndo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const handleRedo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);

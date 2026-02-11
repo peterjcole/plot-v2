@@ -15,9 +15,10 @@ export function useRouteSnapping({
   segments,
   dispatch,
 }: UseRouteSnappingOptions) {
-  const [isRouting, setIsRouting] = useState(false);
   const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeCountRef = useRef(0);
+  const [isRouting, setIsRouting] = useState(false);
 
   useEffect(() => {
     // Find segments that need routing: snapped=true, coordinates=[]
@@ -33,8 +34,7 @@ export function useRouteSnapping({
     // Debounce to batch rapid changes
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      setIsRouting(true);
-      let activeCount = 0;
+      let addedCount = 0;
 
       for (const segIdx of pending) {
         // Cancel any existing request for this segment
@@ -48,7 +48,8 @@ export function useRouteSnapping({
         const to = waypoints[segIdx + 1];
         if (!from || !to) continue;
 
-        activeCount++;
+        addedCount++;
+        activeCountRef.current++;
 
         fetch(
           `/api/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}`,
@@ -88,12 +89,15 @@ export function useRouteSnapping({
           })
           .finally(() => {
             abortControllersRef.current.delete(segIdx);
-            activeCount--;
-            if (activeCount <= 0) setIsRouting(false);
+            activeCountRef.current--;
+            if (activeCountRef.current <= 0) {
+              activeCountRef.current = 0;
+              setIsRouting(false);
+            }
           });
       }
 
-      if (activeCount === 0) setIsRouting(false);
+      if (addedCount > 0) setIsRouting(true);
     }, 150);
 
     return () => {
