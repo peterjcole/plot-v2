@@ -39,6 +39,12 @@ export interface Waypoint {
   ele?: number;
 }
 
+export interface RouteSegment {
+  snapped: boolean;
+  coordinates: Waypoint[];
+  distance?: number;
+}
+
 declare global {
   interface Window {
     __MAP_READY__?: boolean;

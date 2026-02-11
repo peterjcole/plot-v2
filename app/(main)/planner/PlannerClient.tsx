@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import type Map from 'ol/Map';
 import { fromLonLat } from 'ol/proj';
 import { useRouteHistory } from './useRouteHistory';
+import { useRouteSnapping } from './useRouteSnapping';
 import { calculateDistance } from './route-utils';
 import PlannerToolbar from './PlannerToolbar';
 import LayersPanel from './LayersPanel';
@@ -15,8 +16,11 @@ import 'ol/ol.css';
 const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
 
 export default function PlannerClient() {
-  const { waypoints, canUndo, canRedo, dispatch } = useRouteHistory();
+  const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+
+  const { isRouting } = useRouteSnapping({ waypoints, segments, dispatch });
 
   const savedHeatmapPrefs = useMemo(() => {
     try {
@@ -49,7 +53,11 @@ export default function PlannerClient() {
   useEffect(() => {
     const stored = loadRoute();
     if (stored && stored.waypoints.length > 0) {
-      dispatch({ type: 'LOAD', waypoints: stored.waypoints });
+      dispatch({
+        type: 'LOAD',
+        waypoints: stored.waypoints,
+        segments: stored.segments,
+      });
     }
   }, [dispatch]);
 
@@ -64,16 +72,20 @@ export default function PlannerClient() {
         const zoom = view.getZoom();
         saveRoute(
           waypoints,
+          segments,
           (center as [number, number]) ?? [0, 0],
           zoom ?? 7
         );
       } else {
-        saveRoute(waypoints, [0, 0], 7);
+        saveRoute(waypoints, segments, [0, 0], 7);
       }
     }, 500);
-  }, [waypoints]);
+  }, [waypoints, segments]);
 
-  const distance = useMemo(() => calculateDistance(waypoints), [waypoints]);
+  const distance = useMemo(
+    () => calculateDistance(waypoints, segments),
+    [waypoints, segments]
+  );
 
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
@@ -108,9 +120,11 @@ export default function PlannerClient() {
     <div className="fixed inset-0">
       <PlannerMap
         waypoints={waypoints}
+        segments={segments}
         dispatch={dispatch}
         onMapReady={handleMapReady}
         addPointsEnabled={addPointsEnabled}
+        snapEnabled={snapEnabled}
         heatmapEnabled={heatmapEnabled}
         heatmapSport={heatmapSport}
         heatmapColor={heatmapColor}
@@ -128,6 +142,7 @@ export default function PlannerClient() {
       />
       <PlannerToolbar
         waypoints={waypoints}
+        segments={segments}
         distance={distance}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -135,6 +150,9 @@ export default function PlannerClient() {
         onGeolocate={handleGeolocate}
         addPointsEnabled={addPointsEnabled}
         onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
+        snapEnabled={snapEnabled}
+        onToggleSnap={() => setSnapEnabled((v) => !v)}
+        isRouting={isRouting}
       />
     </div>
   );

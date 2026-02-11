@@ -9,7 +9,7 @@ import LineString from 'ol/geom/LineString';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Style, Circle as CircleStyle, Fill, Stroke, Icon } from 'ol/style';
-import { Modify } from 'ol/interaction';
+import { DragPan, Modify } from 'ol/interaction';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import type { EventsKey } from 'ol/events';
@@ -17,14 +17,16 @@ import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
-import { Waypoint } from '@/lib/types';
+import { Waypoint, RouteSegment } from '@/lib/types';
 import { OS_PROJECTION } from '@/lib/map-config';
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
+  segments: RouteSegment[];
   dispatch: React.Dispatch<RouteAction>;
   onMapReady?: (map: Map) => void;
   addPointsEnabled: boolean;
+  snapEnabled: boolean;
   heatmapEnabled: boolean;
   heatmapSport: string;
   heatmapColor: string;
@@ -53,13 +55,31 @@ function waypointStyle(index: number) {
   });
 }
 
-const routeStyle = new Style({
-  stroke: new Stroke({
-    color: 'rgba(74, 90, 43, 0.8)',
-    width: 3.5,
-    lineDash: [6, 8],
-  }),
-});
+// Route styles: cased lines — opaque outline + lighter translucent fill, layer opacity on top.
+// Matches ActivityMap look: translucent fill (0.35) with a dark outline (0.85).
+// Layer opacity is 1 — transparency is per-stroke so the fill doesn't mask the outline.
+// Cased lines: opaque outline + opaque lighter fill. The fill fully covers the outline
+// centre so only the border edges remain. Layer opacity (0.45) makes the whole thing translucent.
+const snappedRouteStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 16 }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 10 }) }),
+];
+
+const unsnappedRouteStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 13, lineDash: [12, 14] }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 8, lineDash: [12, 14] }) }),
+];
+
+const routingPendingStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 10, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 6, lineDash: [2, 6] }) }),
+];
+
+// Temporary style during waypoint drag
+const dragTempStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 10, lineDash: [6, 8] }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 6, lineDash: [6, 8] }) }),
+];
 
 function distToSegment(p: number[], a: number[], b: number[]): number {
   const dx = b[0] - a[0];
@@ -91,7 +111,8 @@ function findInsertionIndex(tapCoord: number[], waypoints: Waypoint[]): number {
 function syncFeatures(
   waypointSource: VectorSource | null,
   routeSource: VectorSource | null,
-  waypoints: Waypoint[]
+  waypoints: Waypoint[],
+  segments: RouteSegment[]
 ) {
   if (!waypointSource || !routeSource) return;
 
@@ -108,24 +129,64 @@ function syncFeatures(
 
   routeSource.clear();
   if (waypoints.length >= 2) {
-    const coords = waypoints.map((wp) =>
-      fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
-    );
-    const lineFeature = new Feature({
-      geometry: new LineString(coords),
-    });
-    routeSource.addFeature(lineFeature);
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const seg = segments[i];
+      let coords: number[][];
+
+      if (seg && seg.coordinates.length >= 2) {
+        // Use routed coordinates
+        coords = seg.coordinates.map((wp) =>
+          fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
+        );
+      } else {
+        // Straight line between waypoints
+        coords = [
+          fromLonLat([waypoints[i].lng, waypoints[i].lat], OS_PROJECTION.code),
+          fromLonLat([waypoints[i + 1].lng, waypoints[i + 1].lat], OS_PROJECTION.code),
+        ];
+      }
+
+      const lineFeature = new Feature({
+        geometry: new LineString(coords),
+        segmentIndex: i,
+        snapped: seg?.snapped ?? false,
+      });
+
+      // Style based on segment state
+      if (seg?.snapped && seg.coordinates.length >= 2) {
+        lineFeature.setStyle(snappedRouteStyle);
+      } else if (seg?.snapped && seg.coordinates.length === 0) {
+        lineFeature.setStyle(routingPendingStyle);
+      } else {
+        lineFeature.setStyle(unsnappedRouteStyle);
+      }
+
+      routeSource.addFeature(lineFeature);
+    }
   }
 }
 
-export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsEnabled, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap }: PlannerMapProps) {
+export default function PlannerMap({
+  waypoints,
+  segments,
+  dispatch,
+  onMapReady,
+  addPointsEnabled,
+  snapEnabled,
+  heatmapEnabled,
+  heatmapSport,
+  heatmapColor,
+  dimBaseMap,
+}: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const map = useOpenLayersMap(mapTargetRef);
   const waypointSourceRef = useRef<VectorSource | null>(null);
   const routeSourceRef = useRef<VectorSource | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waypointsRef = useRef(waypoints);
+  const segmentsRef = useRef(segments);
   const addPointsRef = useRef(addPointsEnabled);
+  const snapEnabledRef = useRef(snapEnabled);
   const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
 
@@ -134,8 +195,16 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
   }, [waypoints]);
 
   useEffect(() => {
+    segmentsRef.current = segments;
+  }, [segments]);
+
+  useEffect(() => {
     addPointsRef.current = addPointsEnabled;
   }, [addPointsEnabled]);
+
+  useEffect(() => {
+    snapEnabledRef.current = snapEnabled;
+  }, [snapEnabled]);
 
   // Manage heatmap tile layer
   useEffect(() => {
@@ -232,8 +301,8 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
 
     const routeLayer = new VectorLayer({
       source: routeSource,
-      style: routeStyle,
       zIndex: 5,
+      opacity: 0.45,
     });
 
     map.addLayer(routeLayer);
@@ -242,14 +311,25 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     waypointSourceRef.current = waypointSource;
     routeSourceRef.current = routeSource;
 
-    // Delete popup overlay
+    // Waypoint popup overlay (delete + snap toggles)
     const popupEl = document.createElement('div');
-    popupEl.className = 'ol-delete-popup';
-    popupEl.innerHTML = '<button class="ol-delete-btn" title="Delete waypoint">' +
+    popupEl.className = 'ol-waypoint-popup';
+
+    // Snap "from previous" button (← icon)
+    const snapFromSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>';
+    // Snap "to next" button (→ icon)
+    const snapToSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M5 12h14"/><polyline points="12 5 19 12 12 19"/></svg>';
+
+    popupEl.innerHTML =
+      '<button class="ol-snap-btn ol-snap-from" title="Toggle snap from previous">' + snapFromSvg + '</button>' +
+      '<button class="ol-delete-btn" title="Delete waypoint">' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<polyline points="3 6 5 6 21 6"/>' +
       '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' +
-      '</svg></button>';
+      '</svg></button>' +
+      '<button class="ol-snap-btn ol-snap-to" title="Toggle snap to next">' + snapToSvg + '</button>';
 
     const deleteOverlay = new Overlay({
       element: popupEl,
@@ -258,6 +338,9 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       stopEvent: true,
     });
     map.addOverlay(deleteOverlay);
+
+    const snapFromBtn = popupEl.querySelector('.ol-snap-from') as HTMLButtonElement;
+    const snapToBtn = popupEl.querySelector('.ol-snap-to') as HTMLButtonElement;
 
     // Insert popup overlay (for touch route taps)
     const insertPopupEl = document.createElement('div');
@@ -276,9 +359,11 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     map.addOverlay(insertOverlay);
 
     let insertCoord: number[] | null = null;
+    let insertSegmentIndex: number | null = null;
 
     const hideInsertPopup = () => {
       insertCoord = null;
+      insertSegmentIndex = null;
       insertOverlay.setPosition(undefined);
     };
 
@@ -287,7 +372,14 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       if (insertCoord) {
         const index = findInsertionIndex(insertCoord, waypointsRef.current);
         const [lng, lat] = toLonLat(insertCoord, OS_PROJECTION.code);
-        dispatch({ type: 'INSERT_WAYPOINT', index, waypoint: { lat, lng } });
+        // Inherit snap state from the segment being split
+        const seg = segmentsRef.current[insertSegmentIndex ?? Math.max(0, index - 1)];
+        dispatch({
+          type: 'INSERT_WAYPOINT',
+          index,
+          waypoint: { lat, lng },
+          snap: seg?.snapped,
+        });
         navigator.vibrate?.(15);
       }
       hideInsertPopup();
@@ -295,8 +387,34 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
 
     let deleteTargetIndex: number | null = null;
 
+    const updateSnapButtons = (index: number) => {
+      const segs = segmentsRef.current;
+      const wpCount = waypointsRef.current.length;
+
+      // "From previous" — controls segment[index - 1]
+      if (index === 0) {
+        snapFromBtn.disabled = true;
+        snapFromBtn.classList.remove('ol-snap-active');
+      } else {
+        snapFromBtn.disabled = false;
+        const isSnapped = segs[index - 1]?.snapped ?? false;
+        snapFromBtn.classList.toggle('ol-snap-active', isSnapped);
+      }
+
+      // "To next" — controls segment[index]
+      if (index >= wpCount - 1) {
+        snapToBtn.disabled = true;
+        snapToBtn.classList.remove('ol-snap-active');
+      } else {
+        snapToBtn.disabled = false;
+        const isSnapped = segs[index]?.snapped ?? false;
+        snapToBtn.classList.toggle('ol-snap-active', isSnapped);
+      }
+    };
+
     const showDeletePopup = (coordinate: number[], index: number) => {
       deleteTargetIndex = index;
+      updateSnapButtons(index);
       deleteOverlay.setPosition(coordinate);
       navigator.vibrate?.(40);
     };
@@ -315,73 +433,136 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       hideDeletePopup();
     });
 
-    // Route line modify — added FIRST so it has LOWER priority than waypoint modify.
-    // Handles insert-by-dragging on line edges.
-    const routeModify = new Modify({
-      source: routeSource,
-      pixelTolerance: 10,
-      style: new Style({
-        image: new CircleStyle({
-          radius: 8,
-          fill: new Fill({ color: 'rgba(74, 90, 43, 0.5)' }),
-          stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
-        }),
-      }),
-      condition: (e) => (e.originalEvent as PointerEvent).pointerType !== 'touch',
-    });
-
-    routeModify.on('modifyend', (e) => {
-      const feature = e.features.getArray()[0];
-      if (!feature) return;
-      const geom = feature.getGeometry() as LineString;
-      const newCoords = geom.getCoordinates();
-      const current = waypointsRef.current;
-
-      if (newCoords.length === current.length + 1) {
-        // A vertex was inserted — find which index is new
-        const oldCoords = current.map((wp) =>
-          fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
-        );
-        let insertIndex = -1;
-        let j = 0;
-        for (let i = 0; i < newCoords.length; i++) {
-          if (
-            j < oldCoords.length &&
-            Math.abs(newCoords[i][0] - oldCoords[j][0]) < 1 &&
-            Math.abs(newCoords[i][1] - oldCoords[j][1]) < 1
-          ) {
-            j++;
-          } else {
-            insertIndex = i;
-          }
-        }
-        if (insertIndex >= 0) {
-          const [lng, lat] = toLonLat(newCoords[insertIndex], OS_PROJECTION.code);
-          dispatch({ type: 'INSERT_WAYPOINT', index: insertIndex, waypoint: { lat, lng } });
-          navigator.vibrate?.(15);
-        }
-      } else if (newCoords.length === current.length) {
-        // An existing vertex was moved — find which one changed
-        const oldCoords = current.map((wp) =>
-          fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code)
-        );
-        for (let i = 0; i < newCoords.length; i++) {
-          if (
-            Math.abs(newCoords[i][0] - oldCoords[i][0]) > 1 ||
-            Math.abs(newCoords[i][1] - oldCoords[i][1]) > 1
-          ) {
-            const [lng, lat] = toLonLat(newCoords[i], OS_PROJECTION.code);
-            dispatch({ type: 'MOVE_WAYPOINT', index: i, waypoint: { lat, lng } });
-          }
-        }
+    snapFromBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (deleteTargetIndex !== null && deleteTargetIndex > 0) {
+        dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: deleteTargetIndex - 1 });
+        // Update button state immediately
+        const seg = segmentsRef.current[deleteTargetIndex - 1];
+        snapFromBtn.classList.toggle('ol-snap-active', !seg?.snapped);
+        navigator.vibrate?.(15);
       }
     });
 
-    map.addInteraction(routeModify);
+    snapToBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (deleteTargetIndex !== null && deleteTargetIndex < waypointsRef.current.length - 1) {
+        dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: deleteTargetIndex });
+        // Update button state immediately
+        const seg = segmentsRef.current[deleteTargetIndex];
+        snapToBtn.classList.toggle('ol-snap-active', !seg?.snapped);
+        navigator.vibrate?.(15);
+      }
+    });
+
+    // Custom drag-to-insert on route lines.
+    // OL's Modify interaction can't handle dense routed paths (moves vertices instead of inserting).
+    // This manually tracks pointerdown→drag→pointerup on route features.
+    const dragInsertStyle = new Style({
+      image: new CircleStyle({
+        radius: 8,
+        fill: new Fill({ color: 'rgba(74, 90, 43, 0.5)' }),
+        stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
+      }),
+    });
+
+    let dragInsertSegIdx: number | null = null;
+    let dragInsertSnapped: boolean = false;
+    let dragInsertFeature: Feature | null = null;
+    let dragInsertMoved = false;
+
+    const viewport = map.getViewport();
+
+    viewport.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;
+
+      const pixel = map.getEventPixel(e);
+
+      // Don't start route drag if we hit a waypoint
+      const waypointHit = map.forEachFeatureAtPixel(pixel, () => true, {
+        layerFilter: (layer) => layer === waypointLayer,
+        hitTolerance: 8,
+      });
+      if (waypointHit) return;
+
+      const routeFeature = map.forEachFeatureAtPixel(pixel, (f) => f, {
+        layerFilter: (layer) => layer === routeLayer,
+        hitTolerance: 10,
+      });
+      if (!routeFeature) return;
+
+      dragInsertSegIdx = routeFeature.get('segmentIndex') as number;
+      dragInsertSnapped = routeFeature.get('snapped') as boolean;
+      dragInsertMoved = false;
+
+      const coord = map.getCoordinateFromPixel(pixel);
+
+      // Show drag indicator at pointer position
+      dragInsertFeature = new Feature({ geometry: new Point(coord) });
+      dragInsertFeature.setStyle(dragInsertStyle);
+      waypointSource.addFeature(dragInsertFeature);
+
+      // Disable map panning while dragging on route
+      map.getInteractions().forEach((i) => {
+        if (i instanceof DragPan) i.setActive(false);
+      });
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (dragInsertSegIdx === null || !dragInsertFeature) return;
+      if (!e.buttons) {
+        // Mouse released outside viewport — clean up
+        waypointSource.removeFeature(dragInsertFeature);
+        dragInsertFeature = null;
+        dragInsertSegIdx = null;
+        map.getInteractions().forEach((i) => {
+          if (i instanceof DragPan) i.setActive(true);
+        });
+        return;
+      }
+      dragInsertMoved = true;
+      const pixel = map.getEventPixel(e);
+      const coord = map.getCoordinateFromPixel(pixel);
+      (dragInsertFeature.getGeometry() as Point).setCoordinates(coord);
+    });
+
+    viewport.addEventListener('pointerup', () => {
+      if (dragInsertSegIdx === null) return;
+
+      // Re-enable map panning
+      map.getInteractions().forEach((i) => {
+        if (i instanceof DragPan) i.setActive(true);
+      });
+
+      const coord = dragInsertFeature
+        ? (dragInsertFeature.getGeometry() as Point).getCoordinates()
+        : null;
+
+      // Clean up drag indicator
+      if (dragInsertFeature) {
+        waypointSource.removeFeature(dragInsertFeature);
+        dragInsertFeature = null;
+      }
+
+      const segIdx = dragInsertSegIdx;
+      const isSnapped = dragInsertSnapped;
+      const moved = dragInsertMoved;
+      dragInsertSegIdx = null;
+
+      // Only insert if the user actually dragged (not just clicked — click handler handles that)
+      if (!moved || !coord) return;
+
+      const [lng, lat] = toLonLat(coord, OS_PROJECTION.code);
+      dispatch({
+        type: 'INSERT_WAYPOINT',
+        index: segIdx + 1,
+        waypoint: { lat, lng },
+        snap: isSnapped,
+      });
+      navigator.vibrate?.(15);
+    });
 
     // Waypoint modify — added SECOND so it has HIGHER priority.
-    // When dragging a waypoint marker, this grabs it and stops propagation
-    // so routeModify doesn't also try to handle the line vertex.
     const pinHighlightSvg =
       '<svg xmlns="http://www.w3.org/2000/svg" width="38" height="50" viewBox="-3 -3 38 50">' +
       '<path d="M16 44c-3-10-14-18-14-28a14 14 0 1 1 28 0c0 10-11 18-14 28Z" ' +
@@ -413,18 +594,30 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       geometryChangeKey = geom.on('change', () => {
         const newCoord = geom.getCoordinates();
 
-        // Fix 2: update line live during drag
-        const lineFeature = routeSource.getFeatures()[0];
-        if (lineFeature) {
-          const lineGeom = lineFeature.getGeometry() as LineString;
-          const coords = waypointsRef.current.map((wp, i) => {
-            if (i === dragIndex) return newCoord;
-            return fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
-          });
-          lineGeom.setCoordinates(coords);
+        // During drag: update adjacent route line segments to show straight dashed lines to drag position
+        const routeFeatures = routeSource.getFeatures();
+        for (const rf of routeFeatures) {
+          const segIdx = rf.get('segmentIndex') as number;
+          if (typeof segIdx !== 'number') continue;
+
+          if (segIdx === dragIndex - 1) {
+            // Segment ending at dragged waypoint
+            const lineGeom = rf.getGeometry() as LineString;
+            const startWp = waypointsRef.current[dragIndex - 1];
+            const startCoord = fromLonLat([startWp.lng, startWp.lat], OS_PROJECTION.code);
+            lineGeom.setCoordinates([startCoord, newCoord]);
+            rf.setStyle(dragTempStyle);
+          } else if (segIdx === dragIndex) {
+            // Segment starting at dragged waypoint
+            const lineGeom = rf.getGeometry() as LineString;
+            const endWp = waypointsRef.current[dragIndex + 1];
+            const endCoord = fromLonLat([endWp.lng, endWp.lat], OS_PROJECTION.code);
+            lineGeom.setCoordinates([newCoord, endCoord]);
+            rf.setStyle(dragTempStyle);
+          }
         }
 
-        // Fix 4: track delete overlay if open for this waypoint
+        // Track delete overlay if open for this waypoint
         if (deleteTargetIndex === dragIndex) {
           deleteOverlay.setPosition(newCoord);
         }
@@ -472,16 +665,30 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       if (hadPopup) return;
 
       // Check for route line hit
-      const routeHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+      const routeFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
         layerFilter: (layer) => layer === routeLayer,
         hitTolerance: 6,
       });
-      if (routeHit) {
-        // Touch tap on route line → show insert popup
+      if (routeFeature) {
         const origEvent = e.originalEvent as PointerEvent;
+        const segIndex = routeFeature.get('segmentIndex') as number;
+        const isSnapped = routeFeature.get('snapped') as boolean;
+
         if (origEvent.pointerType === 'touch') {
+          // Touch: show insert popup for all segment types
           insertCoord = e.coordinate;
+          insertSegmentIndex = segIndex ?? null;
           insertOverlay.setPosition(e.coordinate);
+          navigator.vibrate?.(15);
+        } else {
+          // Desktop click on any segment: insert waypoint directly
+          const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+          dispatch({
+            type: 'INSERT_WAYPOINT',
+            index: segIndex + 1,
+            waypoint: { lat, lng },
+            snap: isSnapped,
+          });
           navigator.vibrate?.(15);
         }
         return;
@@ -491,7 +698,11 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       if (!addPointsRef.current) return;
 
       const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
-      dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng } });
+      dispatch({
+        type: 'ADD_WAYPOINT',
+        waypoint: { lat, lng },
+        snap: snapEnabledRef.current,
+      });
       navigator.vibrate?.(15);
     });
 
@@ -550,7 +761,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
         viewport.style.cursor = 'move';
         return;
       }
-      const routeHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+      const routeHit = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
         layerFilter: (layer) => layer === routeLayer,
         hitTolerance: 6,
       });
@@ -562,7 +773,7 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     });
 
     // Initial sync for waypoints loaded from localStorage before map was ready
-    syncFeatures(waypointSource, routeSource, waypointsRef.current);
+    syncFeatures(waypointSource, routeSource, waypointsRef.current, segmentsRef.current);
 
     onMapReady?.(map);
 
@@ -570,7 +781,6 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
       map.removeLayer(routeLayer);
       map.removeLayer(waypointLayer);
       map.removeInteraction(waypointModify);
-      map.removeInteraction(routeModify);
       map.removeOverlay(deleteOverlay);
       map.removeOverlay(insertOverlay);
       waypointSourceRef.current = null;
@@ -578,10 +788,10 @@ export default function PlannerMap({ waypoints, dispatch, onMapReady, addPointsE
     };
   }, [map, dispatch, onMapReady]);
 
-  // Sync waypoints to OL features
+  // Sync waypoints + segments to OL features
   useEffect(() => {
-    syncFeatures(waypointSourceRef.current, routeSourceRef.current, waypoints);
-  }, [waypoints]);
+    syncFeatures(waypointSourceRef.current, routeSourceRef.current, waypoints, segments);
+  }, [waypoints, segments]);
 
   return <div ref={mapTargetRef} className="w-full h-full" />;
 }
