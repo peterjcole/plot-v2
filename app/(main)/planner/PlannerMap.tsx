@@ -31,6 +31,7 @@ interface PlannerMapProps {
   heatmapSport: string;
   heatmapColor: string;
   dimBaseMap: boolean;
+  hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
 }
 
 function pinSvg(index: number): string {
@@ -177,6 +178,7 @@ export default function PlannerMap({
   heatmapSport,
   heatmapColor,
   dimBaseMap,
+  hoveredElevationPoint,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const map = useOpenLayersMap(mapTargetRef);
@@ -189,6 +191,9 @@ export default function PlannerMap({
   const snapEnabledRef = useRef(snapEnabled);
   const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const hoverSourceRef = useRef<VectorSource | null>(null);
+  const hoverLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const hoverOverlayRef = useRef<Overlay | null>(null);
 
   useEffect(() => {
     waypointsRef.current = waypoints;
@@ -792,6 +797,109 @@ export default function PlannerMap({
   useEffect(() => {
     syncFeatures(waypointSourceRef.current, routeSourceRef.current, waypoints, segments);
   }, [waypoints, segments]);
+
+  // Elevation hover marker + tooltip
+  useEffect(() => {
+    if (!map) return;
+
+    if (!hoverSourceRef.current) {
+      const source = new VectorSource();
+      const layer = new VectorLayer({
+        source,
+        zIndex: 15,
+      });
+      map.addLayer(layer);
+      hoverSourceRef.current = source;
+      hoverLayerRef.current = layer;
+    }
+
+    if (!hoverOverlayRef.current) {
+      const el = document.createElement('div');
+      Object.assign(el.style, {
+        background: 'rgba(255, 255, 255, 0.92)',
+        backdropFilter: 'blur(4px)',
+        borderRadius: '6px',
+        boxShadow: '0 1px 6px rgba(0, 0, 0, 0.2)',
+        padding: '3px 8px',
+        fontSize: '12px',
+        color: '#1C1814',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+      });
+      const overlay = new Overlay({
+        element: el,
+        positioning: 'bottom-center',
+        offset: [0, -20],
+        stopEvent: false,
+      });
+      map.addOverlay(overlay);
+      hoverOverlayRef.current = overlay;
+    }
+
+    const source = hoverSourceRef.current;
+    const overlay = hoverOverlayRef.current;
+    source.clear();
+
+    if (hoveredElevationPoint) {
+      const coord = fromLonLat(
+        [hoveredElevationPoint.lng, hoveredElevationPoint.lat],
+        OS_PROJECTION.code
+      );
+      const feature = new Feature({ geometry: new Point(coord) });
+      feature.setStyle([
+        new Style({
+          image: new CircleStyle({
+            radius: 12,
+            fill: new Fill({ color: 'rgba(74, 90, 43, 0.15)' }),
+            stroke: new Stroke({ color: 'rgba(74, 90, 43, 0.3)', width: 1 }),
+          }),
+        }),
+        new Style({
+          image: new CircleStyle({
+            radius: 6,
+            fill: new Fill({ color: '#4A5A2B' }),
+            stroke: new Stroke({ color: '#ffffff', width: 2 }),
+          }),
+        }),
+      ]);
+      source.addFeature(feature);
+
+      // Tooltip content
+      const dist = hoveredElevationPoint.distance;
+      const distStr = dist < 1000
+        ? `${Math.round(dist)}m`
+        : `${(dist / 1000).toFixed(1)}km`;
+      const eleStr = `${Math.round(hoveredElevationPoint.ele)}m`;
+
+      const mountainIcon = '<svg style="display:inline-block;vertical-align:-1px;margin-right:2px;flex-shrink:0" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>';
+      const arrowIcon = '<svg style="display:inline-block;vertical-align:-1px;margin-right:2px;flex-shrink:0" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>';
+
+      const el = overlay.getElement()!;
+      el.innerHTML =
+        `<span style="display:inline-flex;align-items:center;opacity:0.7">${arrowIcon}${distStr}</span>` +
+        `<span style="display:inline-flex;align-items:center;font-weight:600;margin-left:6px">${mountainIcon}${eleStr}</span>`;
+      overlay.setPosition(coord);
+    } else {
+      overlay.setPosition(undefined);
+    }
+  }, [map, hoveredElevationPoint]);
+
+  // Cleanup hover layer + overlay on unmount
+  useEffect(() => {
+    return () => {
+      if (map) {
+        if (hoverLayerRef.current) {
+          map.removeLayer(hoverLayerRef.current);
+          hoverLayerRef.current = null;
+          hoverSourceRef.current = null;
+        }
+        if (hoverOverlayRef.current) {
+          map.removeOverlay(hoverOverlayRef.current);
+          hoverOverlayRef.current = null;
+        }
+      }
+    };
+  }, [map]);
 
   return <div ref={mapTargetRef} className="w-full h-full" />;
 }

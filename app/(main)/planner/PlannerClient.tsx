@@ -6,6 +6,8 @@ import type Map from 'ol/Map';
 import { fromLonLat } from 'ol/proj';
 import { useRouteHistory } from './useRouteHistory';
 import { useRouteSnapping } from './useRouteSnapping';
+import { useElevationProfile } from './useElevationProfile';
+import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
 import PlannerToolbar from './PlannerToolbar';
 import LayersPanel from './LayersPanel';
@@ -21,6 +23,8 @@ export default function PlannerClient() {
   const [snapEnabled, setSnapEnabled] = useState(true);
 
   const { isRouting } = useRouteSnapping({ waypoints, segments, dispatch });
+  const { elevationData, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
+  const [hoveredElevationPoint, setHoveredElevationPoint] = useState<ElevationHoverPoint | null>(null);
 
   const savedHeatmapPrefs = useMemo(() => {
     try {
@@ -129,6 +133,7 @@ export default function PlannerClient() {
         heatmapSport={heatmapSport}
         heatmapColor={heatmapColor}
         dimBaseMap={dimBaseMap}
+        hoveredElevationPoint={hoveredElevationPoint}
       />
       <LayersPanel
         heatmapEnabled={heatmapEnabled}
@@ -153,6 +158,9 @@ export default function PlannerClient() {
         snapEnabled={snapEnabled}
         onToggleSnap={() => setSnapEnabled((v) => !v)}
         isRouting={isRouting}
+        elevationData={elevationData}
+        isLoadingElevation={isLoadingElevation}
+        onElevationHover={setHoveredElevationPoint}
       />
     </div>
   );
