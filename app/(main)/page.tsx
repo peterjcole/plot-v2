@@ -4,7 +4,7 @@ import ActivityList from '@/app/components/ActivityList';
 
 export default async function Home() {
   const session = await getSession();
-  const isLoggedIn = !!session.accessToken;
+  const isLoggedIn = !!session.jwt;
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-surface font-sans">

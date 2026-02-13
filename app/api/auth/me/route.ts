@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth';
 export async function GET() {
   const session = await getSession();
 
-  if (!session.accessToken) {
+  if (!session.jwt) {
     return NextResponse.json({ authenticated: false });
   }
 

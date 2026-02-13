@@ -23,6 +23,7 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
     orientation: (['landscape', 'portrait', 'mixed'].includes(orientation ?? '') ? orientation : undefined) as MockOrientation | undefined,
   } : undefined;
 
+  // token is now a JWT (passed from activity-printout route via session)
   const activity = await getActivityDetail(token || '', activityId, mockOptions);
 
   return (
