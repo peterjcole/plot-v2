@@ -15,6 +15,9 @@ import { unByKey } from 'ol/Observable';
 import type { EventsKey } from 'ol/events';
 import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
+import OlVectorTileLayer from 'ol/layer/VectorTile';
+import OlVectorTileSource from 'ol/source/VectorTile';
+import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -31,6 +34,7 @@ interface PlannerMapProps {
   heatmapSport: string;
   heatmapColor: string;
   dimBaseMap: boolean;
+  personalHeatmapEnabled: boolean;
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
 }
 
@@ -178,6 +182,7 @@ export default function PlannerMap({
   heatmapSport,
   heatmapColor,
   dimBaseMap,
+  personalHeatmapEnabled,
   hoveredElevationPoint,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
@@ -191,6 +196,7 @@ export default function PlannerMap({
   const snapEnabledRef = useRef(snapEnabled);
   const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const hoverSourceRef = useRef<VectorSource | null>(null);
   const hoverLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const hoverOverlayRef = useRef<Overlay | null>(null);
@@ -252,7 +258,7 @@ export default function PlannerMap({
       dimLayerRef.current = null;
     }
 
-    if (!heatmapEnabled || !dimBaseMap) return;
+    if (!(heatmapEnabled || personalHeatmapEnabled) || !dimBaseMap) return;
 
     const dimLayer = new TileLayer({
       source: new XYZ({
@@ -280,7 +286,43 @@ export default function PlannerMap({
         dimLayerRef.current = null;
       }
     };
-  }, [map, heatmapEnabled, dimBaseMap]);
+  }, [map, heatmapEnabled, personalHeatmapEnabled, dimBaseMap]);
+
+  // Manage personal heatmap vector tile layer
+  useEffect(() => {
+    if (!map) return;
+
+    if (personalHeatmapLayerRef.current) {
+      map.removeLayer(personalHeatmapLayerRef.current);
+      personalHeatmapLayerRef.current = null;
+    }
+
+    if (!personalHeatmapEnabled) return;
+
+    const layer = new OlVectorTileLayer({
+      source: new OlVectorTileSource({
+        format: new MVT(),
+        url: '/api/tiles/{z}/{x}/{y}',
+      }),
+      style: new Style({
+        stroke: new Stroke({
+          color: 'rgba(140, 40, 220, 0.55)',
+          width: 2,
+        }),
+      }),
+      zIndex: 4,
+    });
+
+    map.addLayer(layer);
+    personalHeatmapLayerRef.current = layer;
+
+    return () => {
+      if (personalHeatmapLayerRef.current) {
+        map.removeLayer(personalHeatmapLayerRef.current);
+        personalHeatmapLayerRef.current = null;
+      }
+    };
+  }, [map, personalHeatmapEnabled]);
 
   // Update cursor when addPointsEnabled changes
   useEffect(() => {
