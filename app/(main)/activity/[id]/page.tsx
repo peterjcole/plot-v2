@@ -24,11 +24,11 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
   } else {
     const session = await getSession();
 
-    if (!session.accessToken) {
+    if (!session.jwt) {
       redirect('/');
     }
 
-    activity = await getActivityDetail(session.accessToken, id);
+    activity = await getActivityDetail(session.jwt, id);
   }
 
   return (

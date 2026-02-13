@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { getBrowser } from '@/lib/puppeteer';
 import { getSession } from '@/lib/auth';
-import { refreshTokenIfNeeded } from '@/lib/strava';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -10,12 +9,8 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   const session = await getSession();
 
-  if (!session.accessToken) {
+  if (!session.jwt) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-
-  if (await refreshTokenIfNeeded(session)) {
-    await session.save();
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -54,7 +49,7 @@ export async function GET(request: NextRequest) {
     const origin = request.nextUrl.origin;
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
-    const token = encodeURIComponent(session.accessToken);
+    const token = encodeURIComponent(session.jwt);
     const renderUrl = `${origin}/render/${activityId}?token=${token}${bypassParam}`;
 
     await page.goto(renderUrl, {
