@@ -38,6 +38,8 @@ export default function PlannerClient() {
   const [heatmapSport, setHeatmapSport] = useState<string>(() => savedHeatmapPrefs?.sport ?? 'all');
   const [heatmapColor, setHeatmapColor] = useState<string>(() => savedHeatmapPrefs?.color ?? 'blue');
   const [dimBaseMap, setDimBaseMap] = useState(() => savedHeatmapPrefs?.dimBaseMap ?? false);
+  const [personalHeatmapEnabled, setPersonalHeatmapEnabled] = useState(() => savedHeatmapPrefs?.personalHeatmapEnabled ?? false);
+  const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -49,9 +51,18 @@ export default function PlannerClient() {
         sport: heatmapSport,
         color: heatmapColor,
         dimBaseMap,
+        personalHeatmapEnabled,
       }));
     } catch { /* ignore */ }
-  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap]);
+  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled]);
+
+  // Check personal tile availability
+  useEffect(() => {
+    fetch('/api/tiles/meta')
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setPersonalTilesAvailable(data?.available ?? false))
+      .catch(() => setPersonalTilesAvailable(false));
+  }, []);
 
   // Load saved route on mount
   useEffect(() => {
@@ -133,6 +144,7 @@ export default function PlannerClient() {
         heatmapSport={heatmapSport}
         heatmapColor={heatmapColor}
         dimBaseMap={dimBaseMap}
+        personalHeatmapEnabled={personalHeatmapEnabled}
         hoveredElevationPoint={hoveredElevationPoint}
       />
       <LayersPanel
@@ -144,6 +156,9 @@ export default function PlannerClient() {
         onHeatmapColorChange={setHeatmapColor}
         dimBaseMap={dimBaseMap}
         onDimBaseMapChange={setDimBaseMap}
+        personalHeatmapEnabled={personalHeatmapEnabled}
+        onPersonalHeatmapEnabledChange={setPersonalHeatmapEnabled}
+        personalTilesAvailable={personalTilesAvailable}
       />
       <PlannerToolbar
         waypoints={waypoints}

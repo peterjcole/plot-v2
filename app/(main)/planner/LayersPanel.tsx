@@ -11,6 +11,9 @@ interface LayersPanelProps {
   onHeatmapColorChange: (color: string) => void;
   dimBaseMap: boolean;
   onDimBaseMapChange: (dim: boolean) => void;
+  personalHeatmapEnabled: boolean;
+  onPersonalHeatmapEnabledChange: (enabled: boolean) => void;
+  personalTilesAvailable: boolean | null;
 }
 
 const SPORTS = [
@@ -32,17 +35,19 @@ const COLORS = [
 const selectClass =
   'w-full bg-surface-muted border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent';
 
-function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
+function ToggleSwitch({ enabled, onChange, disabled }: { enabled: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button
-      onClick={() => onChange(!enabled)}
+      onClick={() => !disabled && onChange(!enabled)}
+      disabled={disabled}
       className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
+        disabled ? 'bg-surface-muted opacity-50 cursor-not-allowed' :
         enabled ? 'bg-accent' : 'bg-surface-muted'
       }`}
     >
       <span
         className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform mt-0.5 ml-0.5 ${
-          enabled ? 'translate-x-4' : 'translate-x-0'
+          enabled && !disabled ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
@@ -58,6 +63,9 @@ export default function LayersPanel({
   onHeatmapColorChange,
   dimBaseMap,
   onDimBaseMapChange,
+  personalHeatmapEnabled,
+  onPersonalHeatmapEnabledChange,
+  personalTilesAvailable,
 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -86,7 +94,26 @@ export default function LayersPanel({
 
           <div className="w-full h-px bg-border mb-3" />
 
-          {/* Heatmap section */}
+          {/* Personal heatmap section */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-medium text-text-secondary">Personal heatmap</div>
+              <ToggleSwitch
+                enabled={personalHeatmapEnabled}
+                onChange={onPersonalHeatmapEnabledChange}
+                disabled={personalTilesAvailable === false}
+              />
+            </div>
+            {personalTilesAvailable === false && (
+              <p className="text-xs text-text-secondary/70">
+                Import your activities to generate your personal heatmap.
+              </p>
+            )}
+          </div>
+
+          <div className="w-full h-px bg-border mb-3" />
+
+          {/* Global heatmap section */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-medium text-text-secondary">Global heatmap</div>
@@ -95,10 +122,6 @@ export default function LayersPanel({
 
             {heatmapEnabled && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs text-text-secondary">Dim base map</label>
-                  <ToggleSwitch enabled={dimBaseMap} onChange={onDimBaseMapChange} />
-                </div>
                 <div>
                   <label className="text-xs text-text-secondary">Sport</label>
                   <select
@@ -126,6 +149,16 @@ export default function LayersPanel({
               </div>
             )}
           </div>
+
+          {(heatmapEnabled || personalHeatmapEnabled) && (
+            <>
+              <div className="w-full h-px bg-border my-3" />
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-text-secondary">Dim base map</label>
+                <ToggleSwitch enabled={dimBaseMap} onChange={onDimBaseMapChange} />
+              </div>
+            </>
+          )}
         </div>
       )}
 
