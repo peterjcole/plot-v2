@@ -29,12 +29,16 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function ActivityList() {
-  const [activities, setActivities] = useState<ActivitySummary[]>([]);
+interface ActivityListProps {
+  initialActivities: ActivitySummary[];
+}
+
+export default function ActivityList({ initialActivities }: ActivityListProps) {
+  const [activities, setActivities] = useState<ActivitySummary[]>(initialActivities);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(initialActivities.length === 20);
   const fetchIdRef = useRef(0);
   const [downloading, setDownloading] = useState<Set<number>>(new Set());
   const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
@@ -64,8 +68,14 @@ export default function ActivityList() {
     }
   }, [page]);
 
-  // Fetch activities on mount and page change
+  // Fetch activities on page change (page 1 is provided server-side)
+  const initialPageRef = useRef(true);
   useEffect(() => {
+    if (initialPageRef.current) {
+      initialPageRef.current = false;
+      return;
+    }
+    setLoading(true);
     fetchActivities();
   }, [fetchActivities]);
 
@@ -135,11 +145,18 @@ export default function ActivityList() {
     }
   }, []);
 
-  if (loading && !importStatus) {
-    return <p className="text-text-secondary">Loading activities...</p>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-8">
+        <svg className="h-6 w-6 animate-spin text-text-secondary" viewBox="0 0 24 24" fill="none" aria-label="Loading activities">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      </div>
+    );
   }
 
-  if (error && !importStatus) {
+  if (error) {
     return <p className="text-red-600">Error: {error}</p>;
   }
 

@@ -1,10 +1,12 @@
 import { getSession } from '@/lib/auth';
+import { getAthleteActivities } from '@/lib/strava';
 import LoginButton from '@/app/components/LoginButton';
 import ActivityList from '@/app/components/ActivityList';
 
 export default async function Home() {
   const session = await getSession();
   const isLoggedIn = !!session.jwt;
+  const initialActivities = isLoggedIn ? await getAthleteActivities(session.jwt!, 1, 20) : [];
 
   return (
     <div className="flex min-h-screen items-start justify-center bg-surface font-sans">
@@ -29,7 +31,7 @@ export default async function Home() {
                 </form>
               </div>
             </div>
-            <ActivityList />
+            <ActivityList initialActivities={initialActivities} />
           </>
         ) : (
           <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
