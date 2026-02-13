@@ -303,6 +303,7 @@ export default function PlannerMap({
       source: new OlVectorTileSource({
         format: new MVT(),
         url: '/api/tiles/{z}/{x}/{y}',
+        maxZoom: 14,
       }),
       style: new Style({
         stroke: new Stroke({
