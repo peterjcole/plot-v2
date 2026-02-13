@@ -10,6 +10,7 @@ import { useElevationProfile } from './useElevationProfile';
 import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
 import PlannerToolbar from './PlannerToolbar';
+import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION } from '@/lib/map-config';
@@ -131,6 +132,13 @@ export default function PlannerClient() {
     );
   }, []);
 
+  const handlePlaceSelect = useCallback((coordinates: [number, number]) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const center = fromLonLat(coordinates, OS_PROJECTION.code);
+    map.getView().animate({ center, zoom: 8, duration: 500 });
+  }, []);
+
   return (
     <div className="fixed inset-0">
       <PlannerMap
@@ -160,6 +168,7 @@ export default function PlannerClient() {
         onPersonalHeatmapEnabledChange={setPersonalHeatmapEnabled}
         personalTilesAvailable={personalTilesAvailable}
       />
+      <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar
         waypoints={waypoints}
         segments={segments}
