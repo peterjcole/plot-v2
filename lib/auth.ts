@@ -2,12 +2,15 @@ import { getIronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 
 export interface SessionData {
-  jwt?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: number;
   athlete?: {
     id: number;
     firstname: string;
     lastname: string;
   };
+  oauthState?: string;
 }
 
 const sessionSecret = process.env.SESSION_SECRET;
@@ -29,24 +32,4 @@ export const sessionOptions: SessionOptions = {
 
 export async function getSession() {
   return getIronSession<SessionData>(await cookies(), sessionOptions);
-}
-
-const BACKEND_URL = process.env.HEATMAP_BACKEND_URL;
-
-/**
- * Make an authenticated request to the backend API.
- * Returns null if not authenticated.
- */
-export async function backendFetch(path: string, jwt: string, init?: RequestInit): Promise<Response> {
-  if (!BACKEND_URL) {
-    throw new Error('HEATMAP_BACKEND_URL is not configured');
-  }
-
-  return fetch(`${BACKEND_URL}${path}`, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      Authorization: `Bearer ${jwt}`,
-    },
-  });
 }

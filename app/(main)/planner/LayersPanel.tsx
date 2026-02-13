@@ -94,24 +94,22 @@ export default function LayersPanel({
 
           <div className="w-full h-px bg-border mb-3" />
 
-          {/* Personal heatmap section */}
-          <div className="mb-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-medium text-text-secondary">Personal heatmap</div>
-              <ToggleSwitch
-                enabled={personalHeatmapEnabled}
-                onChange={onPersonalHeatmapEnabledChange}
-                disabled={personalTilesAvailable === false}
-              />
-            </div>
-            {personalTilesAvailable === false && (
-              <p className="text-xs text-text-secondary/70">
-                Import your activities to generate your personal heatmap.
-              </p>
-            )}
-          </div>
+          {/* Personal heatmap section — only shown for tile-enabled users */}
+          {personalTilesAvailable === true && (
+            <>
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-text-secondary">Personal heatmap</div>
+                  <ToggleSwitch
+                    enabled={personalHeatmapEnabled}
+                    onChange={onPersonalHeatmapEnabledChange}
+                  />
+                </div>
+              </div>
 
-          <div className="w-full h-px bg-border mb-3" />
+              <div className="w-full h-px bg-border mb-3" />
+            </>
+          )}
 
           {/* Global heatmap section */}
           <div>

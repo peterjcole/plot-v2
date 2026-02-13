@@ -4,12 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ActivitySummary } from '@/lib/types';
 
-interface ImportStatus {
-  status: 'running' | 'completed' | 'failed' | null;
-  activities_imported?: number;
-  error?: string;
-}
-
 function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(1) + ' km';
 }
@@ -41,8 +35,6 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
   const [hasMore, setHasMore] = useState(initialActivities.length === 20);
   const fetchIdRef = useRef(0);
   const [downloading, setDownloading] = useState<Set<number>>(new Set());
-  const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const perPage = 20;
 
@@ -78,47 +70,6 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
     setLoading(true);
     fetchActivities();
   }, [fetchActivities]);
-
-  // Poll import status
-  useEffect(() => {
-    let cancelled = false;
-
-    async function checkImportStatus() {
-      try {
-        const res = await fetch('/api/import/status');
-        if (cancelled) return;
-        if (!res.ok) return;
-        const data: ImportStatus = await res.json();
-        if (cancelled) return;
-        setImportStatus(data);
-
-        if (data.status === 'running') {
-          // Re-fetch activities to show newly imported ones
-          fetchActivities();
-        }
-
-        if (data.status === 'completed') {
-          // Final re-fetch and stop polling
-          fetchActivities();
-          if (pollRef.current) clearInterval(pollRef.current);
-        }
-
-        if (data.status === 'failed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-        }
-      } catch {
-        // Silently ignore polling errors
-      }
-    }
-
-    checkImportStatus();
-    pollRef.current = setInterval(checkImportStatus, 3000);
-
-    return () => {
-      cancelled = true;
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDownload = useCallback(async (activityId: number) => {
     setDownloading((prev) => new Set(prev).add(activityId));
@@ -162,30 +113,7 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
 
   return (
     <div className="w-full">
-      {importStatus?.status === 'running' && (
-        <div className="mb-4 flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-text-primary">
-          <svg className="h-4 w-4 shrink-0 animate-spin text-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <span>
-            Importing activities...{' '}
-            {importStatus.activities_imported != null && importStatus.activities_imported > 0 && (
-              <span className="text-text-secondary">
-                ({importStatus.activities_imported} imported so far)
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-
-      {importStatus?.status === 'failed' && (
-        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
-          Import failed{importStatus.error ? `: ${importStatus.error}` : '.'}
-        </div>
-      )}
-
-      {activities.length === 0 && page === 1 && importStatus?.status !== 'running' ? (
+      {activities.length === 0 && page === 1 ? (
         <p className="text-text-secondary">No activities found.</p>
       ) : (
         <>

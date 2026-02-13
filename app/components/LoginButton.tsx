@@ -1,13 +1,9 @@
 'use client';
 
 export default function LoginButton() {
-  const backendUrl = process.env.NEXT_PUBLIC_HEATMAP_BACKEND_URL;
-  const redirectUri = `${window.location.origin}/api/auth/token`;
-  const href = `${backendUrl}/auth/strava?redirect_uri=${encodeURIComponent(redirectUri)}`;
-
   return (
     <a
-      href={href}
+      href="/api/auth/strava"
       className="inline-flex items-center gap-2 rounded-md bg-[#FC4C02] px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-[#e04400]"
     >
       <svg
