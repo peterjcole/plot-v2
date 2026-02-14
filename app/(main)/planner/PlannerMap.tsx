@@ -478,9 +478,8 @@ export default function PlannerMap({
       source: gridSource,
       style: new Style({
         stroke: new Stroke({
-          color: 'rgba(150, 150, 150, 0.4)',
-          width: 0.5,
-          lineDash: [4, 4],
+          color: 'rgba(80, 80, 80, 0.5)',
+          width: 1,
         }),
       }),
       zIndex: 3.4,
