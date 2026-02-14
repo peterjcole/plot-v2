@@ -86,7 +86,7 @@ export default function ElevationChart({ data, onHover }: ElevationChartProps) {
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 50,
+      height: 28,
       layout: {
         background: { color: 'transparent' },
         textColor: 'transparent',
@@ -145,6 +145,7 @@ export default function ElevationChart({ data, onHover }: ElevationChartProps) {
     const ro = new ResizeObserver(() => {
       if (containerRef.current) {
         chart.applyOptions({ width: containerRef.current.clientWidth });
+        chart.timeScale().fitContent();
       }
     });
     ro.observe(containerRef.current);
@@ -161,21 +162,21 @@ export default function ElevationChart({ data, onHover }: ElevationChartProps) {
   if (!data || data.length < 2) return null;
 
   return (
-    <div className="relative flex-1 min-w-[120px] max-w-[200px] h-[50px] pl-1">
+    <div className="relative flex-1 min-w-[120px] h-[28px] pl-1">
       <div ref={containerRef} className="w-full h-full" />
 
       {/* Min/max labels */}
-      <span className="absolute top-0 right-1 text-[9px] leading-none text-text-secondary/70 pointer-events-none">
+      <span className="absolute top-0 right-1 text-[8px] leading-none text-text-secondary/70 pointer-events-none">
         {maxEle}m
       </span>
-      <span className="absolute bottom-0 right-1 text-[9px] leading-none text-text-secondary/70 pointer-events-none">
+      <span className="absolute bottom-0 right-1 text-[8px] leading-none text-text-secondary/70 pointer-events-none">
         {minEle}m
       </span>
 
       {/* Hover tooltip */}
       {tooltip && (
         <div
-          className="absolute top-[-18px] text-[10px] font-medium text-text-primary bg-surface-raised/90 rounded px-1 py-0.5 pointer-events-none whitespace-nowrap shadow-sm border border-border"
+          className="absolute top-0 z-10 text-[10px] font-medium text-text-primary bg-surface-raised rounded px-1 py-0.5 pointer-events-none whitespace-nowrap shadow-sm border border-border"
           style={{ left: tooltip.x, transform: 'translateX(-50%)' }}
         >
           {Math.round(tooltip.ele)}m

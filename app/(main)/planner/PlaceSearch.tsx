@@ -93,10 +93,10 @@ export default function PlaceSearch({ onSelect }: PlaceSearchProps) {
       <button
         onClick={() => (open ? close() : setOpen(true))}
         title="Search places"
-        className={`absolute bottom-[72px] right-3 z-10 flex items-center justify-center w-11 h-11 rounded-lg backdrop-blur-sm shadow-lg border transition-colors ${
+        className={`absolute bottom-[72px] right-3 z-10 flex items-center justify-center w-11 h-11 rounded-lg backdrop-blur-md shadow-lg border transition-colors ${
           open
             ? 'bg-accent text-white border-accent'
-            : 'bg-surface-raised/95 border-border text-text-primary hover:bg-surface-muted'
+            : 'bg-surface-raised/70 border-border text-text-primary hover:bg-surface-muted'
         }`}
       >
         <Search size={18} />
@@ -108,7 +108,7 @@ export default function PlaceSearch({ onSelect }: PlaceSearchProps) {
           ref={panelRef}
           className="absolute bottom-[74px] right-[65px] z-20 w-64 sm:w-72"
         >
-          <div className="bg-surface-raised/95 backdrop-blur-sm rounded-lg shadow-lg border border-border overflow-hidden">
+          <div className="bg-surface-raised/70 backdrop-blur-md rounded-lg shadow-lg border border-border overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2">
               <Search size={14} className="text-text-secondary shrink-0" />
               <input

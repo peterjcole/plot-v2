@@ -171,7 +171,7 @@ export default function PlannerClient() {
         hoveredElevationPoint={hoveredElevationPoint}
       />
       {/* Zoom controls — bottom-left, above layers button */}
-      <div className="absolute bottom-[72px] left-3 z-10 flex flex-col bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border overflow-hidden">
+      <div className="absolute bottom-[72px] left-3 z-10 flex flex-col bg-surface-raised/70 backdrop-blur-md rounded-xl shadow-lg border border-border overflow-hidden">
         <button
           onClick={handleZoomIn}
           title="Zoom in"

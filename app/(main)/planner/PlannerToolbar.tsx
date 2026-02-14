@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { Undo2, Redo2, Trash2, Download, Mountain, LocateFixed } from 'lucide-react';
+import { Undo2, Redo2, Trash2, Download, Mountain, LocateFixed, MapPinPlus, Magnet } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
 import ElevationChart, { type ElevationHoverPoint } from './ElevationChart';
 import Switch from '@/app/components/ui/Switch';
+import IconToggle from '@/app/components/ui/IconToggle';
 
 interface PlannerToolbarProps {
   waypoints: Waypoint[];
@@ -32,7 +33,7 @@ function formatDistance(meters: number): string {
 }
 
 const btnClass =
-  'flex items-center justify-center w-11 h-11 rounded-lg text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors';
+  'flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-lg text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors';
 
 
 export default function PlannerToolbar({
@@ -78,65 +79,78 @@ export default function PlannerToolbar({
 
   return (
     <>
-      {/* Main toolbar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border px-2 py-1.5 max-w-[calc(100vw-1.5rem)] sm:gap-2 sm:px-3 sm:py-2">
-        {/* Add Points toggle */}
-        <Switch
-          checked={addPointsEnabled}
-          onCheckedChange={() => onToggleAddPoints()}
-          label="Add Points"
-        />
+      {/* Toolbar + elevation column */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col max-w-[calc(100vw-1.5rem)]">
+        {/* Main toolbar */}
+        <div className={`relative flex items-center justify-evenly gap-1 bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border px-2 py-1.5 sm:justify-start sm:gap-2 sm:px-3 sm:py-2 ${waypoints.length >= 2 ? 'rounded-t-xl' : 'rounded-xl'}`}>
+          {/* Add Points toggle — icon on small, switch on large */}
+          <div className="sm:hidden">
+            <IconToggle pressed={addPointsEnabled} onPressedChange={() => onToggleAddPoints()} title="Add Points">
+              <MapPinPlus size={18} />
+            </IconToggle>
+          </div>
+          <div className="hidden sm:block">
+            <Switch
+              checked={addPointsEnabled}
+              onCheckedChange={() => onToggleAddPoints()}
+              label="Add Points"
+            />
+          </div>
 
-        {/* Snap to Path toggle — slides in when Add Points is ON */}
-        <div
-          className={`overflow-hidden transition-all duration-200 ${
-            addPointsEnabled
-              ? 'max-w-48 opacity-100'
-              : 'max-w-0 opacity-0'
-          }`}
-        >
-          <Switch
-            checked={snapEnabled}
-            onCheckedChange={() => onToggleSnap()}
-            label="Snap to Path"
-          />
+          {/* Snap to Path — always visible as icon on small, slides in as switch on large */}
+          <div className="sm:hidden">
+            <IconToggle pressed={snapEnabled} onPressedChange={() => onToggleSnap()} title="Snap to Path" disabled={!addPointsEnabled}>
+              <Magnet size={18} />
+            </IconToggle>
+          </div>
+          <div
+            className={`hidden sm:block overflow-hidden transition-all duration-200 ${
+              addPointsEnabled
+                ? 'max-w-48 opacity-100'
+                : 'max-w-0 opacity-0'
+            }`}
+          >
+            <Switch
+              checked={snapEnabled}
+              onCheckedChange={() => onToggleSnap()}
+              label="Snap to Path"
+            />
+          </div>
+
+          <div className="w-px h-6 bg-border shrink-0" />
+
+          <button onClick={handleUndo} disabled={!canUndo} title="Undo" className={btnClass}>
+            <Undo2 size={18} />
+          </button>
+
+          <button onClick={handleRedo} disabled={!canRedo} title="Redo" className={btnClass}>
+            <Redo2 size={18} />
+          </button>
+
+          <div className="w-px h-6 bg-border shrink-0" />
+
+          <button onClick={handleClear} disabled={waypoints.length === 0} title="Clear route" className={btnClass}>
+            <Trash2 size={18} />
+          </button>
+
+          <button onClick={handleExport} disabled={waypoints.length === 0} title="Export GPX" className={btnClass}>
+            <Download size={18} />
+          </button>
         </div>
 
-        <div className="w-px h-6 bg-border" />
-
-        <button onClick={handleUndo} disabled={!canUndo} title="Undo" className={btnClass}>
-          <Undo2 size={18} />
-        </button>
-
-        <button onClick={handleRedo} disabled={!canRedo} title="Redo" className={btnClass}>
-          <Redo2 size={18} />
-        </button>
-
-        <div className="w-px h-6 bg-border" />
-
-        <button onClick={handleClear} disabled={waypoints.length === 0} title="Clear route" className={btnClass}>
-          <Trash2 size={18} />
-        </button>
-
-        <button onClick={handleExport} disabled={waypoints.length === 0} title="Export GPX" className={btnClass}>
-          <Download size={18} />
-        </button>
-      </div>
-
-      {/* Distance tray — visible when route has 2+ waypoints */}
-      <div
-        className={`absolute left-1/2 -translate-x-1/2 z-10 w-max transition-all duration-300 ease-out ${
-          waypoints.length >= 2
-            ? 'top-[68px] sm:top-[72px] opacity-100'
-            : 'top-[52px] sm:top-[56px] opacity-0 pointer-events-none'
-        }`}
-      >
-        <div className="relative flex items-center gap-3 bg-surface-raised/80 backdrop-blur-sm rounded-lg shadow-md border border-border px-4 py-1.5">
-          <span className="text-sm font-semibold text-text-primary tabular-nums shrink-0">
-            {formatDistance(distance)}
-          </span>
-          {(elevationGain != null || elevationData || isLoadingElevation) && (
-            <div className="relative flex items-center gap-2">
+        {/* Elevation tray — slides down from under the toolbar */}
+        <div
+          className={`w-full overflow-hidden transition-all duration-300 ease-out ${
+            waypoints.length >= 2
+              ? 'max-h-[80px] opacity-100'
+              : 'max-h-0 opacity-0 pointer-events-none'
+          }`}
+        >
+          <div className="relative -mt-2 pt-4 flex items-center gap-3 bg-surface-raised/50 backdrop-blur-md rounded-b-xl shadow-md border border-border border-t-0 px-4 py-1.5">
+            <span className="text-sm font-semibold text-text-primary tabular-nums shrink-0">
+              {formatDistance(distance)}
+            </span>
+            <div className="relative flex items-center gap-2 flex-1 min-w-0 h-[28px]">
               {elevationGain != null && (
                 <span className="inline-flex items-center gap-0.5 text-sm text-text-secondary tabular-nums shrink-0">
                   <Mountain size={10} strokeWidth={2.5} className="shrink-0" />
@@ -145,16 +159,14 @@ export default function PlannerToolbar({
               )}
               {elevationData ? (
                 <ElevationChart data={elevationData} onHover={onElevationHover} />
-              ) : isLoadingElevation ? (
-                <div className="min-w-[120px] max-w-[200px] h-[50px]" />
               ) : null}
               {isLoadingElevation && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-raised/80 backdrop-blur-sm rounded-lg">
+                <div className="absolute inset-0 z-10 flex items-center justify-center">
                   <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -162,7 +174,7 @@ export default function PlannerToolbar({
       <button
         onClick={onGeolocate}
         title="My location"
-        className="absolute bottom-4 right-3 z-10 flex items-center justify-center w-11 h-11 rounded-lg bg-surface-raised/95 backdrop-blur-sm shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
+        className="absolute bottom-4 right-3 z-10 flex items-center justify-center w-11 h-11 rounded-lg bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
       >
         <LocateFixed size={18} />
       </button>

@@ -30,9 +30,9 @@ export default function Switch({ checked, onCheckedChange, label, disabled }: Sw
   if (!label) return switchElement;
 
   return (
-    <label className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-surface-muted sm:gap-2 cursor-pointer whitespace-nowrap">
+    <label className="flex items-center gap-1.5 px-1.5 py-1.5 rounded-lg transition-colors hover:bg-surface-muted sm:gap-2 sm:px-2 cursor-pointer min-w-0">
       {switchElement}
-      <span className="text-xs font-medium text-text-primary leading-tight">{label}</span>
+      <span className="text-xs font-medium text-text-primary leading-tight overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
     </label>
   );
 }

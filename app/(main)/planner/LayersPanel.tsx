@@ -56,7 +56,7 @@ export default function LayersPanel({
   return (
     <div className="absolute bottom-4 left-3 z-10">
       {open && (
-        <div className="mb-2 w-56 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border p-3">
+        <div className="mb-2 w-56 bg-surface-raised/70 backdrop-blur-md rounded-xl shadow-lg border border-border p-3">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-text-primary">Layers</span>
             <button
@@ -144,7 +144,7 @@ export default function LayersPanel({
       <button
         onClick={() => setOpen((v) => !v)}
         title="Layers"
-        className="flex items-center justify-center w-11 h-11 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
+        className="flex items-center justify-center w-11 h-11 bg-surface-raised/70 backdrop-blur-md rounded-xl shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
       >
         <Layers size={18} />
       </button>
