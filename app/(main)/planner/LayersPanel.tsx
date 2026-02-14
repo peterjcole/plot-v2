@@ -16,6 +16,10 @@ interface LayersPanelProps {
   personalHeatmapEnabled: boolean;
   onPersonalHeatmapEnabledChange: (enabled: boolean) => void;
   personalTilesAvailable: boolean | null;
+  explorerEnabled: boolean;
+  onExplorerEnabledChange: (enabled: boolean) => void;
+  explorerFilter: string;
+  onExplorerFilterChange: (filter: string) => void;
 }
 
 const SPORTS = [
@@ -50,6 +54,10 @@ export default function LayersPanel({
   personalHeatmapEnabled,
   onPersonalHeatmapEnabledChange,
   personalTilesAvailable,
+  explorerEnabled,
+  onExplorerEnabledChange,
+  explorerFilter,
+  onExplorerFilterChange,
 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -86,6 +94,30 @@ export default function LayersPanel({
                     onCheckedChange={onPersonalHeatmapEnabledChange}
                   />
                 </div>
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-text-secondary">Explorer tiles</div>
+                  <Switch
+                    checked={explorerEnabled}
+                    onCheckedChange={onExplorerEnabledChange}
+                  />
+                </div>
+
+                {explorerEnabled && (
+                  <div>
+                    <label className="text-xs text-text-secondary">Filter</label>
+                    <select
+                      value={explorerFilter}
+                      onChange={(e) => onExplorerFilterChange(e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="all">All</option>
+                      <option value="non-cycling">Non-cycling</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="w-full h-px bg-border mb-3" />
@@ -129,7 +161,7 @@ export default function LayersPanel({
             )}
           </div>
 
-          {(heatmapEnabled || personalHeatmapEnabled) && (
+          {(heatmapEnabled || personalHeatmapEnabled || explorerEnabled) && (
             <>
               <div className="w-full h-px bg-border my-3" />
               <div className="flex items-center justify-between">

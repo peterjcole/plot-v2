@@ -1,16 +1,17 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import Map from 'ol/Map';
 import Overlay from 'ol/Overlay';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
+import Polygon from 'ol/geom/Polygon';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Style, Circle as CircleStyle, Fill, Stroke, Icon } from 'ol/style';
 import { DragPan, Modify } from 'ol/interaction';
-import { fromLonLat, toLonLat } from 'ol/proj';
+import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import type { EventsKey } from 'ol/events';
 import TileLayer from 'ol/layer/Tile';
@@ -35,6 +36,8 @@ interface PlannerMapProps {
   heatmapColor: string;
   dimBaseMap: boolean;
   personalHeatmapEnabled: boolean;
+  explorerEnabled: boolean;
+  explorerFilter: string;
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
 }
 
@@ -183,6 +186,8 @@ export default function PlannerMap({
   heatmapColor,
   dimBaseMap,
   personalHeatmapEnabled,
+  explorerEnabled,
+  explorerFilter,
   hoveredElevationPoint,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
@@ -197,6 +202,9 @@ export default function PlannerMap({
   const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
+  const explorerGridLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerSquareLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const hoverSourceRef = useRef<VectorSource | null>(null);
   const hoverLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const hoverOverlayRef = useRef<Overlay | null>(null);
@@ -258,7 +266,7 @@ export default function PlannerMap({
       dimLayerRef.current = null;
     }
 
-    if (!(heatmapEnabled || personalHeatmapEnabled) || !dimBaseMap) return;
+    if (!(heatmapEnabled || personalHeatmapEnabled || explorerEnabled) || !dimBaseMap) return;
 
     const dimLayer = new TileLayer({
       source: new XYZ({
@@ -286,7 +294,7 @@ export default function PlannerMap({
         dimLayerRef.current = null;
       }
     };
-  }, [map, heatmapEnabled, personalHeatmapEnabled, dimBaseMap]);
+  }, [map, heatmapEnabled, personalHeatmapEnabled, explorerEnabled, dimBaseMap]);
 
   // Manage personal heatmap vector tile layer
   useEffect(() => {
@@ -324,6 +332,196 @@ export default function PlannerMap({
       }
     };
   }, [map, personalHeatmapEnabled]);
+
+  /** Convert OSM tile x/y at a given zoom to a polygon in EPSG:27700 */
+  const tileToPolygonCoords = useCallback((x: number, y: number, zoom: number): number[][] => {
+    const n = 1 << zoom;
+    const lonLeft = (x / n) * 360 - 180;
+    const lonRight = ((x + 1) / n) * 360 - 180;
+    const latTopRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+    const latBottomRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+    const latTop = (latTopRad * 180) / Math.PI;
+    const latBottom = (latBottomRad * 180) / Math.PI;
+
+    return [
+      fromLonLat([lonLeft, latTop], OS_PROJECTION.code),
+      fromLonLat([lonRight, latTop], OS_PROJECTION.code),
+      fromLonLat([lonRight, latBottom], OS_PROJECTION.code),
+      fromLonLat([lonLeft, latBottom], OS_PROJECTION.code),
+      fromLonLat([lonLeft, latTop], OS_PROJECTION.code),
+    ];
+  }, []);
+
+  /** Convert lat/lng to z14 tile coordinates (same formula as backend) */
+  const latLngToTile = useCallback((lat: number, lng: number, zoom: number) => {
+    const n = 1 << zoom;
+    const x = Math.floor(((lng + 180) / 360) * n);
+    const latRad = (lat * Math.PI) / 180;
+    const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+    return { x, y };
+  }, []);
+
+  // Explorer: visited tiles + max square layers
+  useEffect(() => {
+    if (!map) return;
+
+    // Cleanup previous layers
+    if (explorerTilesLayerRef.current) {
+      map.removeLayer(explorerTilesLayerRef.current);
+      explorerTilesLayerRef.current = null;
+    }
+    if (explorerSquareLayerRef.current) {
+      map.removeLayer(explorerSquareLayerRef.current);
+      explorerSquareLayerRef.current = null;
+    }
+
+    if (!explorerEnabled) return;
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchExplorerData = (retriesLeft: number) => {
+      fetch(`/api/explorer?filter=${encodeURIComponent(explorerFilter)}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data: { status?: string; tiles?: [number, number][]; maxSquare?: { x: number; y: number; size: number } | null } | null) => {
+          if (cancelled || !data) return;
+
+          // Backend is still computing — poll again
+          if (data.status === 'computing') {
+            if (retriesLeft > 0) {
+              pollTimer = setTimeout(() => fetchExplorerData(retriesLeft - 1), 2000);
+            }
+            return;
+          }
+
+          if (!data.tiles) return;
+
+          // Visited tiles layer
+          const tilesSource = new VectorSource();
+          for (const [x, y] of data.tiles) {
+            const coords = tileToPolygonCoords(x, y, 14);
+            const feature = new Feature({ geometry: new Polygon([coords]) });
+            tilesSource.addFeature(feature);
+          }
+
+          const tilesLayer = new VectorLayer({
+            source: tilesSource,
+            style: new Style({
+              fill: new Fill({ color: 'rgba(46, 204, 113, 0.25)' }),
+              stroke: new Stroke({ color: 'rgba(46, 204, 113, 0.5)', width: 0.5 }),
+            }),
+            zIndex: 3.5,
+          });
+
+          map.addLayer(tilesLayer);
+          explorerTilesLayerRef.current = tilesLayer;
+
+          // Max square layer
+          if (data.maxSquare) {
+            const { x, y, size } = data.maxSquare;
+            const squareCoords = [
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([((x + size) / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([((x + size) / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + size)) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + size)) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+            ];
+
+            const squareSource = new VectorSource();
+            squareSource.addFeature(new Feature({ geometry: new Polygon([squareCoords]) }));
+
+            const squareLayer = new VectorLayer({
+              source: squareSource,
+              style: new Style({
+                fill: new Fill({ color: 'rgba(231, 76, 60, 0.08)' }),
+                stroke: new Stroke({ color: 'rgba(231, 76, 60, 0.9)', width: 3 }),
+              }),
+              zIndex: 3.6,
+            });
+
+            map.addLayer(squareLayer);
+            explorerSquareLayerRef.current = squareLayer;
+          }
+        })
+        .catch(() => { /* silently fail */ });
+    };
+
+    fetchExplorerData(15);
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      if (explorerTilesLayerRef.current) {
+        map.removeLayer(explorerTilesLayerRef.current);
+        explorerTilesLayerRef.current = null;
+      }
+      if (explorerSquareLayerRef.current) {
+        map.removeLayer(explorerSquareLayerRef.current);
+        explorerSquareLayerRef.current = null;
+      }
+    };
+  }, [map, explorerEnabled, explorerFilter, tileToPolygonCoords]);
+
+  // Explorer: z14 grid overlay (unclaimed tile outlines)
+  useEffect(() => {
+    if (!map) return;
+
+    if (explorerGridLayerRef.current) {
+      map.removeLayer(explorerGridLayerRef.current);
+      explorerGridLayerRef.current = null;
+    }
+
+    if (!explorerEnabled) return;
+
+    const gridSource = new VectorSource();
+    const gridLayer = new VectorLayer({
+      source: gridSource,
+      style: new Style({
+        stroke: new Stroke({
+          color: 'rgba(150, 150, 150, 0.4)',
+          width: 0.5,
+          lineDash: [4, 4],
+        }),
+      }),
+      zIndex: 3.4,
+    });
+    map.addLayer(gridLayer);
+    explorerGridLayerRef.current = gridLayer;
+
+    const updateGrid = () => {
+      gridSource.clear();
+      const extent = map.getView().calculateExtent(map.getSize());
+      // Convert extent from EPSG:27700 to EPSG:4326
+      const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
+
+      const topLeft = latLngToTile(maxLat, minLon, 14);
+      const bottomRight = latLngToTile(minLat, maxLon, 14);
+
+      const tilesX = bottomRight.x - topLeft.x + 1;
+      const tilesY = bottomRight.y - topLeft.y + 1;
+
+      // Skip if too many tiles visible
+      if (tilesX * tilesY > 5000) return;
+
+      for (let x = topLeft.x; x <= bottomRight.x; x++) {
+        for (let y = topLeft.y; y <= bottomRight.y; y++) {
+          const coords = tileToPolygonCoords(x, y, 14);
+          gridSource.addFeature(new Feature({ geometry: new Polygon([coords]) }));
+        }
+      }
+    };
+
+    updateGrid();
+    map.on('moveend', updateGrid);
+
+    return () => {
+      map.un('moveend', updateGrid);
+      if (explorerGridLayerRef.current) {
+        map.removeLayer(explorerGridLayerRef.current);
+        explorerGridLayerRef.current = null;
+      }
+    };
+  }, [map, explorerEnabled, tileToPolygonCoords, latLngToTile]);
 
   // Update cursor when addPointsEnabled changes
   useEffect(() => {

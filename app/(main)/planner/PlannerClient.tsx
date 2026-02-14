@@ -43,6 +43,8 @@ export default function PlannerClient() {
   const [heatmapColor, setHeatmapColor] = useState<string>(() => savedHeatmapPrefs?.color ?? 'blue');
   const [dimBaseMap, setDimBaseMap] = useState(() => savedHeatmapPrefs?.dimBaseMap ?? false);
   const [personalHeatmapEnabled, setPersonalHeatmapEnabled] = useState(() => savedHeatmapPrefs?.personalHeatmapEnabled ?? false);
+  const [explorerEnabled, setExplorerEnabled] = useState(() => savedHeatmapPrefs?.explorerEnabled ?? false);
+  const [explorerFilter, setExplorerFilter] = useState<string>(() => savedHeatmapPrefs?.explorerFilter ?? 'all');
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,9 +58,11 @@ export default function PlannerClient() {
         color: heatmapColor,
         dimBaseMap,
         personalHeatmapEnabled,
+        explorerEnabled,
+        explorerFilter,
       }));
     } catch { /* ignore */ }
-  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled]);
+  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -170,6 +174,8 @@ export default function PlannerClient() {
         heatmapColor={heatmapColor}
         dimBaseMap={dimBaseMap}
         personalHeatmapEnabled={personalHeatmapEnabled}
+        explorerEnabled={explorerEnabled}
+        explorerFilter={explorerFilter}
         hoveredElevationPoint={hoveredElevationPoint}
       />
       {/* Logo panel — desktop only */}
@@ -209,6 +215,10 @@ export default function PlannerClient() {
         personalHeatmapEnabled={personalHeatmapEnabled}
         onPersonalHeatmapEnabledChange={setPersonalHeatmapEnabled}
         personalTilesAvailable={personalTilesAvailable}
+        explorerEnabled={explorerEnabled}
+        onExplorerEnabledChange={setExplorerEnabled}
+        explorerFilter={explorerFilter}
+        onExplorerFilterChange={setExplorerFilter}
       />
       <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar
