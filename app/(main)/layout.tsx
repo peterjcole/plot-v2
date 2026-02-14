@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Ribeye_Marrow } from "next/font/google";
+import Script from "next/script";
+import { Analytics } from "@vercel/analytics/react";
 import "../globals.css";
 
 const geistSans = Geist({
@@ -37,6 +39,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${ribeyeMarrow.variable} antialiased`}
       >
         {children}
+        <Analytics />
+        <Script
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "c25b7e69962d4a34927987a3d6b23ce1"}'
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

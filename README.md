@@ -24,6 +24,8 @@ Plan GPX routes on Ordnance Survey maps.
 - [Puppeteer](https://pptr.dev) + [@sparticuz/chromium](https://github.com/nicolo-ribaudo/chropern) for server-side screenshot capture
 - Strava API for activity data
 
+Rewritten version of an older VueJS app: https://github.com/peterjcole/plot
+
 ## Getting Started
 
 ```bash
