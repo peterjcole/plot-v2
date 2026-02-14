@@ -139,6 +139,20 @@ export default function PlannerClient() {
     map.getView().animate({ center, zoom: 8, duration: 500 });
   }, []);
 
+  const handleZoomIn = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const view = map.getView();
+    view.animate({ zoom: (view.getZoom() ?? 7) + 1, duration: 200 });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const view = map.getView();
+    view.animate({ zoom: (view.getZoom() ?? 7) - 1, duration: 200 });
+  }, []);
+
   return (
     <div className="fixed inset-0">
       <PlannerMap
@@ -155,6 +169,29 @@ export default function PlannerClient() {
         personalHeatmapEnabled={personalHeatmapEnabled}
         hoveredElevationPoint={hoveredElevationPoint}
       />
+      {/* Zoom controls — bottom-left, above layers button */}
+      <div className="absolute bottom-[72px] left-3 z-10 flex flex-col bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border overflow-hidden">
+        <button
+          onClick={handleZoomIn}
+          title="Zoom in"
+          className="flex items-center justify-center w-11 h-11 text-text-primary hover:bg-surface-muted transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+        <div className="h-px bg-border" />
+        <button
+          onClick={handleZoomOut}
+          title="Zoom out"
+          className="flex items-center justify-center w-11 h-11 text-text-primary hover:bg-surface-muted transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
       <LayersPanel
         heatmapEnabled={heatmapEnabled}
         onHeatmapEnabledChange={setHeatmapEnabled}

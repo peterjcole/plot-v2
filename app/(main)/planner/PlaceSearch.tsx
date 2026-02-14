@@ -117,7 +117,7 @@ export default function PlaceSearch({ onSelect }: PlaceSearchProps) {
       {open && (
         <div
           ref={panelRef}
-          className="absolute bottom-[75px] right-[65px] z-20 w-64 sm:w-72"
+          className="absolute bottom-[74px] right-[65px] z-20 w-64 sm:w-72"
         >
           <div className="bg-surface-raised/95 backdrop-blur-sm rounded-lg shadow-lg border border-border overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2">
@@ -142,7 +142,7 @@ export default function PlaceSearch({ onSelect }: PlaceSearchProps) {
                 onChange={handleInputChange}
                 onKeyDown={handleInputKeyDown}
                 placeholder="Search for a place..."
-                className="flex-1 bg-transparent text-sm font-medium text-text-primary placeholder:text-text-secondary/50 outline-none"
+                className="flex-1 bg-transparent text-base font-medium text-text-primary placeholder:text-text-secondary/50 outline-none"
               />
               {isLoading && (
                 <div className="w-3.5 h-3.5 border-2 border-accent border-t-transparent rounded-full animate-spin shrink-0" />
