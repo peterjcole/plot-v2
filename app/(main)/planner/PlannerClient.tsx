@@ -175,7 +175,7 @@ export default function PlannerClient() {
       {/* Logo panel — desktop only */}
       <Link
         href="/"
-        className="absolute top-3 left-3 z-10 hidden sm:flex bg-surface-raised/50 backdrop-blur-md rounded-xl shadow-lg border border-border"
+        className="absolute top-3 left-3 z-10 hidden sm:flex bg-surface-raised/70 backdrop-blur-sm rounded-xl shadow-lg border border-border"
       >
         <Logo size="sm" />
       </Link>
