@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { Undo2, Redo2, Trash2, Download, Mountain, LocateFixed, MapPinPlus, Magnet } from 'lucide-react';
+import Link from 'next/link';
+import { Undo2, Redo2, Trash2, Download, Mountain, LocateFixed, MapPinPlus, Magnet, Home } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -136,6 +137,12 @@ export default function PlannerToolbar({
           <button onClick={handleExport} disabled={waypoints.length === 0} title="Export GPX" className={btnClass}>
             <Download size={18} />
           </button>
+
+          {/* Home — mobile only, far right */}
+          <div className="sm:hidden w-px h-6 bg-border shrink-0" />
+          <Link href="/" title="Home" className={`${btnClass} sm:hidden`}>
+            <Home size={18} />
+          </Link>
         </div>
 
         {/* Elevation tray — slides down from under the toolbar */}

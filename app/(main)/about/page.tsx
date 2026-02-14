@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Logo from '@/app/components/Logo';
 
 export const metadata = {
   title: 'About – Plot',
@@ -8,6 +9,20 @@ export default function AboutPage() {
   return (
     <div className="flex min-h-screen items-start justify-center bg-surface font-sans">
       <main className="w-full max-w-2xl px-4 py-8 sm:px-6 sm:py-12">
+        <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <Link href="/">
+            <Logo size="sm" />
+          </Link>
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/planner"
+              className="text-sm font-medium text-primary hover:text-primary-light transition-colors"
+            >
+              Planner
+            </Link>
+          </nav>
+        </header>
+
         <h1 className="text-2xl font-semibold text-text-primary mb-8">About</h1>
 
         <section className="mb-8">
@@ -25,7 +40,7 @@ export default function AboutPage() {
             Plot is open source. If you have feedback, questions, or run into a
             bug, please{' '}
             <a
-              href="https://github.com/peter-cole/plot/issues"
+              href="https://github.com/peterjcole/plot-v2/issues"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:text-primary-light underline transition-colors"
@@ -60,13 +75,6 @@ export default function AboutPage() {
             .
           </p>
         </section>
-
-        <Link
-          href="/"
-          className="text-sm font-medium text-primary hover:text-primary-light transition-colors"
-        >
-          &larr; Back to home
-        </Link>
       </main>
     </div>
   );

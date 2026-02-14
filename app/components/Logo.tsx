@@ -53,7 +53,7 @@ const sizeConfig = {
   sm: {
     textClass: "text-3xl",
     viewBox: "40 40 520 240",
-    wrapperPadding: "px-10 py-5",
+    wrapperPadding: "p-5",
     strokeWidth: 2.2,
     indexStrokeWidth: 4.0,
     showLabels: false,

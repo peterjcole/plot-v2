@@ -1,5 +1,8 @@
+import Link from 'next/link';
+import { Map, Mountain } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getAthleteActivities } from '@/lib/strava';
+import Header from '@/app/components/Header';
 import LoginButton from '@/app/components/LoginButton';
 import ActivityList from '@/app/components/ActivityList';
 
@@ -15,37 +18,67 @@ export default async function Home() {
   return (
     <div className="flex min-h-screen items-start justify-center bg-surface font-sans">
       <main className="w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
-        {isLoggedIn ? (
-          <>
-            <div className="mb-8 flex flex-wrap items-center justify-between gap-2">
-              <h1 className="text-2xl font-semibold text-text-primary">
-                Activities
-              </h1>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-text-secondary">
-                  {session.athlete?.firstname} {session.athlete?.lastname}
-                </span>
-                <form action="/api/auth/logout" method="POST" className="contents">
-                  <button
-                    type="submit"
-                    className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-                  >
-                    Log out
-                  </button>
-                </form>
+        <Header logo="lg">
+          {isLoggedIn && (
+            <>
+              <span className="text-sm text-text-secondary">
+                {session.athlete?.firstname} {session.athlete?.lastname}
+              </span>
+              <form action="/api/auth/logout" method="POST" className="contents">
+                <button
+                  type="submit"
+                  className="text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Log out
+                </button>
+              </form>
+            </>
+          )}
+        </Header>
+
+        {/* Planner promo banner */}
+        <div className="mt-8 rounded-lg border border-accent p-5">
+          <div className="flex items-start gap-4">
+            <Map className="mt-0.5 h-6 w-6 shrink-0 text-accent" />
+            <div>
+              <h2 className="text-base font-semibold text-text-primary">Route Planner</h2>
+              <p className="mt-1 text-sm text-text-secondary leading-relaxed">
+                Plan walking and cycling routes on Ordnance Survey maps. Snap to
+                paths, view elevation profiles, and export your routes. No login
+                required.
+              </p>
+              <Link
+                href="/planner"
+                className="mt-3 inline-block text-sm font-medium text-accent hover:text-accent/80 transition-colors"
+              >
+                Open planner &rarr;
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Strava login promo banner (logged-out only) */}
+        {!isLoggedIn && (
+          <div className="mt-4 rounded-lg border border-primary p-5">
+            <div className="flex items-start gap-4">
+              <Mountain className="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">Strava Activities</h2>
+                <p className="mt-1 text-sm text-text-secondary leading-relaxed">
+                  Login with Strava to visualise your recent activities on an OS Map.
+                </p>
+                <div className="mt-3">
+                  <LoginButton />
+                </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {isLoggedIn && (
+          <div className="mt-8">
+            <h2 className="mb-4 text-xl font-semibold text-text-primary">Activities</h2>
             <ActivityList initialActivities={initialActivities} />
-          </>
-        ) : (
-          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
-            <h1 className="text-3xl font-semibold text-text-primary">
-              Plot
-            </h1>
-            <p className="text-lg text-text-secondary">
-              Generate printout screenshots of your Strava activities
-            </p>
-            <LoginButton />
           </div>
         )}
       </main>

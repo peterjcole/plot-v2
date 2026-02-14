@@ -9,7 +9,9 @@ import { useRouteSnapping } from './useRouteSnapping';
 import { useElevationProfile } from './useElevationProfile';
 import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
+import Link from 'next/link';
 import { Plus, Minus } from 'lucide-react';
+import Logo from '@/app/components/Logo';
 import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
@@ -170,6 +172,13 @@ export default function PlannerClient() {
         personalHeatmapEnabled={personalHeatmapEnabled}
         hoveredElevationPoint={hoveredElevationPoint}
       />
+      {/* Logo panel — desktop only */}
+      <Link
+        href="/"
+        className="absolute top-3 left-3 z-10 hidden sm:flex bg-surface-raised/50 backdrop-blur-md rounded-xl shadow-lg border border-border"
+      >
+        <Logo size="sm" />
+      </Link>
       {/* Zoom controls — bottom-left, above layers button */}
       <div className="absolute bottom-[72px] left-3 z-10 flex flex-col bg-surface-raised/70 backdrop-blur-md rounded-xl shadow-lg border border-border overflow-hidden">
         <button
