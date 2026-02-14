@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Layers } from 'lucide-react';
+import Switch from '@/app/components/ui/Switch';
 
 interface LayersPanelProps {
   heatmapEnabled: boolean;
@@ -36,24 +37,6 @@ const COLORS = [
 const selectClass =
   'w-full bg-surface-muted border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent';
 
-function ToggleSwitch({ enabled, onChange, disabled }: { enabled: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={() => !disabled && onChange(!enabled)}
-      disabled={disabled}
-      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
-        disabled ? 'bg-surface-muted opacity-50 cursor-not-allowed' :
-        enabled ? 'bg-accent' : 'bg-surface-muted'
-      }`}
-    >
-      <span
-        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform mt-0.5 ml-0.5 ${
-          enabled && !disabled ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  );
-}
 
 export default function LayersPanel({
   heatmapEnabled,
@@ -98,9 +81,9 @@ export default function LayersPanel({
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-medium text-text-secondary">Personal heatmap</div>
-                  <ToggleSwitch
-                    enabled={personalHeatmapEnabled}
-                    onChange={onPersonalHeatmapEnabledChange}
+                  <Switch
+                    checked={personalHeatmapEnabled}
+                    onCheckedChange={onPersonalHeatmapEnabledChange}
                   />
                 </div>
               </div>
@@ -113,7 +96,7 @@ export default function LayersPanel({
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-medium text-text-secondary">Global heatmap</div>
-              <ToggleSwitch enabled={heatmapEnabled} onChange={onHeatmapEnabledChange} />
+              <Switch checked={heatmapEnabled} onCheckedChange={onHeatmapEnabledChange} />
             </div>
 
             {heatmapEnabled && (
@@ -151,7 +134,7 @@ export default function LayersPanel({
               <div className="w-full h-px bg-border my-3" />
               <div className="flex items-center justify-between">
                 <label className="text-xs text-text-secondary">Dim base map</label>
-                <ToggleSwitch enabled={dimBaseMap} onChange={onDimBaseMapChange} />
+                <Switch checked={dimBaseMap} onCheckedChange={onDimBaseMapChange} />
               </div>
             </>
           )}

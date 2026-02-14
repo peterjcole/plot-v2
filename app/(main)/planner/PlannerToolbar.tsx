@@ -7,6 +7,7 @@ import { downloadGpx } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
 import ElevationChart, { type ElevationHoverPoint } from './ElevationChart';
+import Switch from '@/app/components/ui/Switch';
 
 interface PlannerToolbarProps {
   waypoints: Waypoint[];
@@ -33,37 +34,6 @@ function formatDistance(meters: number): string {
 const btnClass =
   'flex items-center justify-center w-11 h-11 rounded-lg text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors';
 
-function ToggleSwitch({
-  enabled,
-  onToggle,
-  label,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors hover:bg-surface-muted sm:gap-2"
-    >
-      <div
-        className={`relative w-8 h-[18px] rounded-full transition-colors ${
-          enabled ? 'bg-accent' : 'bg-text-secondary/30'
-        }`}
-      >
-        <div
-          className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
-            enabled ? 'translate-x-[15px]' : 'translate-x-[2px]'
-          }`}
-        />
-      </div>
-      <span className="text-xs font-medium text-text-primary leading-tight">
-        {label}
-      </span>
-    </button>
-  );
-}
 
 export default function PlannerToolbar({
   waypoints,
@@ -109,11 +79,11 @@ export default function PlannerToolbar({
   return (
     <>
       {/* Main toolbar */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border px-2 py-1.5 max-w-[calc(100vw-1.5rem)] sm:gap-2 sm:px-3 sm:py-2">
         {/* Add Points toggle */}
-        <ToggleSwitch
-          enabled={addPointsEnabled}
-          onToggle={onToggleAddPoints}
+        <Switch
+          checked={addPointsEnabled}
+          onCheckedChange={() => onToggleAddPoints()}
           label="Add Points"
         />
 
@@ -125,9 +95,9 @@ export default function PlannerToolbar({
               : 'max-w-0 opacity-0'
           }`}
         >
-          <ToggleSwitch
-            enabled={snapEnabled}
-            onToggle={onToggleSnap}
+          <Switch
+            checked={snapEnabled}
+            onCheckedChange={() => onToggleSnap()}
             label="Snap to Path"
           />
         </div>
