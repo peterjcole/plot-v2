@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { X, Layers } from 'lucide-react';
 
 interface LayersPanelProps {
   heatmapEnabled: boolean;
@@ -79,10 +80,7 @@ export default function LayersPanel({
               onClick={() => setOpen(false)}
               className="text-text-secondary hover:text-text-primary transition-colors"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+              <X size={16} />
             </button>
           </div>
 
@@ -165,11 +163,7 @@ export default function LayersPanel({
         title="Layers"
         className="flex items-center justify-center w-11 h-11 bg-surface-raised/95 backdrop-blur-sm rounded-xl shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="12 2 2 7 12 12 22 7 12 2" />
-          <polyline points="2 17 12 22 22 17" />
-          <polyline points="2 12 12 17 22 12" />
-        </svg>
+        <Layers size={18} />
       </button>
     </div>
   );

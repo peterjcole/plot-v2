@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { Loader2 } from 'lucide-react';
 import { ActivityData } from '@/lib/types';
 import PhotoGallery from '@/app/components/PhotoGallery';
 
@@ -112,10 +113,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
 
   const spinner = (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-muted">
-      <svg className="h-8 w-8 animate-spin text-text-tertiary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
+      <Loader2 className="h-8 w-8 animate-spin text-text-tertiary" aria-hidden="true" />
     </div>
   );
 
