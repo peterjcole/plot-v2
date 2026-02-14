@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getActivityDetail, refreshTokenIfNeeded, MockOrientation } from '@/lib/strava';
+import { getActivityDetail, MockOrientation } from '@/lib/strava';
 import ActivityViewClient from './ActivityViewClient';
 import DownloadButton from '@/app/components/DownloadButton';
 
@@ -26,10 +26,6 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
 
     if (!session.accessToken) {
       redirect('/');
-    }
-
-    if (await refreshTokenIfNeeded(session)) {
-      await session.save();
     }
 
     activity = await getActivityDetail(session.accessToken, id);

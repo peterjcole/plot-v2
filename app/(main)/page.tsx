@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth';
-import { refreshTokenIfNeeded, getAthleteActivities } from '@/lib/strava';
+import { getAthleteActivities } from '@/lib/strava';
 import LoginButton from '@/app/components/LoginButton';
 import ActivityList from '@/app/components/ActivityList';
 
@@ -9,9 +9,6 @@ export default async function Home() {
 
   let initialActivities: Awaited<ReturnType<typeof getAthleteActivities>> = [];
   if (isLoggedIn) {
-    if (await refreshTokenIfNeeded(session)) {
-      await session.save();
-    }
     initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
   }
 
