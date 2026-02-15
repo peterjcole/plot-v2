@@ -3,6 +3,13 @@ import { ActivityData, ActivitySummary } from './types';
 
 const STRAVA_API_BASE = 'https://www.strava.com/api/v3';
 
+export class StravaApiError extends Error {
+  constructor(public status: number) {
+    super(`Strava API error: ${status}`);
+    this.name = 'StravaApiError';
+  }
+}
+
 /** Refreshes the token in-place if near expiry. Returns true if a refresh occurred. */
 export async function refreshTokenIfNeeded(session: SessionData): Promise<boolean> {
   if (!session.expiresAt || !session.refreshToken) {
@@ -48,7 +55,7 @@ export async function getAthleteActivities(
   );
 
   if (!res.ok) {
-    throw new Error(`Strava API error: ${res.status}`);
+    throw new StravaApiError(res.status);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,7 +150,7 @@ export async function getActivityDetail(
   });
 
   if (!res.ok) {
-    throw new Error(`Strava API error: ${res.status}`);
+    throw new StravaApiError(res.status);
   }
 
   const activity = await res.json();

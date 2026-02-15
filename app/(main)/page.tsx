@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Map, Mountain } from 'lucide-react';
 import { getSession } from '@/lib/auth';
-import { getAthleteActivities } from '@/lib/strava';
+import { getAthleteActivities, StravaApiError } from '@/lib/strava';
 import Header from '@/app/components/Header';
 import LoginButton from '@/app/components/LoginButton';
 import ActivityList from '@/app/components/ActivityList';
@@ -11,8 +12,17 @@ export default async function Home() {
   const isLoggedIn = !!session.accessToken;
 
   let initialActivities: Awaited<ReturnType<typeof getAthleteActivities>> = [];
+  let activitiesError = false;
   if (isLoggedIn) {
-    initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
+    try {
+      initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
+    } catch (error) {
+      if (error instanceof StravaApiError && error.status === 401) {
+        session.destroy();
+        redirect('/');
+      }
+      activitiesError = true;
+    }
   }
 
   return (
@@ -75,7 +85,15 @@ export default async function Home() {
           </div>
         )}
 
-        {isLoggedIn && (
+        {isLoggedIn && activitiesError && (
+          <div className="mt-8 rounded-lg border border-red-300 bg-red-50 p-5">
+            <p className="text-sm text-red-800">
+              Unable to load activities from Strava. This may be a temporary issue &mdash; try refreshing the page.
+            </p>
+          </div>
+        )}
+
+        {isLoggedIn && !activitiesError && (
           <div className="mt-8">
             <h2 className="mb-4 text-xl font-semibold text-text-primary">Activities</h2>
             <ActivityList initialActivities={initialActivities} />
