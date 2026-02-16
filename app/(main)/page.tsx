@@ -18,8 +18,7 @@ export default async function Home() {
       initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
     } catch (error) {
       if (error instanceof StravaApiError && error.status === 401) {
-        session.destroy();
-        redirect('/');
+        redirect('/api/auth/logout');
       }
       activitiesError = true;
     }
