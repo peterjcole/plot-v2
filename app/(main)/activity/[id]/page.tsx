@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getActivityDetail, MockOrientation } from '@/lib/strava';
+import { getActivityDetail, MockOrientation, StravaApiError } from '@/lib/strava';
 import Header from '@/app/components/Header';
 import DownloadButton from '@/app/components/DownloadButton';
 import ActivityViewClient from './ActivityViewClient';
@@ -49,7 +49,14 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
       redirect('/');
     }
 
-    activity = await getActivityDetail(session.accessToken, id);
+    try {
+      activity = await getActivityDetail(session.accessToken, id);
+    } catch (error) {
+      if (error instanceof StravaApiError && error.status === 401) {
+        redirect('/api/auth/logout');
+      }
+      throw error;
+    }
   }
 
   return (
