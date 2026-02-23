@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import type Map from 'ol/Map';
 import { fromLonLat } from 'ol/proj';
+import { boundingExtent } from 'ol/extent';
 import { useRouteHistory } from './useRouteHistory';
 import { useRouteSnapping } from './useRouteSnapping';
 import { useElevationProfile } from './useElevationProfile';
@@ -15,6 +16,7 @@ import Logo from '@/app/components/Logo';
 import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
+import { Waypoint } from '@/lib/types';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION } from '@/lib/map-config';
 import 'ol/ol.css';
@@ -48,6 +50,12 @@ export default function PlannerClient() {
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Mutable refs so moveend handler always reads current route without stale closures
+  const waypointsRef = useRef(waypoints);
+  const segmentsRef = useRef(segments);
+  waypointsRef.current = waypoints;
+  segmentsRef.current = segments;
 
   // Persist heatmap preferences
   useEffect(() => {
@@ -119,6 +127,24 @@ export default function PlannerClient() {
       map.getView().setCenter(stored.mapCenter);
       map.getView().setZoom(stored.mapZoom);
     }
+
+    // Persist map position whenever the user pans or zooms
+    map.on('moveend', () => {
+      const view = map.getView();
+      const center = view.getCenter();
+      const zoom = view.getZoom();
+      if (center && zoom != null) {
+        saveRoute(waypointsRef.current, segmentsRef.current, center as [number, number], zoom);
+      }
+    });
+  }, []);
+
+  const handleFitToRoute = useCallback((wps: Waypoint[]) => {
+    const map = mapInstanceRef.current;
+    if (!map || wps.length < 2) return;
+    const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
+    const extent = boundingExtent(coords);
+    map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
   }, []);
 
   const handleGeolocate = useCallback(() => {
@@ -236,6 +262,7 @@ export default function PlannerClient() {
         elevationData={elevationData}
         isLoadingElevation={isLoadingElevation}
         onElevationHover={setHoveredElevationPoint}
+        onFitToRoute={handleFitToRoute}
       />
     </div>
   );

@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Undo2, Redo2, Trash2, Download, Mountain, LocateFixed, MapPinPlus, Magnet, Home } from 'lucide-react';
+import { Undo2, Redo2, Trash2, Download, Upload, Mountain, LocateFixed, MapPinPlus, Magnet, Home } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
-import { downloadGpx } from '@/lib/gpx';
+import { downloadGpx, parseGpx, simplifyWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
 import ElevationChart, { type ElevationHoverPoint } from './ElevationChart';
@@ -26,6 +26,7 @@ interface PlannerToolbarProps {
   elevationData: ElevationPoint[] | null;
   isLoadingElevation: boolean;
   onElevationHover?: (point: ElevationHoverPoint | null) => void;
+  onFitToRoute?: (waypoints: Waypoint[]) => void;
 }
 
 function formatDistance(meters: number): string {
@@ -52,6 +53,7 @@ export default function PlannerToolbar({
   elevationData,
   isLoadingElevation,
   onElevationHover,
+  onFitToRoute,
 }: PlannerToolbarProps) {
   const elevationGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
@@ -78,8 +80,35 @@ export default function PlannerToolbar({
     downloadGpx(waypoints, segments);
   }, [waypoints, segments]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (waypoints.length > 0 && !window.confirm('Replace the current route with the imported GPX?')) {
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result;
+      if (typeof content !== 'string') return;
+      const parsed = simplifyWaypoints(parseGpx(content));
+      if (parsed.length >= 1) {
+        const gpxSegments: RouteSegment[] = parsed.length > 1
+          ? Array.from({ length: parsed.length - 1 }, () => ({ snapped: false, coordinates: [] }))
+          : [];
+        dispatch({ type: 'LOAD', waypoints: parsed, segments: gpxSegments });
+        onFitToRoute?.(parsed);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, [waypoints.length, dispatch, onFitToRoute]);
+
   return (
     <>
+      <input type="file" accept=".gpx" className="hidden" ref={fileInputRef} onChange={handleImport} />
       {/* Toolbar + elevation column */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col max-w-[calc(100vw-1.5rem)]">
         {/* Main toolbar */}
@@ -136,6 +165,10 @@ export default function PlannerToolbar({
 
           <button onClick={handleExport} disabled={waypoints.length === 0} title="Export GPX" className={btnClass}>
             <Download size={18} />
+          </button>
+
+          <button onClick={() => fileInputRef.current?.click()} title="Import GPX" className={btnClass}>
+            <Upload size={18} />
           </button>
 
           {/* Home — mobile only, far right */}

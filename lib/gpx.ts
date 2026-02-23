@@ -1,5 +1,36 @@
 import { Waypoint, RouteSegment } from './types';
 
+export function parseGpx(content: string): Waypoint[] {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(content, 'application/xml');
+
+  let points = Array.from(doc.querySelectorAll('trkpt'));
+  if (points.length === 0) {
+    points = Array.from(doc.querySelectorAll('wpt'));
+  }
+
+  return points.flatMap((pt) => {
+    const lat = parseFloat(pt.getAttribute('lat') ?? '');
+    const lon = parseFloat(pt.getAttribute('lon') ?? '');
+    if (isNaN(lat) || isNaN(lon)) return [];
+    const eleText = pt.querySelector('ele')?.textContent;
+    const ele = eleText != null ? parseFloat(eleText) : undefined;
+    return [{ lat, lng: lon, ...(ele != null && !isNaN(ele) ? { ele } : {}) }];
+  });
+}
+
+export function simplifyWaypoints(waypoints: Waypoint[], maxPoints = 100): Waypoint[] {
+  if (waypoints.length <= maxPoints) return waypoints;
+  const result: Waypoint[] = [];
+  const last = waypoints.length - 1;
+  for (let i = 0; i <= last; i++) {
+    if (i === 0 || i === last || Math.round((i * (maxPoints - 1)) / last) !== Math.round(((i - 1) * (maxPoints - 1)) / last)) {
+      result.push(waypoints[i]);
+    }
+  }
+  return result;
+}
+
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
