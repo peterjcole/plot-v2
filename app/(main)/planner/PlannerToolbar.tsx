@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Undo2, Redo2, Trash2, Download, Upload, Mountain, LocateFixed, MapPinPlus, Magnet, Home } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
-import { downloadGpx, parseGpx, simplifyWaypoints } from '@/lib/gpx';
+import { downloadGpx, parseGpx, simplifyWaypoints, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
 import ElevationChart, { type ElevationHoverPoint } from './ElevationChart';
@@ -93,12 +93,10 @@ export default function PlannerToolbar({
     reader.onload = (ev) => {
       const content = ev.target?.result;
       if (typeof content !== 'string') return;
-      const parsed = simplifyWaypoints(parseGpx(content));
+      const parsed = simplifyWaypoints(parseGpx(content), 500);
       if (parsed.length >= 1) {
-        const gpxSegments: RouteSegment[] = parsed.length > 1
-          ? Array.from({ length: parsed.length - 1 }, () => ({ snapped: false, coordinates: [] }))
-          : [];
-        dispatch({ type: 'LOAD', waypoints: parsed, segments: gpxSegments });
+        const { waypoints: gpxWaypoints, segments: gpxSegments } = selectGpxWaypoints(parsed);
+        dispatch({ type: 'LOAD', waypoints: gpxWaypoints, segments: gpxSegments });
         onFitToRoute?.(parsed);
       }
     };

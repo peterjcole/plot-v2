@@ -1,5 +1,59 @@
 import { Waypoint, RouteSegment } from './types';
 
+function haversineKm(a: Waypoint, b: Waypoint): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((b.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Splits a GPX track into waypoints and pre-filled segments for import.
+ * Waypoints are placed every ~spacingKm (default 2km), always including
+ * start and end. Each segment receives the track coordinates between its
+ * two waypoints so the route renders immediately without ORS routing.
+ */
+export function selectGpxWaypoints(
+  points: Waypoint[],
+  spacingKm = 2
+): { waypoints: Waypoint[]; segments: RouteSegment[] } {
+  if (points.length <= 1) {
+    return { waypoints: points, segments: [] };
+  }
+
+  const cumDist: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cumDist.push(cumDist[i - 1] + haversineKm(points[i - 1], points[i]));
+  }
+  const totalKm = cumDist[cumDist.length - 1];
+
+  // Ensure at most 20 waypoints by widening spacing on long routes
+  const effectiveSpacing = Math.max(spacingKm, totalKm / 20);
+
+  const wpIndices: number[] = [0];
+  let nextTarget = effectiveSpacing;
+  for (let i = 1; i < points.length - 1; i++) {
+    if (cumDist[i] >= nextTarget) {
+      wpIndices.push(i);
+      nextTarget += effectiveSpacing;
+    }
+  }
+  wpIndices.push(points.length - 1);
+
+  const waypoints = wpIndices.map((i) => points[i]);
+  const segments: RouteSegment[] = wpIndices.slice(0, -1).map((startIdx, si) => ({
+    snapped: true,
+    coordinates: points.slice(startIdx, wpIndices[si + 1] + 1),
+  }));
+
+  return { waypoints, segments };
+}
+
 export function parseGpx(content: string): Waypoint[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(content, 'application/xml');
