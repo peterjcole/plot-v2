@@ -18,6 +18,11 @@ export default async function Home() {
       initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
     } catch (error) {
       if (error instanceof StravaApiError && error.status === 401) {
+        const now = Math.floor(Date.now() / 1000);
+        const isExpired = session.expiresAt !== undefined && session.expiresAt <= now;
+        if (isExpired && session.refreshToken) {
+          redirect('/api/auth/refresh?next=/');
+        }
         redirect('/api/auth/logout');
       }
       activitiesError = true;

@@ -53,6 +53,11 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
       activity = await getActivityDetail(session.accessToken, id);
     } catch (error) {
       if (error instanceof StravaApiError && error.status === 401) {
+        const now = Math.floor(Date.now() / 1000);
+        const isExpired = session.expiresAt !== undefined && session.expiresAt <= now;
+        if (isExpired && session.refreshToken) {
+          redirect(`/api/auth/refresh?next=${encodeURIComponent(`/activity/${id}`)}`);
+        }
         redirect('/api/auth/logout');
       }
       throw error;

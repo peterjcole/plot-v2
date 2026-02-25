@@ -38,3 +38,9 @@ This is a Next.js 16 app (App Router, TypeScript, Tailwind v4) that generates sc
 ### Path Alias
 
 `@/*` maps to the project root (configured in `tsconfig.json`).
+
+### Auth
+- We are using a more recent version of nextjs where middleware was renamed to      
+  proxy
+- There are limitations in nextjs on where cookies can be updated, which we         
+  need to bear in mind 
