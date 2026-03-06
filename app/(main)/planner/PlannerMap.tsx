@@ -22,7 +22,7 @@ import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { OS_PROJECTION } from '@/lib/map-config';
+import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
@@ -31,6 +31,7 @@ interface PlannerMapProps {
   onMapReady?: (map: Map) => void;
   addPointsEnabled: boolean;
   snapEnabled: boolean;
+  baseMap: BaseMap;
   heatmapEnabled: boolean;
   heatmapSport: string;
   heatmapColor: string;
@@ -181,6 +182,7 @@ export default function PlannerMap({
   onMapReady,
   addPointsEnabled,
   snapEnabled,
+  baseMap,
   heatmapEnabled,
   heatmapSport,
   heatmapColor,
@@ -191,7 +193,8 @@ export default function PlannerMap({
   hoveredElevationPoint,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
-  const map = useOpenLayersMap(mapTargetRef);
+  const mapResult = useOpenLayersMap(mapTargetRef);
+  const map = mapResult?.map ?? null;
   const waypointSourceRef = useRef<VectorSource | null>(null);
   const routeSourceRef = useRef<VectorSource | null>(null);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,6 +227,16 @@ export default function PlannerMap({
   useEffect(() => {
     snapEnabledRef.current = snapEnabled;
   }, [snapEnabled]);
+
+  // Toggle OS / satellite base layers
+  useEffect(() => {
+    if (!mapResult) return;
+    const isSatellite = baseMap === 'satellite';
+    for (const layer of mapResult.osLayers) {
+      layer.setVisible(!isSatellite);
+    }
+    mapResult.satelliteLayer.setVisible(isSatellite);
+  }, [mapResult, baseMap]);
 
   // Manage heatmap tile layer
   useEffect(() => {

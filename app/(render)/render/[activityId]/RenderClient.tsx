@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ActivityData } from '@/lib/types';
+import { type BaseMap } from '@/lib/map-config';
 
 const ActivityMap = dynamic(() => import('@/app/components/ActivityMap'), {
   ssr: false,
@@ -24,6 +25,7 @@ interface RenderClientProps {
   activity: ActivityData;
   width?: number;
   height?: number;
+  baseMap?: BaseMap;
 }
 
 function getGalleryLayout(photoCount: number) {
@@ -44,7 +46,7 @@ function getGalleryLayout(photoCount: number) {
   return { columns: 2 as const, galleryRatio: 0.38 };
 }
 
-export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight }: RenderClientProps) {
+export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap }: RenderClientProps) {
   const [viewportSize, setViewportSize] = useState({ w: fixedWidth ?? 0, h: fixedHeight ?? 0 });
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
   const layout = getGalleryLayout(activity.photos.length);
 
   if (!layout) {
-    return <ActivityMap activity={activity} width={width} height={height} />;
+    return <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} />;
   }
 
   const displayPhotos = activity.photos.slice(0, 8);
@@ -80,6 +82,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
         width={width}
         height={height}
         paddingRight={galleryWidth}
+        baseMap={baseMap}
       />
       <div
         style={{

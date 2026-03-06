@@ -4,13 +4,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { ActivityData } from '@/lib/types';
+import { type BaseMap } from '@/lib/map-config';
 import PhotoGallery from '@/app/components/PhotoGallery';
+import ActivityLayersPanel from '@/app/components/ActivityLayersPanel';
 
 interface MapProps {
   activity: ActivityData;
   width: number;
   height: number;
   onPinClick?: (index: number) => void;
+  baseMap?: BaseMap;
 }
 
 const ActivityMap = dynamic<MapProps>(() => import('@/app/components/ActivityMap'), {
@@ -30,6 +33,13 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [isWide, setIsWide] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | undefined>(undefined);
   const [mapReady, setMapReady] = useState(false);
+  const [baseMap, setBaseMap] = useState<BaseMap>(() => {
+    try {
+      const raw = localStorage.getItem('plotv2-activity-prefs');
+      if (raw) return JSON.parse(raw).baseMap ?? 'os';
+    } catch { /* ignore */ }
+    return 'os';
+  });
 
   const hasPhotos = activity.photos.length > 0;
 
@@ -101,11 +111,18 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return () => clearInterval(interval);
   }, [mapReady, dimensions]);
 
-  // Reset ready state if activity changes
+  // Persist activity preferences
+  useEffect(() => {
+    try {
+      localStorage.setItem('plotv2-activity-prefs', JSON.stringify({ baseMap }));
+    } catch { /* ignore */ }
+  }, [baseMap]);
+
+  // Reset ready state if activity or base map changes
   useEffect(() => {
     window.__MAP_READY__ = false;
     setMapReady(false);
-  }, [activity.id]);
+  }, [activity.id, baseMap]);
 
   const handlePinClick = useCallback((index: number) => {
     setActivePhotoIndex(index);
@@ -121,8 +138,9 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return (
       <div ref={containerRef} className="relative w-full">
         {dimensions && (
-          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} />
+          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} />
         )}
+        <ActivityLayersPanel baseMap={baseMap} onBaseMapChange={setBaseMap} />
         {!mapReady && spinner}
       </div>
     );
@@ -145,6 +163,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
               width={dimensions.width}
               height={isWide && mapHeight ? mapHeight : dimensions.height}
               onPinClick={handlePinClick}
+              baseMap={baseMap}
             />
           </div>
           <div className={isWide ? 'flex-1 overflow-y-auto' : 'flex-1'}>
@@ -156,6 +175,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
           </div>
         </div>
       )}
+      <ActivityLayersPanel baseMap={baseMap} onBaseMapChange={setBaseMap} />
       {!mapReady && spinner}
     </div>
   );

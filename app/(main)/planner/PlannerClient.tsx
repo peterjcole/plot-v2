@@ -18,7 +18,7 @@ import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
 import { Waypoint } from '@/lib/types';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
-import { OS_PROJECTION } from '@/lib/map-config';
+import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
 import 'ol/ol.css';
 
 const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
@@ -40,6 +40,7 @@ export default function PlannerClient() {
     return null;
   }, []);
 
+  const [baseMap, setBaseMap] = useState<BaseMap>(() => savedHeatmapPrefs?.baseMap ?? 'os');
   const [heatmapEnabled, setHeatmapEnabled] = useState(() => savedHeatmapPrefs?.enabled ?? false);
   const [heatmapSport, setHeatmapSport] = useState<string>(() => savedHeatmapPrefs?.sport ?? 'all');
   const [heatmapColor, setHeatmapColor] = useState<string>(() => savedHeatmapPrefs?.color ?? 'blue');
@@ -61,6 +62,7 @@ export default function PlannerClient() {
   useEffect(() => {
     try {
       localStorage.setItem('plotv2-heatmap-prefs', JSON.stringify({
+        baseMap,
         enabled: heatmapEnabled,
         sport: heatmapSport,
         color: heatmapColor,
@@ -70,7 +72,7 @@ export default function PlannerClient() {
         explorerFilter,
       }));
     } catch { /* ignore */ }
-  }, [heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
+  }, [baseMap, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -195,6 +197,7 @@ export default function PlannerClient() {
         onMapReady={handleMapReady}
         addPointsEnabled={addPointsEnabled}
         snapEnabled={snapEnabled}
+        baseMap={baseMap}
         heatmapEnabled={heatmapEnabled}
         heatmapSport={heatmapSport}
         heatmapColor={heatmapColor}
@@ -230,6 +233,8 @@ export default function PlannerClient() {
         </button>
       </div>
       <LayersPanel
+        baseMap={baseMap}
+        onBaseMapChange={setBaseMap}
         heatmapEnabled={heatmapEnabled}
         onHeatmapEnabledChange={setHeatmapEnabled}
         heatmapSport={heatmapSport}

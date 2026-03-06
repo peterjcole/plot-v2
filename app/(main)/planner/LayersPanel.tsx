@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import { X, Layers } from 'lucide-react';
 import Switch from '@/app/components/ui/Switch';
+import type { BaseMap } from '@/lib/map-config';
 
 interface LayersPanelProps {
+  baseMap: BaseMap;
+  onBaseMapChange: (b: BaseMap) => void;
   heatmapEnabled: boolean;
   onHeatmapEnabledChange: (enabled: boolean) => void;
   heatmapSport: string;
@@ -43,6 +46,8 @@ const selectClass =
 
 
 export default function LayersPanel({
+  baseMap,
+  onBaseMapChange,
   heatmapEnabled,
   onHeatmapEnabledChange,
   heatmapSport,
@@ -78,7 +83,14 @@ export default function LayersPanel({
           {/* Base map section */}
           <div className="mb-3">
             <div className="text-xs font-medium text-text-secondary mb-1">Base map</div>
-            <div className="text-sm text-text-primary">Ordnance Survey</div>
+            <select
+              value={baseMap}
+              onChange={(e) => onBaseMapChange(e.target.value as BaseMap)}
+              className={selectClass}
+            >
+              <option value="os">Ordnance Survey</option>
+              <option value="satellite">Satellite</option>
+            </select>
           </div>
 
           <div className="w-full h-px bg-border mb-3" />

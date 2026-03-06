@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { ActivityData } from '@/lib/types';
+import type { BaseMap } from '@/lib/map-config';
 
 interface TextOverlayProps {
   activity: ActivityData;
+  baseMap?: BaseMap;
 }
 
 function formatDistance(meters: number): string {
@@ -43,8 +45,19 @@ function formatDate(isoString: string): string {
   });
 }
 
-export default function TextOverlay({ activity }: TextOverlayProps) {
+export default function TextOverlay({ activity, baseMap }: TextOverlayProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const isSatellite = baseMap === 'satellite';
+
+  const topGradient = isSatellite
+    ? 'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.36) 70%, transparent 100%)'
+    : 'linear-gradient(to bottom, rgba(255,248,236,0.88) 0%, rgba(255,248,236,0.5) 70%, transparent 100%)';
+  const bottomGradient = isSatellite
+    ? 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.36) 40%, rgba(0,0,0,0.78) 100%)'
+    : 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)';
+  const textColor = isSatellite ? '#F0ECE6' : '#1C1814';
+  const textShadow = isSatellite ? '0 1px 3px rgba(0,0,0,0.7)' : '0 1px 2px rgba(255,248,236,0.6)';
+  const btnBg = isSatellite ? '#D4872B' : '#4A5A2B';
 
   return (
     <>
@@ -52,8 +65,8 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
       <div
         className="md:hidden absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 z-[1000]"
         style={{
-          background: 'linear-gradient(to bottom, rgba(255,248,236,0.88) 0%, rgba(255,248,236,0.5) 70%, transparent 100%)',
-          color: '#1C1814',
+          background: topGradient,
+          color: textColor,
         }}
       >
         <div className="text-sm font-semibold">
@@ -63,7 +76,7 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
           onClick={() => setShowDetails(!showDetails)}
           className="px-3 py-1.5 text-[13px] font-medium rounded cursor-pointer border-none"
           style={{
-            background: '#4A5A2B',
+            background: btnBg,
             color: '#FFF8EC',
           }}
         >
@@ -75,15 +88,13 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
       <div
         className={`md:hidden absolute bottom-0 left-0 right-0 px-4 pt-[60px] pb-5 z-[1000] ${showDetails ? 'block' : 'hidden'}`}
         style={{
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
-          color: '#1C1814',
+          background: bottomGradient,
+          color: textColor,
         }}
       >
         <h1
           className="m-0 mb-1.5 text-[20px] font-bold tracking-tight"
-          style={{
-            textShadow: '0 1px 2px rgba(255,248,236,0.6)',
-          }}
+          style={{ textShadow }}
         >
           {activity.name}
         </h1>
@@ -122,15 +133,13 @@ export default function TextOverlay({ activity }: TextOverlayProps) {
       <div
         className="hidden md:block absolute bottom-0 left-0 right-0 px-6 pt-[60px] pb-5 z-[1000]"
         style={{
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)',
-          color: '#1C1814',
+          background: bottomGradient,
+          color: textColor,
         }}
       >
         <h1
           className="m-0 mb-2 text-2xl font-bold tracking-tight"
-          style={{
-            textShadow: '0 1px 2px rgba(255,248,236,0.6)',
-          }}
+          style={{ textShadow }}
         >
           {activity.name}
         </h1>

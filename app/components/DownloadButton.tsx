@@ -13,7 +13,12 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
   async function handleDownload() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}&format=jpeg`, {
+      let fetchUrl = `/api/activity-printout?activityId=${encodeURIComponent(activityId)}&format=jpeg`;
+      try {
+        const prefs = JSON.parse(localStorage.getItem('plotv2-activity-prefs') || '{}');
+        if (prefs.baseMap === 'satellite') fetchUrl += '&baseMap=satellite';
+      } catch { /* ignore */ }
+      const res = await fetch(fetchUrl, {
         cache: 'no-store',
       });
       if (!res.ok) throw new Error('Download failed');

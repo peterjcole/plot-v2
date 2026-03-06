@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, type BaseMap } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -20,7 +20,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // EPSG:27700 British National Grid CRS
-const crs = new L.Proj.CRS(
+const osCRS = new L.Proj.CRS(
   OS_PROJECTION.code,
   OS_PROJECTION.proj4,
   {
@@ -35,9 +35,10 @@ interface ActivityMapProps {
   height: number;
   paddingRight?: number;
   onPinClick?: (index: number) => void;
+  baseMap?: BaseMap;
 }
 
-function RouteOutlineFilter() {
+function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string; outlineColor: string }) {
   const map = useMap();
 
   useEffect(() => {
@@ -45,14 +46,12 @@ function RouteOutlineFilter() {
       const svg = map.getContainer().querySelector('svg');
       if (!svg) return;
 
-      // Find the route polyline by stroke color
       const paths = svg.querySelectorAll('path.leaflet-interactive');
       const routePath = Array.from(paths).find(
-        (p) => p.getAttribute('stroke') === '#4A5A2B'
+        (p) => p.getAttribute('stroke') === strokeColor
       );
       if (!routePath) return;
 
-      // Inject filter defs into Leaflet's SVG
       let defs = svg.querySelector('defs');
       if (!defs) {
         defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -71,9 +70,8 @@ function RouteOutlineFilter() {
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
           '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
-          '<feFlood flood-color="#3A4722" flood-opacity="0.85" result="color"/>',
+          `<feFlood flood-color="${outlineColor}" flood-opacity="0.9" result="color"/>`,
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
-          // Subtract original stroke area so outline only appears outside
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
           '<feMerge>',
           '  <feMergeNode in="border-only"/>',
@@ -155,7 +153,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os' }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -164,37 +162,50 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
     ? route[Math.floor(route.length / 2)]
     : [OS_DEFAULT_CENTER.lat, OS_DEFAULT_CENTER.lng];
 
+  const isSatellite = baseMap === 'satellite';
+  const activeCRS = isSatellite ? L.CRS.EPSG3857 : osCRS;
+  const tileUrl = isSatellite ? SATELLITE_TILE_URL : OS_TILE_URL;
+  const minZoom = isSatellite ? 2 : 6;
+  const maxZoom = isSatellite ? 18 : 9;
+
+  // Satellite: accent orange (#D4872B — OS contour-orange token) with dark brown outline
+  // OS: primary green with dark green outline
+  const routeColor = isSatellite ? '#D4872B' : '#4A5A2B';
+  const routeOutlineColor = isSatellite ? '#5A2D00' : '#3A4722';
+  const routeOpacity = 0.35;
+
   return (
     <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
       <MapContainer
+        key={baseMap}
         center={center}
         zoom={7}
-        minZoom={6}
-        maxZoom={9}
-        crs={crs}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        crs={activeCRS}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
       >
         <TileLayer
-          url={OS_TILE_URL}
-          maxNativeZoom={9}
-          minNativeZoom={8}
+          url={tileUrl}
+          maxNativeZoom={isSatellite ? 18 : 9}
+          {...(!isSatellite && { minNativeZoom: 8 })}
         />
         <Polyline
           positions={route}
           pathOptions={{
-            color: '#4A5A2B',
+            color: routeColor,
             weight: 5,
-            opacity: 0.35,
+            opacity: routeOpacity,
           }}
         />
-        <RouteOutlineFilter />
+        <RouteOutlineFilter strokeColor={routeColor} outlineColor={routeOutlineColor} />
         <MapController route={route} paddingRight={paddingRight} />
         <TileLoadHandler />
         <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} />
       </MapContainer>
-      <TextOverlay activity={activity} />
+      <TextOverlay activity={activity} baseMap={baseMap} />
     </div>
   );
 }
