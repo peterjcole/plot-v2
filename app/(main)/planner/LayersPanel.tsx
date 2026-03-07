@@ -8,6 +8,10 @@ import type { BaseMap } from '@/lib/map-config';
 interface LayersPanelProps {
   baseMap: BaseMap;
   onBaseMapChange: (b: BaseMap) => void;
+  osMapMode: 'light' | 'dark';
+  onOsMapModeChange: (mode: 'light' | 'dark') => void;
+  osMapFollowSystem: boolean;
+  onOsMapFollowSystemChange: (follow: boolean) => void;
   heatmapEnabled: boolean;
   onHeatmapEnabledChange: (enabled: boolean) => void;
   heatmapSport: string;
@@ -48,6 +52,10 @@ const selectClass =
 export default function LayersPanel({
   baseMap,
   onBaseMapChange,
+  osMapMode,
+  onOsMapModeChange,
+  osMapFollowSystem,
+  onOsMapFollowSystemChange,
   heatmapEnabled,
   onHeatmapEnabledChange,
   heatmapSport,
@@ -91,6 +99,28 @@ export default function LayersPanel({
               <option value="os">Ordnance Survey</option>
               <option value="satellite">Satellite</option>
             </select>
+
+            {baseMap === 'os' && (
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-secondary">Dark mode</span>
+                  <Switch
+                    checked={osMapMode === 'dark'}
+                    onCheckedChange={(checked) => onOsMapModeChange(checked ? 'dark' : 'light')}
+                    disabled={osMapFollowSystem}
+                  />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={osMapFollowSystem}
+                    onChange={(e) => onOsMapFollowSystemChange(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-accent"
+                  />
+                  <span className="text-xs text-text-secondary">Follow system colour scheme</span>
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="w-full h-px bg-border mb-3" />

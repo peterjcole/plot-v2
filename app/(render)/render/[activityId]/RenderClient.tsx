@@ -26,6 +26,7 @@ interface RenderClientProps {
   width?: number;
   height?: number;
   baseMap?: BaseMap;
+  osDark?: boolean;
 }
 
 function getGalleryLayout(photoCount: number) {
@@ -46,7 +47,7 @@ function getGalleryLayout(photoCount: number) {
   return { columns: 2 as const, galleryRatio: 0.38 };
 }
 
-export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap }: RenderClientProps) {
+export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap, osDark }: RenderClientProps) {
   const [viewportSize, setViewportSize] = useState({ w: fixedWidth ?? 0, h: fixedHeight ?? 0 });
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
   const layout = getGalleryLayout(activity.photos.length);
 
   if (!layout) {
-    return <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} />;
+    return <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} osDark={osDark} />;
   }
 
   const displayPhotos = activity.photos.slice(0, 8);
@@ -83,6 +84,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
         height={height}
         paddingRight={galleryWidth}
         baseMap={baseMap}
+        osDark={osDark}
       />
       <div
         style={{

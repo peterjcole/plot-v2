@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, type BaseMap } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -77,6 +77,7 @@ interface ActivityMapProps {
   paddingRight?: number;
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
+  osDark?: boolean;
 }
 
 function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string; outlineColor: string }) {
@@ -263,7 +264,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os' }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -274,7 +275,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
 
   const isSatellite = baseMap === 'satellite';
   const activeCRS = isSatellite ? L.CRS.EPSG3857 : osCRS;
-  const tileUrl = isSatellite ? SATELLITE_TILE_URL : OS_TILE_URL;
+  const tileUrl = isSatellite ? SATELLITE_TILE_URL : osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
   const minZoom = isSatellite ? 2 : 6;
   const maxZoom = isSatellite ? 18 : 9;
 

@@ -2,17 +2,29 @@
 
 import { useState } from 'react';
 import { X, Layers } from 'lucide-react';
+import Switch from '@/app/components/ui/Switch';
 import type { BaseMap } from '@/lib/map-config';
 
 interface ActivityLayersPanelProps {
   baseMap: BaseMap;
   onBaseMapChange: (b: BaseMap) => void;
+  osMapMode: 'light' | 'dark';
+  onOsMapModeChange: (mode: 'light' | 'dark') => void;
+  osMapFollowSystem: boolean;
+  onOsMapFollowSystemChange: (follow: boolean) => void;
 }
 
 const selectClass =
   'w-full bg-surface-muted border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent';
 
-export default function ActivityLayersPanel({ baseMap, onBaseMapChange }: ActivityLayersPanelProps) {
+export default function ActivityLayersPanel({
+  baseMap,
+  onBaseMapChange,
+  osMapMode,
+  onOsMapModeChange,
+  osMapFollowSystem,
+  onOsMapFollowSystemChange,
+}: ActivityLayersPanelProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -40,6 +52,28 @@ export default function ActivityLayersPanel({ baseMap, onBaseMapChange }: Activi
               <option value="satellite">Satellite</option>
             </select>
           </div>
+
+          {baseMap === 'os' && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary">Dark mode</span>
+                <Switch
+                  checked={osMapMode === 'dark'}
+                  onCheckedChange={(checked) => onOsMapModeChange(checked ? 'dark' : 'light')}
+                  disabled={osMapFollowSystem}
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={osMapFollowSystem}
+                  onChange={(e) => onOsMapFollowSystemChange(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-accent"
+                />
+                <span className="text-xs text-text-secondary">Follow system colour scheme</span>
+              </label>
+            </div>
+          )}
         </div>
       )}
 

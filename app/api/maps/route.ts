@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(Buffer.from(buffer), {
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+        'Cache-Control': 'public, max-age=1209600, s-maxage=1209600',
       },
     });
   } catch {

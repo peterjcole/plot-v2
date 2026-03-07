@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';
   const debug = searchParams.get('debug') === 'true';
   const baseMap = searchParams.get('baseMap') === 'satellite' ? 'satellite' : 'os';
+  const osDark = searchParams.get('osDark') === 'true';
 
   try {
     const browser = await getBrowser();
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const token = encodeURIComponent(session.accessToken);
-    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${bypassParam}`;
+    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',

@@ -41,6 +41,9 @@ export default function PlannerClient() {
   }, []);
 
   const [baseMap, setBaseMap] = useState<BaseMap>(() => savedHeatmapPrefs?.baseMap ?? 'os');
+  const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => savedHeatmapPrefs?.osMapMode ?? 'light');
+  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => savedHeatmapPrefs?.osMapFollowSystem ?? false);
+  const [systemDark, setSystemDark] = useState(false);
   const [heatmapEnabled, setHeatmapEnabled] = useState(() => savedHeatmapPrefs?.enabled ?? false);
   const [heatmapSport, setHeatmapSport] = useState<string>(() => savedHeatmapPrefs?.sport ?? 'all');
   const [heatmapColor, setHeatmapColor] = useState<string>(() => savedHeatmapPrefs?.color ?? 'blue');
@@ -58,11 +61,24 @@ export default function PlannerClient() {
   waypointsRef.current = waypoints;
   segmentsRef.current = segments;
 
+  // Detect system dark mode preference
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const osDark = baseMap === 'os' && (osMapFollowSystem ? systemDark : osMapMode === 'dark');
+
   // Persist heatmap preferences
   useEffect(() => {
     try {
       localStorage.setItem('plotv2-heatmap-prefs', JSON.stringify({
         baseMap,
+        osMapMode,
+        osMapFollowSystem,
         enabled: heatmapEnabled,
         sport: heatmapSport,
         color: heatmapColor,
@@ -72,7 +88,7 @@ export default function PlannerClient() {
         explorerFilter,
       }));
     } catch { /* ignore */ }
-  }, [baseMap, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
+  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -198,6 +214,7 @@ export default function PlannerClient() {
         addPointsEnabled={addPointsEnabled}
         snapEnabled={snapEnabled}
         baseMap={baseMap}
+        osDark={osDark}
         heatmapEnabled={heatmapEnabled}
         heatmapSport={heatmapSport}
         heatmapColor={heatmapColor}
@@ -235,6 +252,10 @@ export default function PlannerClient() {
       <LayersPanel
         baseMap={baseMap}
         onBaseMapChange={setBaseMap}
+        osMapMode={osMapMode}
+        onOsMapModeChange={setOsMapMode}
+        osMapFollowSystem={osMapFollowSystem}
+        onOsMapFollowSystemChange={setOsMapFollowSystem}
         heatmapEnabled={heatmapEnabled}
         onHeatmapEnabledChange={setHeatmapEnabled}
         heatmapSport={heatmapSport}

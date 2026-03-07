@@ -17,6 +17,10 @@ export default function DownloadButton({ activityId }: DownloadButtonProps) {
       try {
         const prefs = JSON.parse(localStorage.getItem('plotv2-activity-prefs') || '{}');
         if (prefs.baseMap === 'satellite') fetchUrl += '&baseMap=satellite';
+        const followSystem = prefs.osMapFollowSystem ?? false;
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const osDark = prefs.baseMap !== 'satellite' && (followSystem ? systemDark : prefs.osMapMode === 'dark');
+        if (osDark) fetchUrl += '&osDark=true';
       } catch { /* ignore */ }
       const res = await fetch(fetchUrl, {
         cache: 'no-store',

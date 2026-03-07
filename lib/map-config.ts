@@ -6,6 +6,7 @@ export const OS_PROJECTION = {
 };
 
 export const OS_TILE_URL = '/api/maps?z={z}&x={x}&y={y}';
+export const OS_DARK_TILE_URL = '/api/maps/dark?z={z}&x={x}&y={y}';
 export const OS_DEFAULT_CENTER = { lat: 54.4, lng: -2.9 };
 export const OS_ZOOM = { min: 0, max: 9, default: 7 };
 

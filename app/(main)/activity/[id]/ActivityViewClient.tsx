@@ -14,6 +14,7 @@ interface MapProps {
   height: number;
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
+  osDark?: boolean;
 }
 
 const ActivityMap = dynamic<MapProps>(() => import('@/app/components/ActivityMap'), {
@@ -22,6 +23,14 @@ const ActivityMap = dynamic<MapProps>(() => import('@/app/components/ActivityMap
 
 interface ActivityViewClientProps {
   activity: ActivityData;
+}
+
+function loadActivityPrefs() {
+  try {
+    const raw = localStorage.getItem('plotv2-activity-prefs');
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
 }
 
 export default function ActivityViewClient({ activity }: ActivityViewClientProps) {
@@ -33,15 +42,23 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [isWide, setIsWide] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | undefined>(undefined);
   const [mapReady, setMapReady] = useState(false);
-  const [baseMap, setBaseMap] = useState<BaseMap>(() => {
-    try {
-      const raw = localStorage.getItem('plotv2-activity-prefs');
-      if (raw) return JSON.parse(raw).baseMap ?? 'os';
-    } catch { /* ignore */ }
-    return 'os';
-  });
+  const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityPrefs().baseMap ?? 'os');
+  const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityPrefs().osMapMode ?? 'light');
+  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityPrefs().osMapFollowSystem ?? false);
+  const [systemDark, setSystemDark] = useState(false);
 
   const hasPhotos = activity.photos.length > 0;
+
+  // Detect system dark mode preference
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemDark(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const osDark = baseMap === 'os' && (osMapFollowSystem ? systemDark : osMapMode === 'dark');
 
   useEffect(() => {
     const el = containerRef.current;
@@ -114,15 +131,15 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   // Persist activity preferences
   useEffect(() => {
     try {
-      localStorage.setItem('plotv2-activity-prefs', JSON.stringify({ baseMap }));
+      localStorage.setItem('plotv2-activity-prefs', JSON.stringify({ baseMap, osMapMode, osMapFollowSystem }));
     } catch { /* ignore */ }
-  }, [baseMap]);
+  }, [baseMap, osMapMode, osMapFollowSystem]);
 
-  // Reset ready state if activity or base map changes
+  // Reset ready state if activity, base map, or dark mode changes
   useEffect(() => {
     window.__MAP_READY__ = false;
     setMapReady(false);
-  }, [activity.id, baseMap]);
+  }, [activity.id, baseMap, osDark]);
 
   const handlePinClick = useCallback((index: number) => {
     setActivePhotoIndex(index);
@@ -134,13 +151,24 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     </div>
   );
 
+  const layersPanel = (
+    <ActivityLayersPanel
+      baseMap={baseMap}
+      onBaseMapChange={setBaseMap}
+      osMapMode={osMapMode}
+      onOsMapModeChange={setOsMapMode}
+      osMapFollowSystem={osMapFollowSystem}
+      onOsMapFollowSystemChange={setOsMapFollowSystem}
+    />
+  );
+
   if (!hasPhotos) {
     return (
       <div ref={containerRef} className="relative w-full">
         {dimensions && (
-          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} />
+          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} />
         )}
-        <ActivityLayersPanel baseMap={baseMap} onBaseMapChange={setBaseMap} />
+        {layersPanel}
         {!mapReady && spinner}
       </div>
     );
@@ -164,6 +192,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
               height={isWide && mapHeight ? mapHeight : dimensions.height}
               onPinClick={handlePinClick}
               baseMap={baseMap}
+              osDark={osDark}
             />
           </div>
           <div className={isWide ? 'flex-1 overflow-y-auto' : 'flex-1'}>
@@ -175,7 +204,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
           </div>
         </div>
       )}
-      <ActivityLayersPanel baseMap={baseMap} onBaseMapChange={setBaseMap} />
+      {layersPanel}
       {!mapReady && spinner}
     </div>
   );

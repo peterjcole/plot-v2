@@ -22,7 +22,7 @@ import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
@@ -32,6 +32,7 @@ interface PlannerMapProps {
   addPointsEnabled: boolean;
   snapEnabled: boolean;
   baseMap: BaseMap;
+  osDark?: boolean;
   heatmapEnabled: boolean;
   heatmapSport: string;
   heatmapColor: string;
@@ -183,6 +184,7 @@ export default function PlannerMap({
   addPointsEnabled,
   snapEnabled,
   baseMap,
+  osDark = false,
   heatmapEnabled,
   heatmapSport,
   heatmapColor,
@@ -237,6 +239,16 @@ export default function PlannerMap({
     }
     mapResult.satelliteLayer.setVisible(isSatellite);
   }, [mapResult, baseMap]);
+
+  // Update OS tile URLs when dark mode or algorithm changes
+  useEffect(() => {
+    if (!mapResult) return;
+    const url = osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
+    // osLayers[0] is the OSM fallback layer — no URL to change
+    for (const layer of mapResult.osLayers.slice(1)) {
+      (layer.getSource() as XYZ).setUrl(url);
+    }
+  }, [mapResult, osDark]);
 
   // Manage heatmap tile layer
   useEffect(() => {
