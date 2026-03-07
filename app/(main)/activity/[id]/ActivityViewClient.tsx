@@ -44,7 +44,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [mapReady, setMapReady] = useState(false);
   const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityPrefs().baseMap ?? 'os');
   const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityPrefs().osMapMode ?? 'light');
-  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityPrefs().osMapFollowSystem ?? false);
+  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityPrefs().osMapFollowSystem ?? true);
   const [systemDark, setSystemDark] = useState(false);
 
   const hasPhotos = activity.photos.length > 0;

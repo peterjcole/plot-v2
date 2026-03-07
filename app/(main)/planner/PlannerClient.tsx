@@ -42,7 +42,7 @@ export default function PlannerClient() {
 
   const [baseMap, setBaseMap] = useState<BaseMap>(() => savedHeatmapPrefs?.baseMap ?? 'os');
   const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => savedHeatmapPrefs?.osMapMode ?? 'light');
-  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => savedHeatmapPrefs?.osMapFollowSystem ?? false);
+  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => savedHeatmapPrefs?.osMapFollowSystem ?? true);
   const [systemDark, setSystemDark] = useState(false);
   const [heatmapEnabled, setHeatmapEnabled] = useState(() => savedHeatmapPrefs?.enabled ?? false);
   const [heatmapSport, setHeatmapSport] = useState<string>(() => savedHeatmapPrefs?.sport ?? 'all');
