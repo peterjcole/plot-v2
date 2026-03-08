@@ -181,7 +181,7 @@ function StartEndMarkers({ route, color }: { route: [number, number][]; color: s
   return null;
 }
 
-function DirectionArrows({ route, color }: { route: [number, number][]; color: string }) {
+function DirectionArrows({ route, color, opacity = 1 }: { route: [number, number][]; color: string; opacity?: number }) {
   const map = useMap();
 
   useEffect(() => {
@@ -193,7 +193,7 @@ function DirectionArrows({ route, color }: { route: [number, number][]; color: s
       const deg = bearing(route[idx][0], route[idx][1], route[ahead][0], route[ahead][1]);
       const icon = L.divIcon({
         className: '',
-        html: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="display:block;transform:rotate(${deg}deg)"><path d="M18 15 L12 9 L6 15" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        html: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="display:block;transform:rotate(${deg}deg);opacity:${opacity}"><path d="M18 15 L12 9 L6 15" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
         iconSize: [28, 28],
         iconAnchor: [14, 14],
       });
@@ -203,7 +203,7 @@ function DirectionArrows({ route, color }: { route: [number, number][]; color: s
     return () => {
       markers.forEach((m) => m.remove());
     };
-  }, [map, route, color]);
+  }, [map, route, color, opacity]);
 
   return null;
 }
@@ -279,11 +279,12 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
   const minZoom = isSatellite ? 2 : 6;
   const maxZoom = isSatellite ? 18 : 9;
 
-  // Satellite: accent orange (#D4872B — OS contour-orange token) with dark brown outline
-  // OS: primary green with dark green outline
-  const routeColor = isSatellite ? '#D4872B' : '#4A5A2B';
-  const routeOutlineColor = isSatellite ? '#5A2D00' : '#3A4722';
-  const routeOpacity = 0.35;
+  // Satellite or dark OS: bright accent orange (dark-mode --accent-light token) with dark brown outline
+  // Light OS: primary green with dark green outline
+  const isDark = isSatellite || osDark;
+  const routeColor = isDark ? '#E09B45' : '#4A5A2B';
+  const routeOutlineColor = isDark ? '#5A2D00' : '#3A4722';
+  const routeOpacity = isDark ? 0.60 : 0.35;
 
   return (
     <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
@@ -312,13 +313,13 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
           }}
         />
         <RouteOutlineFilter strokeColor={routeColor} outlineColor={routeOutlineColor} />
-        <DirectionArrows route={route} color={routeOutlineColor} />
+        <DirectionArrows route={route} color={routeColor} opacity={isDark ? routeOpacity : 1} />
         <StartEndMarkers route={route} color={routeColor} />
         <MapController route={route} paddingRight={paddingRight} />
         <TileLoadHandler />
-        <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} />
+        <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />
       </MapContainer>
-      <TextOverlay activity={activity} baseMap={baseMap} />
+      <TextOverlay activity={activity} baseMap={baseMap} osDark={osDark} />
     </div>
   );
 }

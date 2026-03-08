@@ -7,6 +7,7 @@ import type { BaseMap } from '@/lib/map-config';
 interface TextOverlayProps {
   activity: ActivityData;
   baseMap?: BaseMap;
+  osDark?: boolean;
 }
 
 function formatDistance(meters: number): string {
@@ -45,19 +46,19 @@ function formatDate(isoString: string): string {
   });
 }
 
-export default function TextOverlay({ activity, baseMap }: TextOverlayProps) {
+export default function TextOverlay({ activity, baseMap, osDark }: TextOverlayProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const isSatellite = baseMap === 'satellite';
+  const isDark = baseMap === 'satellite' || !!osDark;
 
-  const topGradient = isSatellite
+  const topGradient = isDark
     ? 'linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.36) 70%, transparent 100%)'
     : 'linear-gradient(to bottom, rgba(255,248,236,0.88) 0%, rgba(255,248,236,0.5) 70%, transparent 100%)';
-  const bottomGradient = isSatellite
+  const bottomGradient = isDark
     ? 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.36) 40%, rgba(0,0,0,0.78) 100%)'
     : 'linear-gradient(to bottom, transparent 0%, rgba(255,248,236,0.5) 40%, rgba(255,248,236,0.88) 100%)';
-  const textColor = isSatellite ? '#F0ECE6' : '#1C1814';
-  const textShadow = isSatellite ? '0 1px 3px rgba(0,0,0,0.7)' : '0 1px 2px rgba(255,248,236,0.6)';
-  const btnBg = isSatellite ? '#D4872B' : '#4A5A2B';
+  const textColor = isDark ? '#F0ECE6' : '#1C1814';
+  const textShadow = isDark ? '0 1px 3px rgba(0,0,0,0.7)' : '0 1px 2px rgba(255,248,236,0.6)';
+  const btnBg = isDark ? '#D4872B' : '#4A5A2B';
 
   return (
     <>
