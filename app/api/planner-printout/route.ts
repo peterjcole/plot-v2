@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
       minLng: Math.min(...lngs),
       maxLng: Math.max(...lngs),
     };
-    const MAX_ROUTE_PIXELS = exportMode === 'satellite' ? 10_000_000 : 25_000_000;
+    const MAX_ROUTE_PIXELS = exportMode === 'satellite'
+      ? parseInt(process.env.EXPORT_MAX_PIXELS_SATELLITE ?? '10000000', 10)
+      : parseInt(process.env.EXPORT_MAX_PIXELS_OS ?? '25000000', 10);
     const dims = calculateRenderDimensions(bbox, exportMode, MAX_ROUTE_PIXELS);
     width = dims.width;
     height = dims.height;

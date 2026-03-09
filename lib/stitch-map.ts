@@ -228,8 +228,10 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     (t): t is NonNullable<typeof t> => t !== null,
   );
 
-  // Composite tiles onto a gray canvas, then crop to exact output dimensions
-  const stitched = await sharp({
+  // Composite tiles onto a gray canvas, then crop to exact output dimensions.
+  // Use raw pixel buffers for intermediates — PNG encode/decode of a large
+  // tilesheet is extremely slow (was the cause of Vercel timeout on large exports).
+  const { data: stitchedRaw, info: stitchedInfo } = await sharp({
     create: {
       width: tilesWide * 256,
       height: tilesTall * 256,
@@ -238,16 +240,21 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     },
   })
     .composite(fetchedTiles)
-    .png()
-    .toBuffer();
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  const cropped = await sharp(stitched)
+  const { data: croppedRaw } = await sharp(stitchedRaw, {
+    raw: { width: stitchedInfo.width, height: stitchedInfo.height, channels: stitchedInfo.channels },
+  })
     .extract({ left: offsetX, top: offsetY, width, height })
-    .toBuffer();
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
   const hasRoute = route.length >= 2;
   if (!hasRoute) {
-    return sharp(cropped).jpeg({ quality: 90 }).toBuffer();
+    return sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
+      .jpeg({ quality: 90 })
+      .toBuffer();
   }
 
   // Convert route coordinates to image pixel positions
@@ -277,7 +284,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     height,
   );
 
-  return sharp(cropped)
+  return sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
     .composite([{ input: Buffer.from(svgStr) }])
     .jpeg({ quality: 90 })
     .toBuffer();
