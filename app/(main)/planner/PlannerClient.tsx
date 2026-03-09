@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import type Map from 'ol/Map';
-import { fromLonLat } from 'ol/proj';
+import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
 import { useRouteHistory } from './useRouteHistory';
 import { useRouteSnapping } from './useRouteSnapping';
@@ -52,6 +52,7 @@ export default function PlannerClient() {
   const [explorerEnabled, setExplorerEnabled] = useState(() => savedHeatmapPrefs?.explorerEnabled ?? false);
   const [explorerFilter, setExplorerFilter] = useState<string>(() => savedHeatmapPrefs?.explorerFilter ?? 'all');
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
+  const [isExportingImage, setIsExportingImage] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -204,6 +205,56 @@ export default function PlannerClient() {
     view.animate({ zoom: (view.getZoom() ?? 7) - 1, duration: 200 });
   }, []);
 
+  const handleExportImage = useCallback(async () => {
+    const map = mapInstanceRef.current;
+    const view = map?.getView();
+    const center27700 = view?.getCenter();
+    const olZoom = view?.getZoom() ?? 7;
+
+    const exportMode =
+      baseMap === 'satellite'            ? 'satellite'  :
+      (olZoom >= 5.4 && olZoom < 6)     ? 'landranger' :
+                                           'explorer';
+    console.log('[export] OL zoom:', olZoom, '→ exportMode:', exportMode);
+
+    // Convert center from EPSG:27700 → WGS84
+    const wgs84Center = center27700
+      ? transform(center27700, 'EPSG:27700', 'EPSG:4326')
+      : [-2.9, 54.4];
+    const center: [number, number] = [wgs84Center[1], wgs84Center[0]]; // [lat, lng]
+
+    // Flatten all segment coordinates (already WGS84)
+    const route = segments.flatMap((s) =>
+      s.coordinates.map((c) => [c.lat, c.lng] as [number, number])
+    );
+
+    setIsExportingImage(true);
+    try {
+      const res = await fetch('/api/planner-printout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ route, center, exportMode, baseMap, osDark }),
+      });
+
+      if (!res.ok) {
+        console.error('Image export failed:', await res.text());
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'route.jpg';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Image export error:', err);
+    } finally {
+      setIsExportingImage(false);
+    }
+  }, [baseMap, osDark, segments]);
+
   return (
     <div className="fixed inset-0">
       <PlannerMap
@@ -289,6 +340,8 @@ export default function PlannerClient() {
         isLoadingElevation={isLoadingElevation}
         onElevationHover={setHoveredElevationPoint}
         onFitToRoute={handleFitToRoute}
+        onExportImage={handleExportImage}
+        isExportingImage={isExportingImage}
       />
     </div>
   );

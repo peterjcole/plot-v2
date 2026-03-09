@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Undo2, Redo2, Trash2, Download, Upload, Mountain, LocateFixed, MapPinPlus, Magnet, Home } from 'lucide-react';
+import { Undo2, Redo2, Trash2, Download, Upload, Mountain, LocateFixed, MapPinPlus, Magnet, Home, Share2, Printer } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, simplifyWaypoints, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -27,6 +27,8 @@ interface PlannerToolbarProps {
   isLoadingElevation: boolean;
   onElevationHover?: (point: ElevationHoverPoint | null) => void;
   onFitToRoute?: (waypoints: Waypoint[]) => void;
+  onExportImage?: () => void;
+  isExportingImage?: boolean;
 }
 
 function formatDistance(meters: number): string {
@@ -54,7 +56,11 @@ export default function PlannerToolbar({
   isLoadingElevation,
   onElevationHover,
   onFitToRoute,
+  onExportImage,
+  isExportingImage = false,
 }: PlannerToolbarProps) {
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const elevationGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
     let gain = 0;
@@ -81,6 +87,22 @@ export default function PlannerToolbar({
   }, [waypoints, segments]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportDropdownToggle = useCallback(() => {
+    setExportDropdownOpen((v) => !v);
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+        setExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportDropdownOpen]);
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,7 +132,7 @@ export default function PlannerToolbar({
       {/* Toolbar + elevation column */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col max-w-[calc(100vw-1.5rem)]">
         {/* Main toolbar */}
-        <div className={`relative flex items-center justify-evenly gap-1 bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border px-2 py-1.5 sm:justify-start sm:gap-2 sm:px-3 sm:py-2 ${waypoints.length >= 2 ? 'rounded-t-xl' : 'rounded-xl'}`}>
+        <div className={`relative z-[1] flex items-center justify-evenly gap-1 bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border px-2 py-1.5 sm:justify-start sm:gap-2 sm:px-3 sm:py-2 ${waypoints.length >= 2 ? 'rounded-t-xl' : 'rounded-xl'}`}>
           {/* Add Points toggle — icon on small, switch on large */}
           <div className="sm:hidden">
             <IconToggle pressed={addPointsEnabled} onPressedChange={() => onToggleAddPoints()} title="Add Points">
@@ -161,9 +183,41 @@ export default function PlannerToolbar({
             <Trash2 size={18} />
           </button>
 
-          <button onClick={handleExport} disabled={waypoints.length === 0} title="Export GPX" className={btnClass}>
-            <Download size={18} />
-          </button>
+          {/* Export dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button
+              onClick={handleExportDropdownToggle}
+              disabled={isExportingImage}
+              title="Export"
+              className={btnClass}
+            >
+              {isExportingImage ? (
+                <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Share2 size={18} />
+              )}
+            </button>
+            {exportDropdownOpen && (
+              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-20 flex flex-col bg-surface-raised shadow-lg border border-border rounded-lg overflow-hidden min-w-[140px]">
+                <button
+                  onClick={() => { handleExport(); setExportDropdownOpen(false); }}
+                  disabled={waypoints.length === 0}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Download size={15} />
+                  Export GPX
+                </button>
+                <button
+                  onClick={() => { onExportImage?.(); setExportDropdownOpen(false); }}
+                  disabled={isExportingImage}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Printer size={15} />
+                  Export Image
+                </button>
+              </div>
+            )}
+          </div>
 
           <button onClick={() => fileInputRef.current?.click()} title="Import GPX" className={btnClass}>
             <Upload size={18} />

@@ -78,6 +78,8 @@ interface ActivityMapProps {
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
   osDark?: boolean;
+  /** When set, positions the map with setView instead of fitBounds */
+  centerZoom?: { center: [number, number]; zoom: number };
 }
 
 function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string; outlineColor: string }) {
@@ -208,18 +210,28 @@ function DirectionArrows({ route, color, opacity = 1 }: { route: [number, number
   return null;
 }
 
-function MapController({ route, paddingRight = 0 }: { route: [number, number][]; paddingRight?: number }) {
+function MapController({
+  route,
+  paddingRight = 0,
+  centerZoom,
+}: {
+  route: [number, number][];
+  paddingRight?: number;
+  centerZoom?: { center: [number, number]; zoom: number };
+}) {
   const map = useMap();
 
   useEffect(() => {
-    if (route.length > 0) {
+    if (centerZoom) {
+      map.setView(centerZoom.center, centerZoom.zoom);
+    } else if (route.length > 0) {
       const bounds = L.latLngBounds(route.map(([lat, lng]) => [lat, lng]));
       map.fitBounds(bounds, {
         paddingTopLeft: [50, 50] as L.PointExpression,
         paddingBottomRight: [paddingRight + 50, 50] as L.PointExpression,
       });
     }
-  }, [map, route, paddingRight]);
+  }, [map, route, paddingRight, centerZoom]);
 
   return null;
 }
@@ -264,7 +276,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, centerZoom }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -315,7 +327,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         <RouteOutlineFilter strokeColor={routeColor} outlineColor={routeOutlineColor} />
         <DirectionArrows route={route} color={routeColor} opacity={isDark ? routeOpacity : 1} />
         <StartEndMarkers route={route} color={routeColor} />
-        <MapController route={route} paddingRight={paddingRight} />
+        <MapController route={route} paddingRight={paddingRight} centerZoom={centerZoom} />
         <TileLoadHandler />
         <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />
       </MapContainer>
