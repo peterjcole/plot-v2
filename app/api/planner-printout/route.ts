@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
 
   const hasRoute = route.length >= 2;
 
-  let width = 5120;
-  let height = 2880;
+  let width = parseInt(process.env.EXPORT_DEFAULT_WIDTH ?? '10240', 10);
+  let height = parseInt(process.env.EXPORT_DEFAULT_HEIGHT ?? '8192', 10);
   let renderZoom = getExportRenderZoom(exportMode);
 
   if (hasRoute) {
