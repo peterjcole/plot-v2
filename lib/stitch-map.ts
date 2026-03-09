@@ -284,16 +284,20 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     height,
   );
 
-  // Render SVG at half resolution then upscale — feMorphology is O(pixels) so rendering
-  // at 1/2 size makes it 4× faster (was ~55s at 25MP, now ~14s), while stroke widths
-  // and outline appearance are identical after the 2× upscale.
-  const svgHalfW = Math.round(width / 2);
-  const svgHalfH = Math.round(height / 2);
-  const svgHalf = svgStr.replace(
+  // Render SVG at ¼ resolution to keep feMorphology fast at large export sizes.
+  // feMorphology is O(pixels): at 25MP it takes ~55s; at ¼ scale (~1.6MP) it takes ~3s.
+  //
+  // IMPORTANT: on SVG input, sharp passes .resize() dimensions directly to librsvg as the
+  // render target — it does NOT rasterise first then scale. So we must call .toBuffer()
+  // first (which rasterises at the SVG's declared width/height), then resize the bitmap.
+  const svgSmallW = Math.round(width / 4);
+  const svgSmallH = Math.round(height / 4);
+  const svgSmall = svgStr.replace(
     `width="${width}" height="${height}">`,
-    `width="${svgHalfW}" height="${svgHalfH}" viewBox="0 0 ${width} ${height}">`,
+    `width="${svgSmallW}" height="${svgSmallH}" viewBox="0 0 ${width} ${height}">`,
   );
-  const svgOverlay = await sharp(Buffer.from(svgHalf))
+  const svgRasterized = await sharp(Buffer.from(svgSmall)).toBuffer();
+  const svgOverlay = await sharp(svgRasterized)
     .resize(width, height, { fit: 'fill', kernel: 'lanczos3' })
     .toBuffer();
 
