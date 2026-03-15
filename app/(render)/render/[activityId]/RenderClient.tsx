@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ActivityData } from '@/lib/types';
 import { type BaseMap } from '@/lib/map-config';
+import LogoWatermark from '@/app/components/LogoWatermark';
 
 const ActivityMap = dynamic(() => import('@/app/components/ActivityMap'), {
   ssr: false,
@@ -27,6 +28,8 @@ interface RenderClientProps {
   height?: number;
   baseMap?: BaseMap;
   osDark?: boolean;
+  hidePhotos?: boolean;
+  includeLogo?: boolean;
 }
 
 function getGalleryLayout(photoCount: number) {
@@ -47,7 +50,7 @@ function getGalleryLayout(photoCount: number) {
   return { columns: 2 as const, galleryRatio: 0.38 };
 }
 
-export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap, osDark }: RenderClientProps) {
+export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap, osDark, hidePhotos, includeLogo }: RenderClientProps) {
   const [viewportSize, setViewportSize] = useState({ w: fixedWidth ?? 0, h: fixedHeight ?? 0 });
 
   useEffect(() => {
@@ -63,10 +66,16 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
 
   if (!width || !height) return null;
 
-  const layout = getGalleryLayout(activity.photos.length);
+  const photoCount = hidePhotos ? 0 : activity.photos.length;
+  const layout = getGalleryLayout(photoCount);
 
   if (!layout) {
-    return <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} osDark={osDark} />;
+    return (
+      <div style={{ position: 'relative', width, height }}>
+        <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} osDark={osDark} hidePhotos={hidePhotos} />
+        {includeLogo && <LogoWatermark />}
+      </div>
+    );
   }
 
   const displayPhotos = activity.photos.slice(0, 8);
@@ -160,6 +169,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
           ))}
         </div>
       </div>
+      {includeLogo && <LogoWatermark />}
     </div>
   );
 }

@@ -3,12 +3,12 @@ import RenderClient from './RenderClient';
 
 interface RenderPageProps {
   params: Promise<{ activityId: string }>;
-  searchParams: Promise<{ width?: string; height?: string; fixed?: string; token?: string; photos?: string; orientation?: string; baseMap?: string; osDark?: string }>;
+  searchParams: Promise<{ width?: string; height?: string; fixed?: string; token?: string; photos?: string; orientation?: string; baseMap?: string; osDark?: string; hidePhotos?: string; includeLogo?: string }>;
 }
 
 export default async function RenderPage({ params, searchParams }: RenderPageProps) {
   const { activityId } = await params;
-  const { width: widthParam, height: heightParam, fixed, token, photos, orientation, baseMap, osDark: osDarkParam } = await searchParams;
+  const { width: widthParam, height: heightParam, fixed, token, photos, orientation, baseMap, osDark: osDarkParam, hidePhotos, includeLogo } = await searchParams;
 
   const useFixedSize = fixed === 'true';
   const fixedWidth = useFixedSize ? parseInt(widthParam || '860', 10) : undefined;
@@ -31,7 +31,7 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
       height: fixedHeight ?? '100vh',
       overflow: 'hidden',
     }}>
-      <RenderClient activity={activity} width={fixedWidth} height={fixedHeight} baseMap={baseMap === 'satellite' ? 'satellite' : 'os'} osDark={osDarkParam === 'true'} />
+      <RenderClient activity={activity} width={fixedWidth} height={fixedHeight} baseMap={baseMap === 'satellite' ? 'satellite' : 'os'} osDark={osDarkParam === 'true'} hidePhotos={hidePhotos === 'true'} includeLogo={includeLogo === 'true'} />
     </div>
   );
 }

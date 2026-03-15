@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { ActivitySummary } from '@/lib/types';
+import { buildPrintoutUrl, loadActivityExportPrefs } from '@/lib/activity-export-prefs';
 
 function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(1) + ' km';
@@ -75,7 +76,9 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
   const handleDownload = useCallback(async (activityId: number) => {
     setDownloading((prev) => new Set(prev).add(activityId));
     try {
-      const res = await fetch(`/api/activity-printout?activityId=${encodeURIComponent(activityId)}&format=jpeg`);
+      const prefs = loadActivityExportPrefs();
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const res = await fetch(buildPrintoutUrl(String(activityId), prefs, systemDark));
       if (!res.ok) throw new Error('Download failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getActivityDetail, MockOrientation, StravaApiError } from '@/lib/strava';
 import Header from '@/app/components/Header';
-import DownloadButton from '@/app/components/DownloadButton';
+import ExportOptionsPanel from '@/app/components/ExportOptionsPanel';
 import ActivityViewClient from './ActivityViewClient';
 
 interface ActivityPageProps {
@@ -69,7 +69,7 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8">
         <div className="mb-3 sm:mb-6">
           <Header logo="sm">
-            <DownloadButton activityId={id} />
+            <ExportOptionsPanel activityId={id} />
           </Header>
           <h1 className="mt-3 text-xl font-semibold text-text-primary">
             {activity.name}

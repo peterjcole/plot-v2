@@ -11,7 +11,7 @@ export default function RenderLayout({
         <meta name="referrer" content="no-referrer" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Ribeye+Marrow&display=swap"
           rel="stylesheet"
           referrerPolicy="no-referrer"
         />

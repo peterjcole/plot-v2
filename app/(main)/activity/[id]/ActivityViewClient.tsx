@@ -5,6 +5,12 @@ import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { ActivityData } from '@/lib/types';
 import { type BaseMap } from '@/lib/map-config';
+import {
+  type ActivityExportPrefs,
+  PREFS_CHANGED_EVENT,
+  dispatchPrefsChanged,
+  loadActivityExportPrefs,
+} from '@/lib/activity-export-prefs';
 import PhotoGallery from '@/app/components/PhotoGallery';
 import ActivityLayersPanel from '@/app/components/ActivityLayersPanel';
 
@@ -25,14 +31,6 @@ interface ActivityViewClientProps {
   activity: ActivityData;
 }
 
-function loadActivityPrefs() {
-  try {
-    const raw = localStorage.getItem('plotv2-activity-prefs');
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return {};
-}
-
 export default function ActivityViewClient({ activity }: ActivityViewClientProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
@@ -42,9 +40,9 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [isWide, setIsWide] = useState(false);
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | undefined>(undefined);
   const [mapReady, setMapReady] = useState(false);
-  const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityPrefs().baseMap ?? 'os');
-  const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityPrefs().osMapMode ?? 'light');
-  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityPrefs().osMapFollowSystem ?? true);
+  const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityExportPrefs().baseMap);
+  const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityExportPrefs().osMapMode);
+  const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityExportPrefs().osMapFollowSystem);
   const [systemDark, setSystemDark] = useState(false);
 
   const hasPhotos = activity.photos.length > 0;
@@ -128,12 +126,27 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return () => clearInterval(interval);
   }, [mapReady, dimensions]);
 
-  // Persist activity preferences
+  // Persist activity preferences and notify other components
   useEffect(() => {
+    const prefs = loadActivityExportPrefs();
+    const updated = { ...prefs, baseMap, osMapMode, osMapFollowSystem };
     try {
-      localStorage.setItem('plotv2-activity-prefs', JSON.stringify({ baseMap, osMapMode, osMapFollowSystem }));
+      localStorage.setItem('plotv2-activity-prefs', JSON.stringify(updated));
     } catch { /* ignore */ }
+    dispatchPrefsChanged(updated);
   }, [baseMap, osMapMode, osMapFollowSystem]);
+
+  // Sync map-layer prefs from ExportOptionsPanel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const incoming = (e as CustomEvent<ActivityExportPrefs>).detail;
+      setBaseMap(incoming.baseMap);
+      setOsMapMode(incoming.osMapMode);
+      setOsMapFollowSystem(incoming.osMapFollowSystem);
+    };
+    window.addEventListener(PREFS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(PREFS_CHANGED_EVENT, handler);
+  }, []);
 
   // Reset ready state if activity, base map, or dark mode changes
   useEffect(() => {

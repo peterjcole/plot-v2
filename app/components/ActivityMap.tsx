@@ -78,6 +78,7 @@ interface ActivityMapProps {
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
   osDark?: boolean;
+  hidePhotos?: boolean;
   /** When set, positions the map with setView instead of fitBounds */
   centerZoom?: { center: [number, number]; zoom: number };
 }
@@ -276,7 +277,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, centerZoom }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, centerZoom }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -329,7 +330,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         <StartEndMarkers route={route} color={routeColor} />
         <MapController route={route} paddingRight={paddingRight} centerZoom={centerZoom} />
         <TileLoadHandler />
-        <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />
+        {!hidePhotos && <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />}
       </MapContainer>
       <TextOverlay activity={activity} baseMap={baseMap} osDark={osDark} />
     </div>
