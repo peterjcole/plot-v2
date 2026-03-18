@@ -52,6 +52,7 @@ export default function PlannerClient() {
   const [explorerEnabled, setExplorerEnabled] = useState(() => savedHeatmapPrefs?.explorerEnabled ?? false);
   const [explorerFilter, setExplorerFilter] = useState<string>(() => savedHeatmapPrefs?.explorerFilter ?? 'all');
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
+  const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,9 +88,10 @@ export default function PlannerClient() {
         personalHeatmapEnabled,
         explorerEnabled,
         explorerFilter,
+        hillshadeEnabled,
       }));
     } catch { /* ignore */ }
-  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter]);
+  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter, hillshadeEnabled]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -233,7 +235,7 @@ export default function PlannerClient() {
       const res = await fetch('/api/planner-printout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ route, center, exportMode, baseMap, osDark }),
+        body: JSON.stringify({ route, center, exportMode, baseMap, osDark, hillshadeEnabled }),
       });
 
       if (!res.ok) {
@@ -274,6 +276,7 @@ export default function PlannerClient() {
         explorerEnabled={explorerEnabled}
         explorerFilter={explorerFilter}
         hoveredElevationPoint={hoveredElevationPoint}
+        hillshadeEnabled={hillshadeEnabled}
       />
       {/* Logo panel — desktop only */}
       <Link
@@ -322,6 +325,8 @@ export default function PlannerClient() {
         onExplorerEnabledChange={setExplorerEnabled}
         explorerFilter={explorerFilter}
         onExplorerFilterChange={setExplorerFilter}
+        hillshadeEnabled={hillshadeEnabled}
+        onHillshadeEnabledChange={setHillshadeEnabled}
       />
       <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar

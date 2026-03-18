@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     exportMode?: unknown;
     baseMap?: unknown;
     osDark?: unknown;
+    hillshadeEnabled?: unknown;
   };
 
   try {
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     'explorer';
   const baseMap: BaseMap = body.baseMap === 'satellite' ? 'satellite' : 'os';
   const osDark = body.osDark === true;
+  const hillshadeEnabled = body.hillshadeEnabled === true;
 
   const hasRoute = route.length >= 2;
 
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
       exportMode,
       baseMap,
       osDark,
+      hillshadeEnabled,
       width,
       height,
       renderZoom,

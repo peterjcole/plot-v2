@@ -27,6 +27,8 @@ interface LayersPanelProps {
   onExplorerEnabledChange: (enabled: boolean) => void;
   explorerFilter: string;
   onExplorerFilterChange: (filter: string) => void;
+  hillshadeEnabled: boolean;
+  onHillshadeEnabledChange: (enabled: boolean) => void;
 }
 
 const SPORTS = [
@@ -47,7 +49,6 @@ const COLORS = [
 
 const selectClass =
   'w-full bg-surface-muted border border-border rounded-lg px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent';
-
 
 export default function LayersPanel({
   baseMap,
@@ -71,6 +72,8 @@ export default function LayersPanel({
   onExplorerEnabledChange,
   explorerFilter,
   onExplorerFilterChange,
+  hillshadeEnabled,
+  onHillshadeEnabledChange,
 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -119,6 +122,10 @@ export default function LayersPanel({
                   />
                   <span className="text-xs text-text-secondary">Follow system colour scheme</span>
                 </label>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-secondary">Hillshading</span>
+                  <Switch checked={hillshadeEnabled} onCheckedChange={onHillshadeEnabledChange} />
+                </div>
               </div>
             )}
           </div>

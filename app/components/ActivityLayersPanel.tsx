@@ -12,6 +12,8 @@ interface ActivityLayersPanelProps {
   onOsMapModeChange: (mode: 'light' | 'dark') => void;
   osMapFollowSystem: boolean;
   onOsMapFollowSystemChange: (follow: boolean) => void;
+  hillshadeEnabled: boolean;
+  onHillshadeEnabledChange: (v: boolean) => void;
 }
 
 const selectClass =
@@ -24,6 +26,8 @@ export default function ActivityLayersPanel({
   onOsMapModeChange,
   osMapFollowSystem,
   onOsMapFollowSystemChange,
+  hillshadeEnabled,
+  onHillshadeEnabledChange,
 }: ActivityLayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -72,6 +76,10 @@ export default function ActivityLayersPanel({
                 />
                 <span className="text-xs text-text-secondary">Follow system colour scheme</span>
               </label>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary">Hillshading</span>
+                <Switch checked={hillshadeEnabled} onCheckedChange={onHillshadeEnabledChange} />
+              </div>
             </div>
           )}
         </div>

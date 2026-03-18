@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
   const osDark = searchParams.get('osDark') === 'true';
   const hidePhotos = searchParams.get('hidePhotos') === 'true';
   const includeLogo = searchParams.get('includeLogo') === 'true';
+  const hillshadeEnabled = searchParams.get('hillshadeEnabled') === 'true';
 
   try {
     const browser = await getBrowser();
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const token = encodeURIComponent(session.accessToken);
-    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}${hidePhotos ? '&hidePhotos=true' : ''}${includeLogo ? '&includeLogo=true' : ''}${bypassParam}`;
+    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}${hidePhotos ? '&hidePhotos=true' : ''}${includeLogo ? '&includeLogo=true' : ''}${hillshadeEnabled ? '&hillshadeEnabled=true' : ''}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',

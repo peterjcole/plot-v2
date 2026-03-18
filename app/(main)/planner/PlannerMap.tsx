@@ -41,6 +41,7 @@ interface PlannerMapProps {
   explorerEnabled: boolean;
   explorerFilter: string;
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
+  hillshadeEnabled: boolean;
 }
 
 function pinSvg(index: number): string {
@@ -193,6 +194,7 @@ export default function PlannerMap({
   explorerEnabled,
   explorerFilter,
   hoveredElevationPoint,
+  hillshadeEnabled,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const mapResult = useOpenLayersMap(mapTargetRef);
@@ -206,6 +208,7 @@ export default function PlannerMap({
   const snapEnabledRef = useRef(snapEnabled);
   const heatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const dimLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const explorerGridLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const explorerTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -320,6 +323,29 @@ export default function PlannerMap({
       }
     };
   }, [map, heatmapEnabled, personalHeatmapEnabled, explorerEnabled, dimBaseMap]);
+
+  // Manage hillshade tile layer
+  useEffect(() => {
+    if (!map) return;
+    if (hillshadeLayerRef.current) {
+      map.removeLayer(hillshadeLayerRef.current);
+      hillshadeLayerRef.current = null;
+    }
+    if (!hillshadeEnabled || baseMap !== 'os') return;
+    const layer = new TileLayer({
+      source: new XYZ({
+        url: `/api/hillshade?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`,
+        projection: 'EPSG:3857',
+      }),
+      zIndex: 1.5,
+    });
+    map.addLayer(layer);
+    hillshadeLayerRef.current = layer;
+    return () => {
+      map.removeLayer(layer);
+      hillshadeLayerRef.current = null;
+    };
+  }, [map, hillshadeEnabled, osDark, baseMap]);
 
   // Manage personal heatmap vector tile layer
   useEffect(() => {

@@ -79,6 +79,7 @@ interface ActivityMapProps {
   baseMap?: BaseMap;
   osDark?: boolean;
   hidePhotos?: boolean;
+  hillshadeEnabled?: boolean;
   /** When set, positions the map with setView instead of fitBounds */
   centerZoom?: { center: [number, number]; zoom: number };
 }
@@ -277,7 +278,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, centerZoom }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hillshadeEnabled = false, centerZoom }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -317,6 +318,14 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
           maxNativeZoom={isSatellite ? 18 : 9}
           {...(!isSatellite && { minNativeZoom: 8 })}
         />
+        {hillshadeEnabled && !isSatellite && (
+          <TileLayer
+            key={String(osDark)}
+            url={`/api/hillshade27700?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}
+            maxNativeZoom={9}
+            zIndex={2}
+          />
+        )}
         <Polyline
           positions={route}
           pathOptions={{

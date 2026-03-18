@@ -45,7 +45,7 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // Sync baseMap/osMapMode/osMapFollowSystem from ActivityViewClient via custom event
+  // Sync baseMap/osMapMode/osMapFollowSystem/hillshadeEnabled from ActivityViewClient via custom event
   useEffect(() => {
     const handler = (e: Event) => {
       const incoming = (e as CustomEvent<ActivityExportPrefs>).detail;
@@ -54,6 +54,7 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
         baseMap: incoming.baseMap,
         osMapMode: incoming.osMapMode,
         osMapFollowSystem: incoming.osMapFollowSystem,
+        hillshadeEnabled: incoming.hillshadeEnabled ?? false,
       }));
     };
     window.addEventListener(PREFS_CHANGED_EVENT, handler);
@@ -160,6 +161,13 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
                   />
                   <span className="text-xs text-text-secondary">Follow system colour scheme</span>
                 </label>
+                <div className={rowClass}>
+                  <span className="text-xs font-medium text-text-secondary">Hillshading</span>
+                  <Switch
+                    checked={prefs.hillshadeEnabled}
+                    onCheckedChange={(checked) => updatePrefs({ hillshadeEnabled: checked })}
+                  />
+                </div>
               </div>
             )}
 

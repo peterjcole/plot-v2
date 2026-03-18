@@ -13,6 +13,7 @@ export interface StitchOptions {
   exportMode: ExportMode;
   baseMap: BaseMap;
   osDark: boolean;
+  hillshadeEnabled?: boolean;
   width: number;
   height: number;
   renderZoom: number;
@@ -171,7 +172,7 @@ function buildSvg(
 }
 
 export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
-  const { route, center, baseMap, osDark, width, height, renderZoom, origin, bypassSecret } = opts;
+  const { route, center, baseMap, osDark, hillshadeEnabled, width, height, renderZoom, origin, bypassSecret } = opts;
 
   const isSatellite = baseMap === 'satellite';
   const isDark = isSatellite || osDark;
@@ -221,6 +222,22 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
           })
           .catch(() => null),
       );
+    }
+  }
+
+  // Append hillshade overlay tiles (RGBA PNG) after OS tiles so Sharp composites them on top
+  if (hillshadeEnabled && !isSatellite) {
+    const darkParam = osDark ? '&dark=1' : '';
+    for (let ty = tileYMin; ty <= tileYMax; ty++) {
+      for (let tx = tileXMin; tx <= tileXMax; tx++) {
+        const left = (tx - tileXMin) * 256;
+        const top = (ty - tileYMin) * 256;
+        fetchPromises.push(
+          fetch(`${origin}/api/hillshade27700?z=${renderZoom}&x=${tx}&y=${ty}${darkParam}${bypassParam}`)
+            .then(async r => r.ok ? { left, top, input: Buffer.from(await r.arrayBuffer()) } : null)
+            .catch(() => null)
+        );
+      }
     }
   }
 

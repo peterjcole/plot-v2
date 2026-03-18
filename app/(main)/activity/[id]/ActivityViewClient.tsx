@@ -21,6 +21,7 @@ interface MapProps {
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
   osDark?: boolean;
+  hillshadeEnabled?: boolean;
 }
 
 const ActivityMap = dynamic<MapProps>(() => import('@/app/components/ActivityMap'), {
@@ -43,6 +44,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityExportPrefs().baseMap);
   const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityExportPrefs().osMapMode);
   const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityExportPrefs().osMapFollowSystem);
+  const [hillshadeEnabled, setHillshadeEnabled] = useState<boolean>(() => loadActivityExportPrefs().hillshadeEnabled ?? false);
   const [systemDark, setSystemDark] = useState(false);
 
   const hasPhotos = activity.photos.length > 0;
@@ -129,12 +131,12 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   // Persist activity preferences and notify other components
   useEffect(() => {
     const prefs = loadActivityExportPrefs();
-    const updated = { ...prefs, baseMap, osMapMode, osMapFollowSystem };
+    const updated = { ...prefs, baseMap, osMapMode, osMapFollowSystem, hillshadeEnabled };
     try {
       localStorage.setItem('plotv2-activity-prefs', JSON.stringify(updated));
     } catch { /* ignore */ }
     dispatchPrefsChanged(updated);
-  }, [baseMap, osMapMode, osMapFollowSystem]);
+  }, [baseMap, osMapMode, osMapFollowSystem, hillshadeEnabled]);
 
   // Sync map-layer prefs from ExportOptionsPanel
   useEffect(() => {
@@ -143,6 +145,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
       setBaseMap(incoming.baseMap);
       setOsMapMode(incoming.osMapMode);
       setOsMapFollowSystem(incoming.osMapFollowSystem);
+      setHillshadeEnabled(incoming.hillshadeEnabled ?? false);
     };
     window.addEventListener(PREFS_CHANGED_EVENT, handler);
     return () => window.removeEventListener(PREFS_CHANGED_EVENT, handler);
@@ -172,6 +175,8 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
       onOsMapModeChange={setOsMapMode}
       osMapFollowSystem={osMapFollowSystem}
       onOsMapFollowSystemChange={setOsMapFollowSystem}
+      hillshadeEnabled={hillshadeEnabled}
+      onHillshadeEnabledChange={setHillshadeEnabled}
     />
   );
 
@@ -179,7 +184,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return (
       <div ref={containerRef} className="relative w-full">
         {dimensions && (
-          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} />
+          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} hillshadeEnabled={hillshadeEnabled} />
         )}
         {layersPanel}
         {!mapReady && spinner}
@@ -206,6 +211,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
               onPinClick={handlePinClick}
               baseMap={baseMap}
               osDark={osDark}
+              hillshadeEnabled={hillshadeEnabled}
             />
           </div>
           <div className={isWide ? 'flex-1 overflow-y-auto' : 'flex-1'}>
