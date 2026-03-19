@@ -10,6 +10,7 @@ export interface ActivityExportPrefs {
   includePhotos: boolean;
   includeLogo: boolean;
   hillshadeEnabled: boolean;
+  includeDetails: boolean;
 }
 
 export const EXPORT_PREFS_DEFAULTS: ActivityExportPrefs = {
@@ -20,6 +21,7 @@ export const EXPORT_PREFS_DEFAULTS: ActivityExportPrefs = {
   includePhotos: true,
   includeLogo: false,
   hillshadeEnabled: false,
+  includeDetails: true,
 };
 
 export const ASPECT_RATIO_DIMENSIONS: Record<AspectRatio, { width: number; height: number }> = {
@@ -72,5 +74,6 @@ export function buildPrintoutUrl(
   if (!prefs.includePhotos) url += '&hidePhotos=true';
   if (prefs.includeLogo) url += '&includeLogo=true';
   if (prefs.hillshadeEnabled && prefs.baseMap !== 'satellite') url += '&hillshadeEnabled=true';
+  if (!prefs.includeDetails) url += '&hideDetails=true';
   return url;
 }

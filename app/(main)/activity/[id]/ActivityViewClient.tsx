@@ -21,6 +21,7 @@ interface MapProps {
   onPinClick?: (index: number) => void;
   baseMap?: BaseMap;
   osDark?: boolean;
+  hideDetails?: boolean;
   hillshadeEnabled?: boolean;
 }
 
@@ -45,6 +46,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityExportPrefs().osMapMode);
   const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityExportPrefs().osMapFollowSystem);
   const [hillshadeEnabled, setHillshadeEnabled] = useState<boolean>(() => loadActivityExportPrefs().hillshadeEnabled ?? false);
+  const [includeDetails, setIncludeDetails] = useState<boolean>(() => loadActivityExportPrefs().includeDetails ?? true);
   const [systemDark, setSystemDark] = useState(false);
 
   const hasPhotos = activity.photos.length > 0;
@@ -146,6 +148,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
       setOsMapMode(incoming.osMapMode);
       setOsMapFollowSystem(incoming.osMapFollowSystem);
       setHillshadeEnabled(incoming.hillshadeEnabled ?? false);
+      setIncludeDetails(incoming.includeDetails ?? true);
     };
     window.addEventListener(PREFS_CHANGED_EVENT, handler);
     return () => window.removeEventListener(PREFS_CHANGED_EVENT, handler);
@@ -184,7 +187,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return (
       <div ref={containerRef} className="relative w-full">
         {dimensions && (
-          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} hillshadeEnabled={hillshadeEnabled} />
+          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} hideDetails={!includeDetails} hillshadeEnabled={hillshadeEnabled} />
         )}
         {layersPanel}
         {!mapReady && spinner}
@@ -211,6 +214,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
               onPinClick={handlePinClick}
               baseMap={baseMap}
               osDark={osDark}
+              hideDetails={!includeDetails}
               hillshadeEnabled={hillshadeEnabled}
             />
           </div>

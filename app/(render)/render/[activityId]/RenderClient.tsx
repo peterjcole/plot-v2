@@ -31,6 +31,7 @@ interface RenderClientProps {
   hidePhotos?: boolean;
   includeLogo?: boolean;
   hillshadeEnabled?: boolean;
+  hideDetails?: boolean;
 }
 
 function getGalleryLayout(photoCount: number) {
@@ -51,7 +52,7 @@ function getGalleryLayout(photoCount: number) {
   return { columns: 2 as const, galleryRatio: 0.38 };
 }
 
-export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap, osDark, hidePhotos, includeLogo, hillshadeEnabled }: RenderClientProps) {
+export default function RenderClient({ activity, width: fixedWidth, height: fixedHeight, baseMap, osDark, hidePhotos, includeLogo, hillshadeEnabled, hideDetails }: RenderClientProps) {
   const [viewportSize, setViewportSize] = useState({ w: fixedWidth ?? 0, h: fixedHeight ?? 0 });
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
   if (!layout) {
     return (
       <div style={{ position: 'relative', width, height }}>
-        <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} osDark={osDark} hidePhotos={hidePhotos} hillshadeEnabled={hillshadeEnabled} />
+        <ActivityMap activity={activity} width={width} height={height} baseMap={baseMap} osDark={osDark} hidePhotos={hidePhotos} hillshadeEnabled={hillshadeEnabled} hideDetails={hideDetails} />
         {includeLogo && <LogoWatermark />}
       </div>
     );
@@ -96,6 +97,7 @@ export default function RenderClient({ activity, width: fixedWidth, height: fixe
         baseMap={baseMap}
         osDark={osDark}
         hillshadeEnabled={hillshadeEnabled}
+        hideDetails={hideDetails}
       />
       <div
         style={{
