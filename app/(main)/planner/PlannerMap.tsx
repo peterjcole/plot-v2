@@ -42,6 +42,9 @@ interface PlannerMapProps {
   explorerFilter: string;
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
   hillshadeEnabled: boolean;
+  onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
+  onCloseActivityPopup?: () => void;
+  hoveredActivityRoute?: [number, number][] | null;
 }
 
 function pinSvg(index: number): string {
@@ -195,6 +198,9 @@ export default function PlannerMap({
   explorerFilter,
   hoveredElevationPoint,
   hillshadeEnabled,
+  onHeatmapClick,
+  onCloseActivityPopup,
+  hoveredActivityRoute,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const mapResult = useOpenLayersMap(mapTargetRef);
@@ -216,6 +222,11 @@ export default function PlannerMap({
   const hoverSourceRef = useRef<VectorSource | null>(null);
   const hoverLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const hoverOverlayRef = useRef<Overlay | null>(null);
+  const activityHighlightSourceRef = useRef<VectorSource | null>(null);
+  const activityHighlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const personalHeatmapEnabledRef = useRef(personalHeatmapEnabled);
+  const onHeatmapClickRef = useRef(onHeatmapClick);
+  const onCloseActivityPopupRef = useRef(onCloseActivityPopup);
 
   useEffect(() => {
     waypointsRef.current = waypoints;
@@ -232,6 +243,18 @@ export default function PlannerMap({
   useEffect(() => {
     snapEnabledRef.current = snapEnabled;
   }, [snapEnabled]);
+
+  useEffect(() => {
+    personalHeatmapEnabledRef.current = personalHeatmapEnabled;
+  }, [personalHeatmapEnabled]);
+
+  useEffect(() => {
+    onHeatmapClickRef.current = onHeatmapClick;
+  }, [onHeatmapClick]);
+
+  useEffect(() => {
+    onCloseActivityPopupRef.current = onCloseActivityPopup;
+  }, [onCloseActivityPopup]);
 
   // Toggle OS / satellite base layers
   useEffect(() => {
@@ -955,6 +978,7 @@ export default function PlannerMap({
           const geom = waypointFeature.getGeometry() as Point;
           showDeletePopup(geom.getCoordinates(), index);
         }
+        onCloseActivityPopupRef.current?.();
         return;
       }
 
@@ -991,6 +1015,15 @@ export default function PlannerMap({
           });
           navigator.vibrate?.(15);
         }
+        onCloseActivityPopupRef.current?.();
+        return;
+      }
+
+      // Heatmap click — show activity popup
+      if (personalHeatmapEnabledRef.current && !addPointsRef.current) {
+        const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+        const evt = e.originalEvent as MouseEvent;
+        onHeatmapClickRef.current?.(lat, lng, evt.clientX, evt.clientY);
         return;
       }
 
@@ -1067,6 +1100,10 @@ export default function PlannerMap({
       });
       if (routeHit) {
         viewport.style.cursor = 'copy';
+        return;
+      }
+      if (personalHeatmapEnabledRef.current && !addPointsRef.current) {
+        viewport.style.cursor = 'pointer';
         return;
       }
       viewport.style.cursor = addPointsRef.current ? 'crosshair' : '';
@@ -1182,6 +1219,35 @@ export default function PlannerMap({
     }
   }, [map, hoveredElevationPoint]);
 
+  // Activity highlight layer (hovered route from popup)
+  useEffect(() => {
+    if (!map) return;
+
+    if (!activityHighlightSourceRef.current) {
+      const source = new VectorSource();
+      const layer = new VectorLayer({
+        source,
+        zIndex: 6,
+      });
+      map.addLayer(layer);
+      activityHighlightSourceRef.current = source;
+      activityHighlightLayerRef.current = layer;
+    }
+
+    const source = activityHighlightSourceRef.current;
+    source.clear();
+
+    if (hoveredActivityRoute && hoveredActivityRoute.length >= 2) {
+      const coords = hoveredActivityRoute.map((coord) => fromLonLat(coord, OS_PROJECTION.code));
+      const feature = new Feature({ geometry: new LineString(coords) });
+      feature.setStyle([
+        new Style({ stroke: new Stroke({ color: '#FF6B35', width: 6 }) }),
+        new Style({ stroke: new Stroke({ color: '#FFD700', width: 3 }) }),
+      ]);
+      source.addFeature(feature);
+    }
+  }, [map, hoveredActivityRoute]);
+
   // Cleanup hover layer + overlay on unmount
   useEffect(() => {
     return () => {
@@ -1194,6 +1260,11 @@ export default function PlannerMap({
         if (hoverOverlayRef.current) {
           map.removeOverlay(hoverOverlayRef.current);
           hoverOverlayRef.current = null;
+        }
+        if (activityHighlightLayerRef.current) {
+          map.removeLayer(activityHighlightLayerRef.current);
+          activityHighlightLayerRef.current = null;
+          activityHighlightSourceRef.current = null;
         }
       }
     };

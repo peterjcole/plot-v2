@@ -16,7 +16,8 @@ import Logo from '@/app/components/Logo';
 import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
-import { Waypoint } from '@/lib/types';
+import HeatmapActivityPopup from './HeatmapActivityPopup';
+import { Waypoint, HeatmapActivity } from '@/lib/types';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
 import 'ol/ol.css';
@@ -54,6 +55,15 @@ export default function PlannerClient() {
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? false);
   const [isExportingImage, setIsExportingImage] = useState(false);
+  const [activityPopup, setActivityPopup] = useState<{
+    activities: HeatmapActivity[];
+    screenX: number;
+    screenY: number;
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [popupLoading, setPopupLoading] = useState(false);
+  const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -193,6 +203,31 @@ export default function PlannerClient() {
     map.getView().animate({ center, zoom: 8, duration: 500 });
   }, []);
 
+  const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
+    // Same point click → toggle close
+    if (activityPopup && Math.abs(activityPopup.lat - lat) < 0.0001 && Math.abs(activityPopup.lng - lng) < 0.0001) {
+      setActivityPopup(null);
+      setHoveredActivityRoute(null);
+      return;
+    }
+    setActivityPopup({ activities: [], screenX, screenY, lat, lng });
+    setPopupLoading(true);
+    setHoveredActivityRoute(null);
+    try {
+      const res = await fetch(`/api/tiles/activities?lat=${lat}&lng=${lng}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActivityPopup((prev) => prev ? { ...prev, activities: data } : null);
+      } else {
+        setActivityPopup(null);
+      }
+    } catch {
+      setActivityPopup(null);
+    } finally {
+      setPopupLoading(false);
+    }
+  }, [activityPopup]);
+
   const handleZoomIn = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -277,7 +312,20 @@ export default function PlannerClient() {
         explorerFilter={explorerFilter}
         hoveredElevationPoint={hoveredElevationPoint}
         hillshadeEnabled={hillshadeEnabled}
+        onHeatmapClick={handleHeatmapClick}
+        onCloseActivityPopup={() => { setActivityPopup(null); setHoveredActivityRoute(null); }}
+        hoveredActivityRoute={hoveredActivityRoute}
       />
+      {activityPopup && (
+        <HeatmapActivityPopup
+          activities={activityPopup.activities}
+          screenX={activityPopup.screenX}
+          screenY={activityPopup.screenY}
+          isLoading={popupLoading}
+          onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); }}
+          onHoverActivity={setHoveredActivityRoute}
+        />
+      )}
       {/* Logo panel — desktop only */}
       <Link
         href="/"

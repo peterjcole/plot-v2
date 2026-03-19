@@ -33,6 +33,16 @@ export interface ActivitySummary {
   elevationGain: number; // in meters
 }
 
+export interface HeatmapActivity {
+  id: number;
+  name: string;
+  sportType: string | null;
+  startDate: string;
+  distance: number | null;
+  movingTime: number | null;
+  route: [number, number][]; // [lng, lat][] GeoJSON order
+}
+
 export interface Waypoint {
   lat: number;
   lng: number;
