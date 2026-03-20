@@ -18,6 +18,7 @@ export interface ActivityStats {
 export interface ActivityData {
   id: string;
   name: string;
+  description?: string;
   route: [number, number][]; // [lat, lng][]
   photos: ActivityPhoto[];
   stats: ActivityStats;

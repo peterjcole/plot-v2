@@ -80,6 +80,7 @@ interface ActivityMapProps {
   osDark?: boolean;
   hidePhotos?: boolean;
   hideDetails?: boolean;
+  hideDescription?: boolean;
   hillshadeEnabled?: boolean;
   /** When set, positions the map with setView instead of fitBounds */
   centerZoom?: { center: [number, number]; zoom: number };
@@ -279,7 +280,7 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hideDetails = false, hillshadeEnabled = false, centerZoom }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hideDetails = false, hideDescription = false, hillshadeEnabled = false, centerZoom }: ActivityMapProps) {
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -342,7 +343,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         <TileLoadHandler />
         {!hidePhotos && <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />}
       </MapContainer>
-      {!hideDetails && <TextOverlay activity={activity} baseMap={baseMap} osDark={osDark} />}
+      {!hideDetails && <TextOverlay activity={activity} baseMap={baseMap} osDark={osDark} hideDescription={hideDescription} />}
     </div>
   );
 }

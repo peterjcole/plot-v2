@@ -121,6 +121,7 @@ function getMockActivity(photoCount: number, orientation: MockOrientation): Acti
   return {
     id: 'mock',
     name: `Lake District Loop (${photoCount} photo${photoCount !== 1 ? 's' : ''}, ${orientation})`,
+    description: 'A stunning circular route through the heart of the Lake District, taking in Helvellyn and the Striding Edge ridge. Challenging but rewarding with exceptional views.',
     route,
     photos,
     stats: {
@@ -180,6 +181,7 @@ export async function getActivityDetail(
   return {
     id: String(activity.id),
     name: activity.name,
+    description: activity.description || undefined,
     route,
     photos,
     stats: {

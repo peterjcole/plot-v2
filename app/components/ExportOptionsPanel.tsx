@@ -188,6 +188,14 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
             </div>
 
             <div className={rowClass}>
+              <span className={labelClass}>Description</span>
+              <Switch
+                checked={prefs.includeDescription ?? true}
+                onCheckedChange={(checked) => updatePrefs({ includeDescription: checked })}
+              />
+            </div>
+
+            <div className={rowClass}>
               <span className={labelClass}>Include logo</span>
               <Switch
                 checked={prefs.includeLogo}

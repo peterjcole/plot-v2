@@ -8,6 +8,7 @@ interface TextOverlayProps {
   activity: ActivityData;
   baseMap?: BaseMap;
   osDark?: boolean;
+  hideDescription?: boolean;
 }
 
 function formatDistance(meters: number): string {
@@ -46,7 +47,7 @@ function formatDate(isoString: string): string {
   });
 }
 
-export default function TextOverlay({ activity, baseMap, osDark }: TextOverlayProps) {
+export default function TextOverlay({ activity, baseMap, osDark, hideDescription }: TextOverlayProps) {
   const [showDetails, setShowDetails] = useState(false);
   const isDark = baseMap === 'satellite' || !!osDark;
 
@@ -128,6 +129,11 @@ export default function TextOverlay({ activity, baseMap, osDark }: TextOverlayPr
             <div className="text-xs">Elevation</div>
           </div>
         </div>
+        {!hideDescription && activity.description && (
+          <p className="m-0 mt-3 text-xs opacity-75 line-clamp-2" style={{ fontStyle: 'italic' }}>
+            {activity.description}
+          </p>
+        )}
       </div>
 
       {/* Desktop: Full overlay at bottom (always visible) */}
@@ -173,6 +179,11 @@ export default function TextOverlay({ activity, baseMap, osDark }: TextOverlayPr
             <div className="text-[13px]">Elevation</div>
           </div>
         </div>
+        {!hideDescription && activity.description && (
+          <p className="m-0 mt-3 text-xs opacity-75 line-clamp-2" style={{ fontStyle: 'italic' }}>
+            {activity.description}
+          </p>
+        )}
       </div>
     </>
   );
