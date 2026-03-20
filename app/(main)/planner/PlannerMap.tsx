@@ -23,6 +23,7 @@ import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
@@ -45,6 +46,7 @@ interface PlannerMapProps {
   onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
   onCloseActivityPopup?: () => void;
   hoveredActivityRoute?: [number, number][] | null;
+  hoveredActivityColor?: string | null;
 }
 
 function pinSvg(index: number): string {
@@ -201,6 +203,7 @@ export default function PlannerMap({
   onHeatmapClick,
   onCloseActivityPopup,
   hoveredActivityRoute,
+  hoveredActivityColor,
 }: PlannerMapProps) {
   const mapTargetRef = useRef<HTMLDivElement>(null);
   const mapResult = useOpenLayersMap(mapTargetRef);
@@ -1238,15 +1241,16 @@ export default function PlannerMap({
     source.clear();
 
     if (hoveredActivityRoute && hoveredActivityRoute.length >= 2) {
+      const color = hoveredActivityColor ?? DEFAULT_SPORT_COLOR;
       const coords = hoveredActivityRoute.map((coord) => fromLonLat(coord, OS_PROJECTION.code));
       const feature = new Feature({ geometry: new LineString(coords) });
       feature.setStyle([
-        new Style({ stroke: new Stroke({ color: '#FF6B35', width: 6 }) }),
-        new Style({ stroke: new Stroke({ color: '#FFD700', width: 3 }) }),
+        new Style({ stroke: new Stroke({ color: hexToRgba(color, 0.45), width: 8 }) }),
+        new Style({ stroke: new Stroke({ color: hexToRgba(color, 0.85), width: 4 }) }),
       ]);
       source.addFeature(feature);
     }
-  }, [map, hoveredActivityRoute]);
+  }, [map, hoveredActivityRoute, hoveredActivityColor]);
 
   // Cleanup hover layer + overlay on unmount
   useEffect(() => {

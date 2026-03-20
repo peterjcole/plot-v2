@@ -64,6 +64,7 @@ export default function PlannerClient() {
   } | null>(null);
   const [popupLoading, setPopupLoading] = useState(false);
   const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
+  const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -315,8 +316,9 @@ export default function PlannerClient() {
         hoveredElevationPoint={hoveredElevationPoint}
         hillshadeEnabled={hillshadeEnabled}
         onHeatmapClick={handleHeatmapClick}
-        onCloseActivityPopup={() => { setActivityPopup(null); setHoveredActivityRoute(null); }}
+        onCloseActivityPopup={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
         hoveredActivityRoute={hoveredActivityRoute}
+        hoveredActivityColor={hoveredActivityColor}
       />
       {activityPopup && (
         <HeatmapActivityPopup
@@ -324,8 +326,8 @@ export default function PlannerClient() {
           screenX={activityPopup.screenX}
           screenY={activityPopup.screenY}
           isLoading={popupLoading}
-          onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); }}
-          onHoverActivity={setHoveredActivityRoute}
+          onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
+          onHoverActivity={(route, color) => { setHoveredActivityRoute(route); setHoveredActivityColor(color ?? null); }}
         />
       )}
       {/* Logo panel — desktop only */}
