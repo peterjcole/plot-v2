@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { Map, Mountain } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getAthleteActivities, StravaApiError } from '@/lib/strava';
@@ -7,7 +8,14 @@ import Header from '@/app/components/Header';
 import LoginButton from '@/app/components/LoginButton';
 import ActivityList from '@/app/components/ActivityList';
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const initialPage = Math.max(1, parseInt(String(params.page ?? '1'), 10) || 1);
+
   const session = await getSession();
   const isLoggedIn = !!session.accessToken;
 
@@ -15,7 +23,7 @@ export default async function Home() {
   let activitiesError = false;
   if (isLoggedIn) {
     try {
-      initialActivities = await getAthleteActivities(session.accessToken!, 1, 20);
+      initialActivities = await getAthleteActivities(session.accessToken!, initialPage, 50);
     } catch (error) {
       if (error instanceof StravaApiError && error.status === 401) {
         const now = Math.floor(Date.now() / 1000);
@@ -100,7 +108,9 @@ export default async function Home() {
         {isLoggedIn && !activitiesError && (
           <div className="mt-8">
             <h2 className="mb-4 text-xl font-semibold text-text-primary">Activities</h2>
-            <ActivityList initialActivities={initialActivities} />
+            <Suspense>
+              <ActivityList initialActivities={initialActivities} initialPage={initialPage} />
+            </Suspense>
           </div>
         )}
       </main>

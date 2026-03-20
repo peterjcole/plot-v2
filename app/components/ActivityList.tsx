@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Camera, Loader2 } from 'lucide-react';
 import { ActivitySummary } from '@/lib/types';
-import { buildPrintoutUrl, loadActivityExportPrefs } from '@/lib/activity-export-prefs';
 
 function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(1) + ' km';
@@ -25,20 +25,43 @@ function formatDate(iso: string): string {
   });
 }
 
-interface ActivityListProps {
-  initialActivities: ActivitySummary[];
+function PhotoCountBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-surface-muted px-1.5 py-0.5 text-xs font-medium text-text-secondary">
+      <Camera className="h-3 w-3" aria-hidden="true" />
+      {count}
+    </span>
+  );
 }
 
-export default function ActivityList({ initialActivities }: ActivityListProps) {
+interface ActivityListProps {
+  initialActivities: ActivitySummary[];
+  initialPage?: number;
+}
+
+export default function ActivityList({ initialActivities, initialPage = 1 }: ActivityListProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activities, setActivities] = useState<ActivitySummary[]>(initialActivities);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(initialActivities.length === 20);
+  const [hasMore, setHasMore] = useState(initialActivities.length === 50);
   const fetchIdRef = useRef(0);
-  const [downloading, setDownloading] = useState<Set<number>>(new Set());
 
-  const perPage = 20;
+  const perPage = 50;
+
+  // Sync page to URL
+  useEffect(() => {
+    const urlPage = parseInt(searchParams.get('page') ?? '1', 10) || 1;
+    if (page === urlPage) return;
+    if (page === 1) {
+      router.replace('/', { scroll: false });
+    } else {
+      router.replace(`?page=${page}`, { scroll: false });
+    }
+  }, [page, router, searchParams]);
 
   const fetchActivities = useCallback(async () => {
     const fetchId = ++fetchIdRef.current;
@@ -73,48 +96,13 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
     fetchActivities();
   }, [fetchActivities]);
 
-  const handleDownload = useCallback(async (activityId: number) => {
-    setDownloading((prev) => new Set(prev).add(activityId));
-    try {
-      const prefs = loadActivityExportPrefs();
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const res = await fetch(buildPrintoutUrl(String(activityId), prefs, systemDark));
-      if (!res.ok) throw new Error('Download failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `activity-${activityId}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-    } catch (err) {
-      console.error('Download error:', err);
-    } finally {
-      setDownloading((prev) => {
-        const next = new Set(prev);
-        next.delete(activityId);
-        return next;
-      });
-    }
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-text-secondary" aria-label="Loading activities" />
-      </div>
-    );
-  }
-
   if (error) {
     return <p className="text-red-600">Error: {error}</p>;
   }
 
   return (
     <div className="w-full">
-      {activities.length === 0 && page === 1 ? (
+      {activities.length === 0 && page === 1 && !loading ? (
         <p className="text-text-secondary">No activities found.</p>
       ) : (
         <>
@@ -129,65 +117,67 @@ export default function ActivityList({ initialActivities }: ActivityListProps) {
                   <th scope="col" className="hidden px-3 py-2 sm:table-cell">Name</th>
                   <th scope="col" className="hidden px-3 py-2 sm:table-cell">Type</th>
                   <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Distance</th>
-                  <th scope="col" className="px-2 py-1.5 text-right sm:px-3 sm:py-2">Time</th>
+                  <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Photos</th>
+                  <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Time</th>
                   <th scope="col" className="hidden px-3 py-2 text-right sm:table-cell">Elevation</th>
                   <th scope="col" className="px-2 py-1.5 sm:px-3 sm:py-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {activities.map((a) => (
-                  <tr
-                    key={a.id}
-                    className="border-b border-border"
-                  >
-                    {/* Mobile: stacked cell */}
-                    <td className="px-2 py-1.5 sm:hidden">
-                      <div className="font-medium text-text-primary">{a.name}</div>
-                      <div className="text-xs text-text-secondary">
-                        {formatDate(a.startDate)} · {formatDistance(a.distance)}
-                      </div>
-                    </td>
-                    {/* Desktop: separate cells */}
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-text-secondary sm:table-cell">
-                      {formatDate(a.startDate)}
-                    </td>
-                    <td className="hidden px-3 py-2 font-medium text-text-primary sm:table-cell">
-                      {a.name}
-                    </td>
-                    <td className="hidden px-3 py-2 text-text-secondary sm:table-cell">
-                      {a.type}
-                    </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
-                      {formatDistance(a.distance)}
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-right text-text-secondary sm:px-3 sm:py-2">
-                      {formatDuration(a.movingTime)}
-                    </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
-                      {a.elevationGain.toFixed(0)}m
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-right sm:px-3 sm:py-2">
-                      <Link
-                        href={`/activity/${a.id}`}
-                        className="mr-2 text-sm font-medium text-primary hover:text-primary-light transition-colors"
-                      >
-                        View
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDownload(a.id)}
-                        disabled={downloading.has(a.id)}
-                        aria-busy={downloading.has(a.id)}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-text-primary disabled:opacity-50 transition-colors"
-                      >
-                        {downloading.has(a.id) && (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                        )}
-                        {downloading.has(a.id) ? 'Generating...' : 'Download'}
-                      </button>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center">
+                      <Loader2 className="mx-auto h-6 w-6 animate-spin text-text-secondary" aria-label="Loading activities" />
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  activities.map((a) => (
+                    <tr key={a.id} className="border-b border-border">
+                      {/* Mobile: stacked cell */}
+                      <td className="py-2.5 pl-2 pr-1 sm:hidden">
+                        <div className="font-medium text-text-primary">{a.name}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-text-secondary">
+                          <span>{formatDate(a.startDate)}</span>
+                          <span>·</span>
+                          <span>{formatDistance(a.distance)}</span>
+                          <span>·</span>
+                          <span>{formatDuration(a.movingTime)}</span>
+                          <PhotoCountBadge count={a.photoCount} />
+                        </div>
+                      </td>
+                      {/* Desktop: separate cells */}
+                      <td className="hidden whitespace-nowrap px-3 py-2 text-text-secondary sm:table-cell">
+                        {formatDate(a.startDate)}
+                      </td>
+                      <td className="hidden px-3 py-2 font-medium text-text-primary sm:table-cell">
+                        {a.name}
+                      </td>
+                      <td className="hidden px-3 py-2 text-text-secondary sm:table-cell">
+                        {a.type}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
+                        {formatDistance(a.distance)}
+                      </td>
+                      <td className="hidden px-3 py-2 text-right sm:table-cell">
+                        <PhotoCountBadge count={a.photoCount} />
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
+                        {formatDuration(a.movingTime)}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-2 text-right text-text-secondary sm:table-cell">
+                        {a.elevationGain.toFixed(0)}m
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right sm:px-3">
+                        <Link
+                          href={`/activity/${a.id}`}
+                          className="text-sm font-medium text-primary hover:text-primary-light transition-colors"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

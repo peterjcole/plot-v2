@@ -32,6 +32,7 @@ export interface ActivitySummary {
   distance: number; // in meters
   movingTime: number; // in seconds
   elevationGain: number; // in meters
+  photoCount: number;
 }
 
 export interface HeatmapActivity {

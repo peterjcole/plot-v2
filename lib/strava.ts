@@ -47,7 +47,7 @@ export async function refreshTokenIfNeeded(session: SessionData): Promise<boolea
 export async function getAthleteActivities(
   accessToken: string,
   page = 1,
-  perPage = 20,
+  perPage = 50,
 ): Promise<ActivitySummary[]> {
   const res = await fetch(
     `${STRAVA_API_BASE}/athlete/activities?page=${page}&per_page=${perPage}`,
@@ -69,6 +69,7 @@ export async function getAthleteActivities(
     distance: a.distance,
     movingTime: a.moving_time,
     elevationGain: a.total_elevation_gain,
+    photoCount: a.total_photo_count ?? 0,
   }));
 }
 
