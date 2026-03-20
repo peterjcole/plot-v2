@@ -63,17 +63,14 @@ export default function TextOverlay({ activity, baseMap, osDark, hideDescription
 
   return (
     <>
-      {/* Mobile: Minimal distance at top with toggle button */}
+      {/* Mobile: Toggle button at top right */}
       <div
-        className="md:hidden absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 z-[1000]"
+        className="md:hidden absolute top-0 left-0 right-0 flex justify-end items-center px-4 py-3 z-[1000]"
         style={{
           background: topGradient,
           color: textColor,
         }}
       >
-        <div className="text-sm font-semibold">
-          {formatDistance(activity.stats.distance)}
-        </div>
         <button
           onClick={() => setShowDetails(!showDetails)}
           className="px-3 py-1.5 text-[13px] font-medium rounded cursor-pointer border-none"
@@ -82,7 +79,7 @@ export default function TextOverlay({ activity, baseMap, osDark, hideDescription
             color: '#FFF8EC',
           }}
         >
-          {showDetails ? 'Hide Info' : 'More Info'}
+          {showDetails ? 'Hide Info' : 'Show activity info'}
         </button>
       </div>
 

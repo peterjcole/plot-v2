@@ -91,12 +91,10 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
 
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    window.addEventListener('resize', update);
     update();
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', update);
     };
   }, [hasPhotos]);
 
