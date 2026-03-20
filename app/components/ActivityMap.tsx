@@ -217,10 +217,12 @@ function DirectionArrows({ route, color, opacity = 1 }: { route: [number, number
 function MapController({
   route,
   paddingRight = 0,
+  paddingBottom = 0,
   centerZoom,
 }: {
   route: [number, number][];
   paddingRight?: number;
+  paddingBottom?: number;
   centerZoom?: { center: [number, number]; zoom: number };
 }) {
   const map = useMap();
@@ -230,12 +232,25 @@ function MapController({
       map.setView(centerZoom.center, centerZoom.zoom);
     } else if (route.length > 0) {
       const bounds = L.latLngBounds(route.map(([lat, lng]) => [lat, lng]));
+
+      // Drop all extra padding if it would push zoom below 6 (tile quality threshold)
+      let effectivePaddingRight = paddingRight;
+      let effectivePaddingBottom = paddingBottom;
+      if (paddingRight > 0 || paddingBottom > 0) {
+        const zoomWith = map.getBoundsZoom(bounds, false, L.point(paddingRight + 60, paddingBottom + 60));
+        const zoomWithout = map.getBoundsZoom(bounds, false, L.point(60, 60));
+        if (zoomWith < 6 && zoomWithout >= 6) {
+          effectivePaddingRight = 0;
+          effectivePaddingBottom = 0;
+        }
+      }
+
       map.fitBounds(bounds, {
-        paddingTopLeft: [50, 50] as L.PointExpression,
-        paddingBottomRight: [paddingRight + 50, 50] as L.PointExpression,
+        paddingTopLeft: [30, 30] as L.PointExpression,
+        paddingBottomRight: [effectivePaddingRight + 30, effectivePaddingBottom + 30] as L.PointExpression,
       });
     }
-  }, [map, route, paddingRight, centerZoom]);
+  }, [map, route, paddingRight, paddingBottom, centerZoom]);
 
   return null;
 }
@@ -281,6 +296,8 @@ function TileLoadHandler() {
 }
 
 export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hideDetails = false, hideDescription = false, hillshadeEnabled = false, centerZoom }: ActivityMapProps) {
+  const extraBottomPadding = hideDetails ? 0 : 60;
+
   const route = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
@@ -292,7 +309,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
   const isSatellite = baseMap === 'satellite';
   const activeCRS = isSatellite ? L.CRS.EPSG3857 : osCRS;
   const tileUrl = isSatellite ? SATELLITE_TILE_URL : osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
-  const minZoom = isSatellite ? 2 : 6;
+  const minZoom = isSatellite ? 2 : 0;
   const maxZoom = isSatellite ? 18 : 9;
 
   // Satellite or dark OS: bright accent orange (dark-mode --accent-light token) with dark brown outline
@@ -315,16 +332,26 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         zoomControl={false}
         attributionControl={false}
       >
-        <TileLayer
-          url={tileUrl}
-          maxNativeZoom={isSatellite ? 18 : 9}
-          {...(!isSatellite && { minNativeZoom: 8 })}
-        />
+        {isSatellite ? (
+          <TileLayer url={tileUrl} maxNativeZoom={18} />
+        ) : (
+          <>
+            {/* zoom 6–9: z=8 tiles */}
+            <TileLayer url={tileUrl} minZoom={6} maxNativeZoom={9} minNativeZoom={8} />
+            {/* zoom 4–5: z=6 tiles */}
+            <TileLayer url={tileUrl} minZoom={4} maxZoom={5} minNativeZoom={6} maxNativeZoom={9} />
+            {/* zoom 3: z=4 tiles */}
+            <TileLayer url={tileUrl} minZoom={3} maxZoom={3} minNativeZoom={4} maxNativeZoom={9} />
+            {/* zoom 0–2: native tiles */}
+            <TileLayer url={tileUrl} maxZoom={2} maxNativeZoom={9} />
+          </>
+        )}
         {hillshadeEnabled && !isSatellite && (
           <TileLayer
             key={String(osDark)}
             url={`/api/hillshade27700?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}
             maxNativeZoom={9}
+            minZoom={6}
             zIndex={2}
           />
         )}
@@ -339,7 +366,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         <RouteOutlineFilter strokeColor={routeColor} outlineColor={routeOutlineColor} />
         <DirectionArrows route={route} color={routeColor} opacity={isDark ? routeOpacity : 1} />
         <StartEndMarkers route={route} color={routeColor} />
-        <MapController route={route} paddingRight={paddingRight} centerZoom={centerZoom} />
+        <MapController route={route} paddingRight={paddingRight ?? 0} paddingBottom={extraBottomPadding} centerZoom={centerZoom} />
         <TileLoadHandler />
         {!hidePhotos && <PhotoOverlay photos={activity.photos} onPinClick={onPinClick} isDark={isDark} />}
       </MapContainer>
