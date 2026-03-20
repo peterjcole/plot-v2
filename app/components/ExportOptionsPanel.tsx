@@ -30,6 +30,7 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
   const [prefs, setPrefs] = useState<ActivityExportPrefs>(EXPORT_PREFS_DEFAULTS);
   const [systemDark, setSystemDark] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [gpxLoading, setGpxLoading] = useState(false);
 
   // Load prefs from localStorage on mount
   useEffect(() => {
@@ -87,6 +88,27 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
       console.error('Download error:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGpxDownload() {
+    setGpxLoading(true);
+    try {
+      const res = await fetch(`/api/activity-gpx/${activityId}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('GPX download failed');
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `activity-${activityId}.gpx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      console.error('GPX download error:', err);
+    } finally {
+      setGpxLoading(false);
     }
   }
 
@@ -204,7 +226,7 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
             </div>
           </div>
 
-          <div className="mt-4 border-t border-border pt-3">
+          <div className="mt-4 border-t border-border pt-3 space-y-2">
             <button
               type="button"
               onClick={handleDownload}
@@ -214,6 +236,16 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               <span aria-live="polite">{loading ? 'Generating...' : 'Download JPEG'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleGpxDownload}
+              disabled={gpxLoading}
+              aria-busy={gpxLoading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary dark:bg-primary-dark px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark dark:hover:bg-primary disabled:opacity-60"
+            >
+              {gpxLoading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              <span aria-live="polite">{gpxLoading ? 'Generating...' : 'Download GPX'}</span>
             </button>
           </div>
 

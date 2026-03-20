@@ -149,6 +149,14 @@ export default function PlannerClient() {
     [waypoints, segments]
   );
 
+  const handleFitToRoute = useCallback((wps: Waypoint[]) => {
+    const map = mapInstanceRef.current;
+    if (!map || wps.length < 2) return;
+    const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
+    const extent = boundingExtent(coords);
+    map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
+  }, []);
+
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
 
@@ -157,6 +165,8 @@ export default function PlannerClient() {
     if (stored && stored.mapCenter[0] !== 0) {
       map.getView().setCenter(stored.mapCenter);
       map.getView().setZoom(stored.mapZoom);
+    } else if (stored && stored.waypoints.length >= 2) {
+      handleFitToRoute(stored.waypoints as Waypoint[]);
     }
 
     // Persist map position whenever the user pans or zooms
@@ -168,15 +178,7 @@ export default function PlannerClient() {
         saveRoute(waypointsRef.current, segmentsRef.current, center as [number, number], zoom);
       }
     });
-  }, []);
-
-  const handleFitToRoute = useCallback((wps: Waypoint[]) => {
-    const map = mapInstanceRef.current;
-    if (!map || wps.length < 2) return;
-    const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
-    const extent = boundingExtent(coords);
-    map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
-  }, []);
+  }, [handleFitToRoute]);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) return;
