@@ -185,7 +185,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
     return (
       <div ref={containerRef} className="relative w-full">
         {dimensions && (
-          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} hideDetails={!includeDetails} hillshadeEnabled={hillshadeEnabled} />
+          <ActivityMap activity={activity} width={dimensions.width} height={dimensions.height} baseMap={baseMap} osDark={osDark} hillshadeEnabled={hillshadeEnabled} />
         )}
         {layersPanel}
         {!mapReady && spinner}
@@ -212,7 +212,6 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
               onPinClick={handlePinClick}
               baseMap={baseMap}
               osDark={osDark}
-              hideDetails={!includeDetails}
               hillshadeEnabled={hillshadeEnabled}
             />
           </div>
