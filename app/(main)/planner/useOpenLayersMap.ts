@@ -11,12 +11,13 @@ import { get as getProjection, fromLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
 import OSM from 'ol/source/OSM';
-import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM, SATELLITE_TILE_URL } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM, SATELLITE_TILE_URL, TOPO_TILE_URL } from '@/lib/map-config';
 
 export interface MapHookResult {
   map: Map;
   osLayers: TileLayer<XYZ>[];
   satelliteLayer: TileLayer<XYZ>;
+  topoLayer: TileLayer<XYZ>;
 }
 
 export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | null>): MapHookResult | null {
@@ -82,6 +83,13 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
       zIndex: 0,
     });
 
+    // Topo layer — EPSG:3857, OL auto-reprojects into EPSG:27700 view
+    const topoLayer = new TileLayer({
+      source: new XYZ({ url: TOPO_TILE_URL, maxZoom: 16 }),
+      visible: false,
+      zIndex: 0,
+    });
+
     const center = fromLonLat(
       [OS_DEFAULT_CENTER.lng, OS_DEFAULT_CENTER.lat],
       OS_PROJECTION.code
@@ -99,7 +107,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     const olMap = new Map({
       target: targetRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [osmLayer, osOverviewLayer, os25kLayer, satelliteLayer],
+      layers: [osmLayer, osOverviewLayer, os25kLayer, satelliteLayer, topoLayer],
       view: new View({
         projection: projection,
         center: center,
@@ -111,7 +119,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     });
 
     const osLayers = [osmLayer, osOverviewLayer, os25kLayer] as unknown as TileLayer<XYZ>[];
-    setMapResult({ map: olMap, osLayers, satelliteLayer });
+    setMapResult({ map: olMap, osLayers, satelliteLayer, topoLayer });
 
     return () => {
       olMap.setTarget(undefined);

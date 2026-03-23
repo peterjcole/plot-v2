@@ -22,7 +22,7 @@ import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
 interface PlannerMapProps {
@@ -259,25 +259,48 @@ export default function PlannerMap({
     onCloseActivityPopupRef.current = onCloseActivityPopup;
   }, [onCloseActivityPopup]);
 
-  // Toggle OS / satellite base layers
+  // Toggle OS / satellite / topo base layers
   useEffect(() => {
     if (!mapResult) return;
     const isSatellite = baseMap === 'satellite';
-    for (const layer of mapResult.osLayers) {
-      layer.setVisible(!isSatellite);
-    }
+    for (const layer of mapResult.osLayers) layer.setVisible(!isSatellite);
     mapResult.satelliteLayer.setVisible(isSatellite);
+    if (isSatellite) mapResult.topoLayer.setVisible(false);
+    // When switching to 'os', the moveend effect below handles topo vs OS visibility
   }, [mapResult, baseMap]);
 
-  // Update OS tile URLs when dark mode or algorithm changes
+  // Update OS and topo tile URLs when dark mode changes
   useEffect(() => {
     if (!mapResult) return;
-    const url = osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
+    const osUrl   = osDark ? OS_DARK_TILE_URL   : OS_TILE_URL;
+    const topoUrl = osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL;
     // osLayers[0] is the OSM fallback layer — no URL to change
     for (const layer of mapResult.osLayers.slice(1)) {
-      (layer.getSource() as XYZ).setUrl(url);
+      (layer.getSource() as XYZ).setUrl(osUrl);
     }
+    (mapResult.topoLayer.getSource() as XYZ).setUrl(topoUrl);
   }, [mapResult, osDark]);
+
+  // Viewport-based OS ↔ topo auto-switch (only when baseMap === 'os')
+  useEffect(() => {
+    if (!map || !mapResult || baseMap !== 'os') return;
+
+    const UK_BOUNDS = { minLat: 49.8, maxLat: 61.0, minLng: -8.6, maxLng: 2.0 };
+
+    const checkViewport = () => {
+      const centerOl = map.getView().getCenter();
+      if (!centerOl) return;
+      const [lng, lat] = toLonLat(centerOl, OS_PROJECTION.code);
+      const isInUK = lat >= UK_BOUNDS.minLat && lat <= UK_BOUNDS.maxLat
+                  && lng >= UK_BOUNDS.minLng && lng <= UK_BOUNDS.maxLng;
+      for (const layer of mapResult.osLayers) layer.setVisible(isInUK);
+      mapResult.topoLayer.setVisible(!isInUK);
+    };
+
+    checkViewport();
+    map.on('moveend', checkViewport);
+    return () => { map.un('moveend', checkViewport); };
+  }, [map, mapResult, baseMap]);
 
   // Manage heatmap tile layer
   useEffect(() => {

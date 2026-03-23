@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -306,11 +306,19 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
     ? route[Math.floor(route.length / 2)]
     : [OS_DEFAULT_CENTER.lat, OS_DEFAULT_CENTER.lng];
 
+  const UK_BOUNDS = { minLat: 49.8, maxLat: 61.0, minLng: -8.6, maxLng: 2.0 };
+  const isInUK = center[0] >= UK_BOUNDS.minLat && center[0] <= UK_BOUNDS.maxLat
+              && center[1] >= UK_BOUNDS.minLng && center[1] <= UK_BOUNDS.maxLng;
+  const useTopoFallback = baseMap === 'os' && !isInUK;
+
   const isSatellite = baseMap === 'satellite';
-  const activeCRS = isSatellite ? L.CRS.EPSG3857 : osCRS;
-  const tileUrl = isSatellite ? SATELLITE_TILE_URL : osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
-  const minZoom = isSatellite ? 2 : 0;
-  const maxZoom = isSatellite ? 18 : 9;
+  const activeCRS = (isSatellite || useTopoFallback) ? L.CRS.EPSG3857 : osCRS;
+  const tileUrl = isSatellite     ? SATELLITE_TILE_URL
+                : useTopoFallback ? (osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL)
+                : osDark          ? OS_DARK_TILE_URL
+                :                   OS_TILE_URL;
+  const minZoom = (isSatellite || useTopoFallback) ? 2 : 0;
+  const maxZoom = (isSatellite || useTopoFallback) ? 18 : 9;
 
   // Satellite or dark OS: bright accent orange (dark-mode --accent-light token) with dark brown outline
   // Light OS: primary green with dark green outline
@@ -334,6 +342,8 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
       >
         {isSatellite ? (
           <TileLayer url={tileUrl} maxNativeZoom={18} />
+        ) : useTopoFallback ? (
+          <TileLayer url={tileUrl} maxNativeZoom={16} maxZoom={18} />
         ) : (
           <>
             {/* zoom 6–9: z=8 tiles */}
@@ -346,7 +356,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
             <TileLayer url={tileUrl} maxZoom={2} maxNativeZoom={9} />
           </>
         )}
-        {hillshadeEnabled && !isSatellite && (
+        {hillshadeEnabled && !isSatellite && !useTopoFallback && (
           <TileLayer
             key={String(osDark)}
             url={`/api/hillshade27700?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}
