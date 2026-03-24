@@ -86,8 +86,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     // Topo layer — EPSG:3857, OL auto-reprojects into EPSG:27700 view
     const topoLayer = new TileLayer({
       source: new XYZ({ url: TOPO_TILE_URL, maxZoom: 16 }),
-      visible: false,
-      zIndex: 0,
+      visible: true,
     });
 
     const center = fromLonLat(
@@ -107,7 +106,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     const olMap = new Map({
       target: targetRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [osmLayer, osOverviewLayer, os25kLayer, satelliteLayer, topoLayer],
+      layers: [topoLayer, osmLayer, osOverviewLayer, os25kLayer, satelliteLayer],
       view: new View({
         projection: projection,
         center: center,

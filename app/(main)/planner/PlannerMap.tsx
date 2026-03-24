@@ -265,8 +265,7 @@ export default function PlannerMap({
     const isSatellite = baseMap === 'satellite';
     for (const layer of mapResult.osLayers) layer.setVisible(!isSatellite);
     mapResult.satelliteLayer.setVisible(isSatellite);
-    if (isSatellite) mapResult.topoLayer.setVisible(false);
-    // When switching to 'os', the moveend effect below handles topo vs OS visibility
+    mapResult.topoLayer.setVisible(!isSatellite);
   }, [mapResult, baseMap]);
 
   // Update OS and topo tile URLs when dark mode changes
@@ -280,27 +279,6 @@ export default function PlannerMap({
     }
     (mapResult.topoLayer.getSource() as XYZ).setUrl(topoUrl);
   }, [mapResult, osDark]);
-
-  // Viewport-based OS ↔ topo auto-switch (only when baseMap === 'os')
-  useEffect(() => {
-    if (!map || !mapResult || baseMap !== 'os') return;
-
-    const UK_BOUNDS = { minLat: 49.8, maxLat: 61.0, minLng: -8.6, maxLng: 2.0 };
-
-    const checkViewport = () => {
-      const centerOl = map.getView().getCenter();
-      if (!centerOl) return;
-      const [lng, lat] = toLonLat(centerOl, OS_PROJECTION.code);
-      const isInUK = lat >= UK_BOUNDS.minLat && lat <= UK_BOUNDS.maxLat
-                  && lng >= UK_BOUNDS.minLng && lng <= UK_BOUNDS.maxLng;
-      for (const layer of mapResult.osLayers) layer.setVisible(isInUK);
-      mapResult.topoLayer.setVisible(!isInUK);
-    };
-
-    checkViewport();
-    map.on('moveend', checkViewport);
-    return () => { map.un('moveend', checkViewport); };
-  }, [map, mapResult, baseMap]);
 
   // Manage heatmap tile layer
   useEffect(() => {
