@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL('https://photon.komoot.io/api/');
     url.searchParams.set('q', q);
-    url.searchParams.set('bbox', '-10.5,49.5,2.5,61.0');
     url.searchParams.set('limit', '5');
     url.searchParams.set('lang', 'en');
 
