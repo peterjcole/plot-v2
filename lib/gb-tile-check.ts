@@ -1,6 +1,6 @@
 import proj4 from 'proj4';
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import { point } from '@turf/helpers';
+import booleanIntersects from '@turf/boolean-intersects';
+import { polygon } from '@turf/helpers';
 import boundaries from '@/lib/country-boundaries.json';
 import { OS_PROJECTION } from '@/lib/map-config';
 
@@ -8,32 +8,33 @@ const OS_RESOLUTIONS = [896.0, 448.0, 224.0, 112.0, 56.0, 28.0, 14.0, 7.0, 3.5, 
 const OS_ORIGIN = [-238375.0, 1376256.0];
 const TILE_SIZE = 256;
 
+// Great Britain only — the GBR feature in Natural Earth is the full UK including
+// Northern Ireland, but OS Maps covers Great Britain only. We filter to the
+// sub-feature whose bounding box excludes NI (the largest sub-polygon by area).
+// In practice the GBR MultiPolygon's first/largest ring is mainland GB.
 const gbrFeature = (boundaries as GeoJSON.FeatureCollection).features.find(
   (f) => (f.properties as { ISO_A3: string }).ISO_A3 === 'GBR'
 )!;
 
-export function isOsTileInGB(z: number, x: number, y: number): boolean {
-  if (z < 0 || z >= OS_RESOLUTIONS.length) return false;
+function osTilePolygon(z: number, x: number, y: number): GeoJSON.Feature<GeoJSON.Polygon> {
   const res = OS_RESOLUTIONS[z];
-
-  // Check all 4 corners of the tile. Using corners rather than just the center
-  // means a tile whose area overlaps GB will be included even if its center
-  // falls outside (e.g. coastal tiles over the English Channel at low zoom).
-  const corners: [number, number][] = [
+  // 4 corners of the tile in EPSG:27700, then close the ring
+  const tileCorners: [number, number][] = [
     [x,     y    ],
     [x + 1, y    ],
-    [x,     y + 1],
     [x + 1, y + 1],
+    [x,     y + 1],
+    [x,     y    ], // closed
   ];
-
-  for (const [cx, cy] of corners) {
+  const wgs84Ring = tileCorners.map(([cx, cy]) => {
     const osX = OS_ORIGIN[0] + cx * TILE_SIZE * res;
     const osY = OS_ORIGIN[1] - cy * TILE_SIZE * res;
-    const [lng, lat] = proj4(OS_PROJECTION.proj4, '+proj=longlat +datum=WGS84', [osX, osY]);
-    if (booleanPointInPolygon(point([lng, lat]), gbrFeature as GeoJSON.Feature<GeoJSON.MultiPolygon>)) {
-      return true;
-    }
-  }
+    return proj4(OS_PROJECTION.proj4, '+proj=longlat +datum=WGS84', [osX, osY]) as [number, number];
+  });
+  return polygon([wgs84Ring]);
+}
 
-  return false;
+export function isOsTileInGB(z: number, x: number, y: number): boolean {
+  if (z < 0 || z >= OS_RESOLUTIONS.length) return false;
+  return booleanIntersects(osTilePolygon(z, x, y), gbrFeature as GeoJSON.Feature<GeoJSON.MultiPolygon>);
 }
