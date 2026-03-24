@@ -11,7 +11,7 @@ import { useElevationProfile } from './useElevationProfile';
 import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
 import Link from 'next/link';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, CircleArrowUp } from 'lucide-react';
 import Logo from '@/app/components/Logo';
 import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
@@ -55,6 +55,7 @@ export default function PlannerClient() {
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? true);
   const [isExportingImage, setIsExportingImage] = useState(false);
+  const [mapRotation, setMapRotation] = useState(0); // radians, 0 = north up
   const [activityPopup, setActivityPopup] = useState<{
     activities: HeatmapActivity[];
     screenX: number;
@@ -179,6 +180,11 @@ export default function PlannerClient() {
         saveRoute(waypointsRef.current, segmentsRef.current, center as [number, number], zoom);
       }
     });
+
+    // Keep compass in sync with map rotation
+    map.getView().on('change:rotation', () => {
+      setMapRotation(map.getView().getRotation());
+    });
   }, [handleFitToRoute]);
 
   const handleGeolocate = useCallback(() => {
@@ -191,7 +197,7 @@ export default function PlannerClient() {
           [pos.coords.longitude, pos.coords.latitude],
           OS_PROJECTION.code
         );
-        map.getView().animate({ center: coord, zoom: 8, duration: 500 });
+        map.getView().animate({ center: coord, zoom: 8, rotation: 0, duration: 500 });
       },
       () => {
         // Silently fail if geolocation is denied
@@ -199,11 +205,15 @@ export default function PlannerClient() {
     );
   }, []);
 
+  const handleResetRotation = useCallback(() => {
+    mapInstanceRef.current?.getView().animate({ rotation: 0, duration: 300 });
+  }, []);
+
   const handlePlaceSelect = useCallback((coordinates: [number, number]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
     const center = fromLonLat(coordinates, OS_PROJECTION.code);
-    map.getView().animate({ center, zoom: 8, duration: 500 });
+    map.getView().animate({ center, zoom: 8, rotation: 0, duration: 500 });
   }, []);
 
   const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
@@ -337,6 +347,19 @@ export default function PlannerClient() {
       >
         <Logo size="sm" />
       </Link>
+      {/* Compass — only visible when map is rotated away from north */}
+      {Math.abs(mapRotation) > 0.001 && (
+        <button
+          onClick={handleResetRotation}
+          title="Reset rotation"
+          className="absolute bottom-[128px] right-3 z-20 flex items-center justify-center w-11 h-11 rounded-lg bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
+        >
+          <CircleArrowUp
+            size={18}
+            style={{ transform: `rotate(${mapRotation * 180 / Math.PI}deg)`, transition: 'transform 0.15s' }}
+          />
+        </button>
+      )}
       {/* Zoom controls — bottom-left, above layers button */}
       <div className="absolute bottom-[72px] left-3 z-10 flex flex-col bg-surface-raised/70 backdrop-blur-md rounded-xl shadow-lg border border-border overflow-hidden">
         <button
