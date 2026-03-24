@@ -164,10 +164,10 @@ export async function GET(req: NextRequest) {
 
       const idx = (row * SIZE + col) * 4;
       if (dark) {
-        out[idx]     = 200;
-        out[idx + 1] = 215;
-        out[idx + 2] = 235;
-        out[idx + 3] = Math.round(hillshade * 0.5 * 255);
+        out[idx]     = 255;
+        out[idx + 1] = 255;
+        out[idx + 2] = 255;
+        out[idx + 3] = Math.round((1 - hillshade) * 0.22 * 255);
       } else {
         out[idx]     = 30;
         out[idx + 1] = 22;
