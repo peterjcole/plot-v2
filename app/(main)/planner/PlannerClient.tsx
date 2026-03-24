@@ -24,6 +24,19 @@ import 'ol/ol.css';
 
 const PlannerMap = dynamic(() => import('./PlannerMap'), { ssr: false });
 
+// Returns the bearing (degrees CW from true north) of the projected +Y axis at the
+// current map centre — i.e. how far "grid north" deviates from geographic north.
+// Needed because EPSG:27700 is centred on 2°W; the deviation is ~78° at US longitudes.
+function computeGridNorthBearing(center: number[]): number {
+  const c = transform(center, OS_PROJECTION.code, 'EPSG:4326') as [number, number];
+  const n = transform([center[0], center[1] + 1000], OS_PROJECTION.code, 'EPSG:4326') as [number, number];
+  const toRad = Math.PI / 180;
+  const φ1 = c[1] * toRad, φ2 = n[1] * toRad, Δλ = (n[0] - c[0]) * toRad;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
 export default function PlannerClient() {
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
@@ -56,6 +69,7 @@ export default function PlannerClient() {
   const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? true);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [mapRotation, setMapRotation] = useState(0); // radians, 0 = north up
+  const [gridNorthBearing, setGridNorthBearing] = useState(0); // degrees CW from true north to grid north
   const [activityPopup, setActivityPopup] = useState<{
     activities: HeatmapActivity[];
     screenX: number;
@@ -138,7 +152,8 @@ export default function PlannerClient() {
           waypoints,
           segments,
           (center as [number, number]) ?? [0, 0],
-          zoom ?? 7
+          zoom ?? 7,
+          view.getRotation()
         );
       } else {
         saveRoute(waypoints, segments, [0, 0], 7);
@@ -167,6 +182,10 @@ export default function PlannerClient() {
     if (stored && stored.mapCenter[0] !== 0) {
       map.getView().setCenter(stored.mapCenter);
       map.getView().setZoom(stored.mapZoom);
+      if (stored.mapRotation != null) {
+        map.getView().setRotation(stored.mapRotation);
+        setMapRotation(stored.mapRotation);
+      }
     } else if (stored && stored.waypoints.length >= 2) {
       handleFitToRoute(stored.waypoints as Waypoint[]);
     }
@@ -177,14 +196,19 @@ export default function PlannerClient() {
       const center = view.getCenter();
       const zoom = view.getZoom();
       if (center && zoom != null) {
-        saveRoute(waypointsRef.current, segmentsRef.current, center as [number, number], zoom);
+        saveRoute(waypointsRef.current, segmentsRef.current, center as [number, number], zoom, view.getRotation());
       }
+      if (center) setGridNorthBearing(computeGridNorthBearing(center));
     });
 
     // Keep compass in sync with map rotation
     map.getView().on('change:rotation', () => {
       setMapRotation(map.getView().getRotation());
     });
+
+    // Initial bearing for current centre
+    const initialCenter = map.getView().getCenter();
+    if (initialCenter) setGridNorthBearing(computeGridNorthBearing(initialCenter));
   }, [handleFitToRoute]);
 
   const handleGeolocate = useCallback(() => {
@@ -197,7 +221,8 @@ export default function PlannerClient() {
           [pos.coords.longitude, pos.coords.latitude],
           OS_PROJECTION.code
         );
-        map.getView().animate({ center: coord, zoom: 8, rotation: 0, duration: 500 });
+        const rotation = computeGridNorthBearing(coord) * Math.PI / 180;
+        map.getView().animate({ center: coord, zoom: 8, rotation, duration: 500 });
       },
       () => {
         // Silently fail if geolocation is denied
@@ -206,14 +231,19 @@ export default function PlannerClient() {
   }, []);
 
   const handleResetRotation = useCallback(() => {
-    mapInstanceRef.current?.getView().animate({ rotation: 0, duration: 300 });
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const center = map.getView().getCenter();
+    const rotation = center ? computeGridNorthBearing(center) * Math.PI / 180 : 0;
+    map.getView().animate({ rotation, duration: 300 });
   }, []);
 
   const handlePlaceSelect = useCallback((coordinates: [number, number]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
     const center = fromLonLat(coordinates, OS_PROJECTION.code);
-    map.getView().animate({ center, zoom: 8, rotation: 0, duration: 500 });
+    const rotation = computeGridNorthBearing(center) * Math.PI / 180;
+    map.getView().animate({ center, zoom: 8, rotation, duration: 500 });
   }, []);
 
   const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
@@ -305,6 +335,9 @@ export default function PlannerClient() {
     }
   }, [baseMap, osDark, segments]);
 
+  // Compass angle: 0 = true north is up. Used for both display and hide logic.
+  const compassDeg = ((mapRotation * 180 / Math.PI - gridNorthBearing) % 360 + 360) % 360;
+
   return (
     <div className="fixed inset-0">
       <PlannerMap
@@ -348,7 +381,7 @@ export default function PlannerClient() {
         <Logo size="sm" />
       </Link>
       {/* Compass — only visible when map is rotated away from north */}
-      {Math.abs(mapRotation) > 0.001 && (
+      {compassDeg > 0.1 && compassDeg < 359.9 && (
         <button
           onClick={handleResetRotation}
           title="Reset rotation"
@@ -356,7 +389,7 @@ export default function PlannerClient() {
         >
           <CircleArrowUp
             size={18}
-            style={{ transform: `rotate(${mapRotation * 180 / Math.PI}deg)`, transition: 'transform 0.15s' }}
+            style={{ transform: `rotate(${compassDeg}deg)`, transition: 'transform 0.15s' }}
           />
         </button>
       )}

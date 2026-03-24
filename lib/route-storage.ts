@@ -16,6 +16,7 @@ interface StoredRouteV2 {
   segments: RouteSegment[];
   mapCenter: [number, number];
   mapZoom: number;
+  mapRotation?: number;
   savedAt: string;
 }
 
@@ -40,7 +41,8 @@ export function saveRoute(
   waypoints: Waypoint[],
   segments: RouteSegment[],
   mapCenter: [number, number],
-  mapZoom: number
+  mapZoom: number,
+  mapRotation?: number
 ): void {
   try {
     const data: StoredRouteV2 = {
@@ -53,6 +55,7 @@ export function saveRoute(
       segments,
       mapCenter,
       mapZoom,
+      ...(mapRotation != null ? { mapRotation } : {}),
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
