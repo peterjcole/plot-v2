@@ -4,6 +4,18 @@ import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { point } from '@turf/helpers';
 import boundaries from '@/lib/country-boundaries.json';
 
+// ── Transparent tile ─────────────────────────────────────────────────────────
+
+let _transparent: Buffer | null = null;
+async function getTransparentTile(): Promise<Buffer> {
+  if (!_transparent) {
+    _transparent = await sharp({
+      create: { width: 256, height: 256, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    }).png().toBuffer();
+  }
+  return _transparent;
+}
+
 // ── Colour processing (same formula as /api/maps/dark) ─────────────────────
 
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -230,6 +242,15 @@ export async function GET(request: NextRequest) {
 
   const [lat, lng] = tileCenterLatLng(z, x, y);
   const iso = getCountry(lat, lng);
+
+  // GB is covered by the OS tile layer on top — return transparent to avoid
+  // a redundant OS Leisure_3857 request for tiles that will never be visible.
+  if (iso === 'GBR') {
+    const transparent = await getTransparentTile();
+    return new NextResponse(new Uint8Array(transparent), {
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=1209600, s-maxage=1209600' },
+    });
+  }
 
   const result = await getProviderTile(iso, z, x, y);
 

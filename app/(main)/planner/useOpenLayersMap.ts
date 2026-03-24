@@ -10,7 +10,6 @@ import XYZ from 'ol/source/XYZ';
 import { get as getProjection, fromLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
-import OSM from 'ol/source/OSM';
 import { OS_PROJECTION, OS_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM, SATELLITE_TILE_URL, TOPO_TILE_URL } from '@/lib/map-config';
 
 export interface MapHookResult {
@@ -45,12 +44,6 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     const overviewTileGrid = new TileGrid({
       resolutions: OS_PROJECTION.resolutions,
       origin: OS_PROJECTION.origin,
-    });
-
-    // OSM base layer for geographic context when zoomed out beyond OS tile range
-    const osmLayer = new TileLayer({
-      source: new OSM(),
-      maxZoom: 3,
     });
 
     // OS overview tiles at low-to-mid zooms
@@ -106,7 +99,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
     const olMap = new Map({
       target: targetRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osmLayer, osOverviewLayer, os25kLayer, satelliteLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer],
       view: new View({
         projection: projection,
         center: center,
@@ -117,7 +110,7 @@ export function useOpenLayersMap(targetRef: React.RefObject<HTMLDivElement | nul
       }),
     });
 
-    const osLayers = [osmLayer, osOverviewLayer, os25kLayer] as unknown as TileLayer<XYZ>[];
+    const osLayers = [osOverviewLayer, os25kLayer] as unknown as TileLayer<XYZ>[];
     setMapResult({ map: olMap, osLayers, satelliteLayer, topoLayer });
 
     return () => {

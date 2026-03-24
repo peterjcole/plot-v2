@@ -273,12 +273,12 @@ export default function PlannerMap({
     if (!mapResult) return;
     const osUrl   = osDark ? OS_DARK_TILE_URL   : OS_TILE_URL;
     const topoUrl = osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL;
-    // osLayers[0] is the OSM fallback layer — no URL to change
-    for (const layer of mapResult.osLayers.slice(1)) {
+    for (const layer of mapResult.osLayers) {
       (layer.getSource() as XYZ).setUrl(osUrl);
     }
     (mapResult.topoLayer.getSource() as XYZ).setUrl(topoUrl);
   }, [mapResult, osDark]);
+
 
   // Manage heatmap tile layer
   useEffect(() => {

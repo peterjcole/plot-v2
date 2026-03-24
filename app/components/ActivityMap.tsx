@@ -4,8 +4,9 @@ import { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
-import { OS_DEFAULT_CENTER, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_DEFAULT_CENTER, OS_TILE_URL, OS_DARK_TILE_URL, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -49,6 +50,13 @@ function sampleArrowIndices(
   }
   return indices;
 }
+
+// EPSG:27700 British National Grid CRS (used for GB activities)
+const osCRS = new L.Proj.CRS(
+  OS_PROJECTION.code,
+  OS_PROJECTION.proj4,
+  { resolutions: OS_PROJECTION.resolutions, origin: OS_PROJECTION.origin }
+);
 
 // Fix Leaflet default marker icon paths (broken in bundlers)
 // Using unpkg CDN for reliable marker icons
@@ -295,10 +303,21 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
     ? route[Math.floor(route.length / 2)]
     : [OS_DEFAULT_CENTER.lat, OS_DEFAULT_CENTER.lng];
 
+  // Bounding box check to decide CRS at render time. Errs toward EPSG:27700
+  // (OS tiles) for mainland GB; Irish/NI activities fall through to topo.
+  const GB_BOUNDS = { minLat: 49.8, maxLat: 61.5, minLng: -8.0, maxLng: 2.0 };
+  const isInGB = baseMap === 'os'
+    && center[0] >= GB_BOUNDS.minLat && center[0] <= GB_BOUNDS.maxLat
+    && center[1] >= GB_BOUNDS.minLng && center[1] <= GB_BOUNDS.maxLng;
+
   const isSatellite = baseMap === 'satellite';
+  const activeCRS = (isSatellite || !isInGB) ? L.CRS.EPSG3857 : osCRS;
   const tileUrl = isSatellite ? SATELLITE_TILE_URL
+                : isInGB      ? (osDark ? OS_DARK_TILE_URL : OS_TILE_URL)
                 : osDark      ? TOPO_DARK_TILE_URL
                 :               TOPO_TILE_URL;
+  const minZoom = (isSatellite || !isInGB) ? 2 : 0;
+  const maxZoom = (isSatellite || !isInGB) ? 18 : 9;
 
   // Satellite or dark mode: bright accent orange with dark brown outline
   // Light mode: primary green with dark green outline
@@ -313,19 +332,29 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         key={baseMap}
         center={center}
         zoom={7}
-        minZoom={2}
-        maxZoom={18}
-        crs={L.CRS.EPSG3857}
+        minZoom={minZoom}
+        maxZoom={maxZoom}
+        crs={activeCRS}
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
       >
-        <TileLayer url={tileUrl} maxNativeZoom={16} maxZoom={18} />
-        {hillshadeEnabled && !isSatellite && (
+        {isInGB ? (
+          <>
+            <TileLayer url={tileUrl} minZoom={6} maxNativeZoom={9} minNativeZoom={8} />
+            <TileLayer url={tileUrl} minZoom={4} maxZoom={5} minNativeZoom={6} maxNativeZoom={9} />
+            <TileLayer url={tileUrl} minZoom={3} maxZoom={3} minNativeZoom={4} maxNativeZoom={9} />
+            <TileLayer url={tileUrl} maxZoom={2} maxNativeZoom={9} />
+          </>
+        ) : (
+          <TileLayer url={tileUrl} maxNativeZoom={16} maxZoom={18} />
+        )}
+        {hillshadeEnabled && !isSatellite && isInGB && (
           <TileLayer
             key={String(osDark)}
-            url={`/api/hillshade?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}
-            maxNativeZoom={14}
+            url={`/api/hillshade27700?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}
+            maxNativeZoom={9}
+            minZoom={6}
             zIndex={2}
           />
         )}
