@@ -15,11 +15,25 @@ const gbrFeature = (boundaries as GeoJSON.FeatureCollection).features.find(
 export function isOsTileInGB(z: number, x: number, y: number): boolean {
   if (z < 0 || z >= OS_RESOLUTIONS.length) return false;
   const res = OS_RESOLUTIONS[z];
-  const centerX = OS_ORIGIN[0] + (x + 0.5) * TILE_SIZE * res;
-  const centerY = OS_ORIGIN[1] - (y + 0.5) * TILE_SIZE * res;
-  const [lng, lat] = proj4(OS_PROJECTION.proj4, '+proj=longlat +datum=WGS84', [centerX, centerY]);
-  return booleanPointInPolygon(
-    point([lng, lat]),
-    gbrFeature as GeoJSON.Feature<GeoJSON.MultiPolygon>
-  );
+
+  // Check all 4 corners of the tile. Using corners rather than just the center
+  // means a tile whose area overlaps GB will be included even if its center
+  // falls outside (e.g. coastal tiles over the English Channel at low zoom).
+  const corners: [number, number][] = [
+    [x,     y    ],
+    [x + 1, y    ],
+    [x,     y + 1],
+    [x + 1, y + 1],
+  ];
+
+  for (const [cx, cy] of corners) {
+    const osX = OS_ORIGIN[0] + cx * TILE_SIZE * res;
+    const osY = OS_ORIGIN[1] - cy * TILE_SIZE * res;
+    const [lng, lat] = proj4(OS_PROJECTION.proj4, '+proj=longlat +datum=WGS84', [osX, osY]);
+    if (booleanPointInPolygon(point([lng, lat]), gbrFeature as GeoJSON.Feature<GeoJSON.MultiPolygon>)) {
+      return true;
+    }
+  }
+
+  return false;
 }
