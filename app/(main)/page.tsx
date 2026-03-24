@@ -65,7 +65,7 @@ export default async function Home({
             <div>
               <h2 className="text-base font-semibold text-text-primary">Route Planner</h2>
               <p className="mt-1 text-sm text-text-secondary leading-relaxed">
-                Plan walking and cycling routes on Ordnance Survey maps. Snap to
+                Plan walking and cycling routes on OS / topo maps. Snap to
                 paths, view elevation profiles, and export your routes. No login
                 required.
               </p>
@@ -87,7 +87,7 @@ export default async function Home({
               <div>
                 <h2 className="text-base font-semibold text-text-primary">Strava Activities</h2>
                 <p className="mt-1 text-sm text-text-secondary leading-relaxed">
-                  Login with Strava to visualise your recent activities on an OS Map.
+                  Login with Strava to visualise your recent activities on an OS / topo map.
                 </p>
                 <div className="mt-3">
                   <LoginButton />

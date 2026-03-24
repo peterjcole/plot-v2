@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     default: "Plot",
     template: "%s – Plot",
   },
-  description: "Visualise your Strava activities on Ordnance Survey maps",
+  description: "Visualise your Strava activities on OS / topo maps",
 };
 
 export default function RootLayout({

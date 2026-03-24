@@ -35,7 +35,7 @@ function tilePolygon(z: number, x: number, y: number): GeoJSON.Feature<GeoJSON.P
   ]]);
 }
 
-// ── Country detection (polygon intersection against Natural Earth 1:50m) ─────
+// ── Country detection (polygon intersection against Natural Earth 1:10m) ─────
 
 function getCountry(z: number, x: number, y: number): string | null {
   const tile = tilePolygon(z, x, y);

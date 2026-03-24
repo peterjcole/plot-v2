@@ -53,7 +53,7 @@ export default function PlannerClient() {
   const [explorerEnabled, setExplorerEnabled] = useState(() => savedHeatmapPrefs?.explorerEnabled ?? false);
   const [explorerFilter, setExplorerFilter] = useState<string>(() => savedHeatmapPrefs?.explorerFilter ?? 'all');
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
-  const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? false);
+  const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? true);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [activityPopup, setActivityPopup] = useState<{
     activities: HeatmapActivity[];

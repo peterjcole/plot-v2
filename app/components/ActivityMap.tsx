@@ -347,7 +347,10 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
             <TileLayer url={tileUrl} maxZoom={2} maxNativeZoom={9} />
           </>
         ) : (
-          <TileLayer url={tileUrl} maxNativeZoom={16} maxZoom={18} />
+          <>
+            <TileLayer url={tileUrl} minZoom={12} minNativeZoom={14} maxNativeZoom={16} maxZoom={18} />
+            <TileLayer url={tileUrl} maxZoom={11} maxNativeZoom={16} />
+          </>
         )}
         {hillshadeEnabled && !isSatellite && isInGB && (
           <TileLayer
