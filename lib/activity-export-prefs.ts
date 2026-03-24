@@ -21,7 +21,7 @@ export const EXPORT_PREFS_DEFAULTS: ActivityExportPrefs = {
   aspectRatio: 'default',
   includePhotos: true,
   includeLogo: false,
-  hillshadeEnabled: false,
+  hillshadeEnabled: true,
   includeDetails: true,
   includeDescription: true,
 };

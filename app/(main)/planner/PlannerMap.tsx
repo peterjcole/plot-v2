@@ -22,7 +22,7 @@ import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
 interface PlannerMapProps {
@@ -259,25 +259,26 @@ export default function PlannerMap({
     onCloseActivityPopupRef.current = onCloseActivityPopup;
   }, [onCloseActivityPopup]);
 
-  // Toggle OS / satellite base layers
+  // Toggle OS / satellite / topo base layers
   useEffect(() => {
     if (!mapResult) return;
     const isSatellite = baseMap === 'satellite';
-    for (const layer of mapResult.osLayers) {
-      layer.setVisible(!isSatellite);
-    }
+    for (const layer of mapResult.osLayers) layer.setVisible(!isSatellite);
     mapResult.satelliteLayer.setVisible(isSatellite);
+    mapResult.topoLayer.setVisible(!isSatellite);
   }, [mapResult, baseMap]);
 
-  // Update OS tile URLs when dark mode or algorithm changes
+  // Update OS and topo tile URLs when dark mode changes
   useEffect(() => {
     if (!mapResult) return;
-    const url = osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
-    // osLayers[0] is the OSM fallback layer — no URL to change
-    for (const layer of mapResult.osLayers.slice(1)) {
-      (layer.getSource() as XYZ).setUrl(url);
+    const osUrl   = osDark ? OS_DARK_TILE_URL   : OS_TILE_URL;
+    const topoUrl = osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL;
+    for (const layer of mapResult.osLayers) {
+      (layer.getSource() as XYZ).setUrl(osUrl);
     }
+    (mapResult.topoLayer.getSource() as XYZ).setUrl(topoUrl);
   }, [mapResult, osDark]);
+
 
   // Manage heatmap tile layer
   useEffect(() => {

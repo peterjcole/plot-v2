@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
-import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, OS_DEFAULT_CENTER, SATELLITE_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { OS_PROJECTION, OS_DEFAULT_CENTER, OS_TILE_URL, OS_DARK_TILE_URL, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -51,6 +51,13 @@ function sampleArrowIndices(
   return indices;
 }
 
+// EPSG:27700 British National Grid CRS (used for GB activities)
+const osCRS = new L.Proj.CRS(
+  OS_PROJECTION.code,
+  OS_PROJECTION.proj4,
+  { resolutions: OS_PROJECTION.resolutions, origin: OS_PROJECTION.origin }
+);
+
 // Fix Leaflet default marker icon paths (broken in bundlers)
 // Using unpkg CDN for reliable marker icons
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
@@ -59,16 +66,6 @@ L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
-
-// EPSG:27700 British National Grid CRS
-const osCRS = new L.Proj.CRS(
-  OS_PROJECTION.code,
-  OS_PROJECTION.proj4,
-  {
-    resolutions: OS_PROJECTION.resolutions,
-    origin: OS_PROJECTION.origin,
-  }
-);
 
 interface ActivityMapProps {
   activity: ActivityData;
@@ -306,14 +303,24 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
     ? route[Math.floor(route.length / 2)]
     : [OS_DEFAULT_CENTER.lat, OS_DEFAULT_CENTER.lng];
 
-  const isSatellite = baseMap === 'satellite';
-  const activeCRS = isSatellite ? L.CRS.EPSG3857 : osCRS;
-  const tileUrl = isSatellite ? SATELLITE_TILE_URL : osDark ? OS_DARK_TILE_URL : OS_TILE_URL;
-  const minZoom = isSatellite ? 2 : 0;
-  const maxZoom = isSatellite ? 18 : 9;
+  // Bounding box check to decide CRS at render time. Errs toward EPSG:27700
+  // (OS tiles) for mainland GB; Irish/NI activities fall through to topo.
+  const GB_BOUNDS = { minLat: 49.8, maxLat: 61.5, minLng: -8.0, maxLng: 2.0 };
+  const isInGB = baseMap === 'os'
+    && center[0] >= GB_BOUNDS.minLat && center[0] <= GB_BOUNDS.maxLat
+    && center[1] >= GB_BOUNDS.minLng && center[1] <= GB_BOUNDS.maxLng;
 
-  // Satellite or dark OS: bright accent orange (dark-mode --accent-light token) with dark brown outline
-  // Light OS: primary green with dark green outline
+  const isSatellite = baseMap === 'satellite';
+  const activeCRS = (isSatellite || !isInGB) ? L.CRS.EPSG3857 : osCRS;
+  const tileUrl = isSatellite ? SATELLITE_TILE_URL
+                : isInGB      ? (osDark ? OS_DARK_TILE_URL : OS_TILE_URL)
+                : osDark      ? TOPO_DARK_TILE_URL
+                :               TOPO_TILE_URL;
+  const minZoom = (isSatellite || !isInGB) ? 2 : 0;
+  const maxZoom = (isSatellite || !isInGB) ? 18 : 9;
+
+  // Satellite or dark mode: bright accent orange with dark brown outline
+  // Light mode: primary green with dark green outline
   const isDark = isSatellite || osDark;
   const routeColor = isDark ? '#E09B45' : '#4A5A2B';
   const routeOutlineColor = isDark ? '#5A2D00' : '#3A4722';
@@ -332,21 +339,20 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
         zoomControl={false}
         attributionControl={false}
       >
-        {isSatellite ? (
-          <TileLayer url={tileUrl} maxNativeZoom={18} />
-        ) : (
+        {isInGB ? (
           <>
-            {/* zoom 6–9: z=8 tiles */}
             <TileLayer url={tileUrl} minZoom={6} maxNativeZoom={9} minNativeZoom={8} />
-            {/* zoom 4–5: z=6 tiles */}
             <TileLayer url={tileUrl} minZoom={4} maxZoom={5} minNativeZoom={6} maxNativeZoom={9} />
-            {/* zoom 3: z=4 tiles */}
             <TileLayer url={tileUrl} minZoom={3} maxZoom={3} minNativeZoom={4} maxNativeZoom={9} />
-            {/* zoom 0–2: native tiles */}
             <TileLayer url={tileUrl} maxZoom={2} maxNativeZoom={9} />
           </>
+        ) : (
+          <>
+            <TileLayer url={tileUrl} minZoom={12} minNativeZoom={14} maxNativeZoom={16} maxZoom={18} />
+            <TileLayer url={tileUrl} maxZoom={11} maxNativeZoom={16} />
+          </>
         )}
-        {hillshadeEnabled && !isSatellite && (
+        {hillshadeEnabled && !isSatellite && isInGB && (
           <TileLayer
             key={String(osDark)}
             url={`/api/hillshade27700?z={z}&x={x}&y={y}${osDark ? '&dark=1' : ''}`}

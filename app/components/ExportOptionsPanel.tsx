@@ -159,7 +159,7 @@ export default function ExportOptionsPanel({ activityId }: ExportOptionsPanelPro
                 onChange={(e) => updatePrefs({ baseMap: e.target.value as BaseMap })}
                 className={selectClass}
               >
-                <option value="os">Ordnance Survey</option>
+                <option value="os">OS / Topo</option>
                 <option value="satellite">Satellite</option>
               </select>
             </div>

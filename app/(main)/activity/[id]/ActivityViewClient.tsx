@@ -45,7 +45,7 @@ export default function ActivityViewClient({ activity }: ActivityViewClientProps
   const [baseMap, setBaseMap] = useState<BaseMap>(() => loadActivityExportPrefs().baseMap);
   const [osMapMode, setOsMapMode] = useState<'light' | 'dark'>(() => loadActivityExportPrefs().osMapMode);
   const [osMapFollowSystem, setOsMapFollowSystem] = useState<boolean>(() => loadActivityExportPrefs().osMapFollowSystem);
-  const [hillshadeEnabled, setHillshadeEnabled] = useState<boolean>(() => loadActivityExportPrefs().hillshadeEnabled ?? false);
+  const [hillshadeEnabled, setHillshadeEnabled] = useState<boolean>(() => loadActivityExportPrefs().hillshadeEnabled ?? true);
   const [includeDetails, setIncludeDetails] = useState<boolean>(() => loadActivityExportPrefs().includeDetails ?? true);
   const [systemDark, setSystemDark] = useState(false);
 
