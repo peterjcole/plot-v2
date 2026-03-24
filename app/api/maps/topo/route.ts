@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
-import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
-import { point } from '@turf/helpers';
+import booleanIntersects from '@turf/boolean-intersects';
+import { polygon } from '@turf/helpers';
 import boundaries from '@/lib/country-boundaries.json';
 import { applyDarkMode } from '@/lib/dark-tile';
 
@@ -19,19 +19,28 @@ async function getTransparentTile(): Promise<Buffer> {
 
 // ── Tile math ───────────────────────────────────────────────────────────────
 
-function tileCenterLatLng(z: number, x: number, y: number): [number, number] {
-  const n = Math.PI - (2 * Math.PI * (y + 0.5)) / (1 << z);
-  const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
-  const lng = ((x + 0.5) / (1 << z)) * 360 - 180;
-  return [lat, lng];
+function tilePolygon(z: number, x: number, y: number): GeoJSON.Feature<GeoJSON.Polygon> {
+  const toLatLng = (tx: number, ty: number): [number, number] => {
+    const n = Math.PI - (2 * Math.PI * ty) / (1 << z);
+    const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
+    const lng = (tx / (1 << z)) * 360 - 180;
+    return [lng, lat];
+  };
+  return polygon([[
+    toLatLng(x,     y),
+    toLatLng(x + 1, y),
+    toLatLng(x + 1, y + 1),
+    toLatLng(x,     y + 1),
+    toLatLng(x,     y),
+  ]]);
 }
 
-// ── Country detection (PiP against Natural Earth 1:50m) ─────────────────────
+// ── Country detection (polygon intersection against Natural Earth 1:50m) ─────
 
-function getCountry(lat: number, lng: number): string | null {
-  const pt = point([lng, lat]);
+function getCountry(z: number, x: number, y: number): string | null {
+  const tile = tilePolygon(z, x, y);
   for (const feature of (boundaries as GeoJSON.FeatureCollection).features) {
-    if (booleanPointInPolygon(pt, feature as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)) {
+    if (booleanIntersects(tile, feature as GeoJSON.Feature<GeoJSON.Polygon | GeoJSON.MultiPolygon>)) {
       return (feature.properties as { ISO_A3: string }).ISO_A3;
     }
   }
@@ -179,8 +188,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'x, y, z must be integers' }, { status: 400 });
   }
 
-  const [lat, lng] = tileCenterLatLng(z, x, y);
-  const iso = getCountry(lat, lng);
+  const iso = getCountry(z, x, y);
 
   // GB is covered by the OS tile layer on top — return transparent to avoid
   // a redundant OS Leisure_3857 request for tiles that will never be visible.
