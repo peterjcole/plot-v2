@@ -29,6 +29,8 @@ interface LayersPanelProps {
   onExplorerFilterChange: (filter: string) => void;
   hillshadeEnabled: boolean;
   onHillshadeEnabledChange: (enabled: boolean) => void;
+  poisEnabled: boolean;
+  onPoisEnabledChange: (enabled: boolean) => void;
 }
 
 const SPORTS = [
@@ -74,6 +76,8 @@ export default function LayersPanel({
   onExplorerFilterChange,
   hillshadeEnabled,
   onHillshadeEnabledChange,
+  poisEnabled,
+  onPoisEnabledChange,
 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -172,6 +176,16 @@ export default function LayersPanel({
               <div className="w-full h-px bg-border mb-3" />
             </>
           )}
+
+          {/* Points of interest section */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-text-secondary">Points of interest</div>
+              <Switch checked={poisEnabled} onCheckedChange={onPoisEnabledChange} />
+            </div>
+          </div>
+
+          <div className="w-full h-px bg-border mb-3" />
 
           {/* Global heatmap section */}
           <div>

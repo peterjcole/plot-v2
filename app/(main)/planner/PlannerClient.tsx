@@ -67,6 +67,7 @@ export default function PlannerClient() {
   const [explorerFilter, setExplorerFilter] = useState<string>(() => savedHeatmapPrefs?.explorerFilter ?? 'all');
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? true);
+  const [poisEnabled, setPoisEnabled] = useState(() => savedHeatmapPrefs?.poisEnabled ?? false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [mapRotation, setMapRotation] = useState(0); // radians, 0 = north up
   const [gridNorthBearing, setGridNorthBearing] = useState(0); // degrees CW from true north to grid north
@@ -115,9 +116,10 @@ export default function PlannerClient() {
         explorerEnabled,
         explorerFilter,
         hillshadeEnabled,
+        poisEnabled,
       }));
     } catch { /* ignore */ }
-  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter, hillshadeEnabled]);
+  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter, hillshadeEnabled, poisEnabled]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -333,7 +335,7 @@ export default function PlannerClient() {
     } finally {
       setIsExportingImage(false);
     }
-  }, [baseMap, osDark, segments]);
+  }, [baseMap, osDark, hillshadeEnabled, segments]);
 
   // Compass angle: 0 = true north is up. Used for both display and hide logic.
   const compassDeg = ((mapRotation * 180 / Math.PI - gridNorthBearing) % 360 + 360) % 360;
@@ -362,6 +364,7 @@ export default function PlannerClient() {
         onCloseActivityPopup={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
         hoveredActivityRoute={hoveredActivityRoute}
         hoveredActivityColor={hoveredActivityColor}
+        poisEnabled={poisEnabled}
       />
       {activityPopup && (
         <HeatmapActivityPopup
@@ -435,6 +438,8 @@ export default function PlannerClient() {
         onExplorerFilterChange={setExplorerFilter}
         hillshadeEnabled={hillshadeEnabled}
         onHillshadeEnabledChange={setHillshadeEnabled}
+        poisEnabled={poisEnabled}
+        onPoisEnabledChange={setPoisEnabled}
       />
       <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar

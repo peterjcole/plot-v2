@@ -43,6 +43,7 @@ interface PlannerMapProps {
   explorerFilter: string;
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
   hillshadeEnabled: boolean;
+  poisEnabled: boolean;
   onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
   onCloseActivityPopup?: () => void;
   hoveredActivityRoute?: [number, number][] | null;
@@ -200,6 +201,7 @@ export default function PlannerMap({
   explorerFilter,
   hoveredElevationPoint,
   hillshadeEnabled,
+  poisEnabled,
   onHeatmapClick,
   onCloseActivityPopup,
   hoveredActivityRoute,
@@ -227,6 +229,9 @@ export default function PlannerMap({
   const hoverOverlayRef = useRef<Overlay | null>(null);
   const activityHighlightSourceRef = useRef<VectorSource | null>(null);
   const activityHighlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const poisLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const poisSourceRef = useRef<VectorSource | null>(null);
+  const poisPopupOverlayRef = useRef<Overlay | null>(null);
   const personalHeatmapEnabledRef = useRef(personalHeatmapEnabled);
   const onHeatmapClickRef = useRef(onHeatmapClick);
   const onCloseActivityPopupRef = useRef(onCloseActivityPopup);
@@ -350,6 +355,109 @@ export default function PlannerMap({
       }
     };
   }, [map, heatmapEnabled, personalHeatmapEnabled, explorerEnabled, dimBaseMap]);
+
+  // Manage POI vector layer
+  useEffect(() => {
+    if (!map) return;
+    if (poisLayerRef.current) {
+      map.removeLayer(poisLayerRef.current);
+      poisLayerRef.current = null;
+      poisSourceRef.current = null;
+      poisPopupOverlayRef.current?.setPosition(undefined);
+    }
+    if (!poisEnabled) return;
+
+    const source = new VectorSource();
+    const layer = new VectorLayer<VectorSource>({
+      source,
+      style: (feature) => {
+        const type = feature.get('poiType') as string;
+        if (type === 'waterfall') {
+          return new Style({
+            image: new CircleStyle({
+              radius: 6,
+              fill: new Fill({ color: 'rgba(56, 189, 248, 0.9)' }),
+              stroke: new Stroke({ color: 'rgba(14, 116, 144, 1)', width: 1.5 }),
+            }),
+          });
+        }
+        return new Style({
+          image: new CircleStyle({
+            radius: 5,
+            fill: new Fill({ color: '#94a3b8' }),
+          }),
+        });
+      },
+      zIndex: 4.5,
+    });
+    map.addLayer(layer);
+    poisLayerRef.current = layer;
+    poisSourceRef.current = source;
+
+    return () => {
+      map.removeLayer(layer);
+      poisLayerRef.current = null;
+      poisSourceRef.current = null;
+      poisPopupOverlayRef.current?.setPosition(undefined);
+    };
+  }, [map, poisEnabled]);
+
+  // Fetch POIs from OS NGD on viewport change
+  useEffect(() => {
+    if (!map || !poisEnabled) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let isCancelled = false;
+
+    const fetchPois = async () => {
+      const view = map.getView();
+      const zoom = view.getZoom() ?? 0;
+      // Hide markers below zoom 6 (they'd be too small to be useful at national scale)
+      if (zoom < 6) {
+        poisSourceRef.current?.clear();
+        return;
+      }
+      const size = map.getSize();
+      if (!size) return;
+      const extent = view.calculateExtent(size);
+      const [minLng, minLat, maxLng, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
+      try {
+        const res = await fetch(`/api/pois?bbox=${minLng},${minLat},${maxLng},${maxLat}`);
+        if (!res.ok || isCancelled) return;
+        const geojson = await res.json() as {
+          features: Array<{
+            geometry: { coordinates: [number, number] };
+            properties: { poiType: string; name1_text?: string };
+          }>;
+        };
+        if (isCancelled) return;
+        const features = geojson.features.map((f) => {
+          const [lng, lat] = f.geometry.coordinates;
+          const olFeature = new Feature({ geometry: new Point(fromLonLat([lng, lat], OS_PROJECTION.code)) });
+          olFeature.set('poiType', f.properties.poiType);
+          olFeature.set('name', f.properties.name1_text ?? 'Waterfall');
+          return olFeature;
+        });
+        poisSourceRef.current?.clear();
+        poisSourceRef.current?.addFeatures(features);
+      } catch { /* silently fail */ }
+    };
+
+    const onMoveEnd = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchPois, 400);
+    };
+    const key = map.on('moveend', onMoveEnd);
+    fetchPois();
+
+    return () => {
+      isCancelled = true;
+      unByKey(key);
+      clearTimeout(debounceTimer);
+      poisSourceRef.current?.clear();
+      poisPopupOverlayRef.current?.setPosition(undefined);
+    };
+  }, [map, poisEnabled]);
 
   // Manage hillshade tile layer
   useEffect(() => {
@@ -664,6 +772,29 @@ export default function PlannerMap({
 
     const snapFromBtn = popupEl.querySelector('.ol-snap-from') as HTMLButtonElement;
     const snapToBtn = popupEl.querySelector('.ol-snap-to') as HTMLButtonElement;
+
+    // POI name popup overlay
+    const poisPopupEl = document.createElement('div');
+    Object.assign(poisPopupEl.style, {
+      background: 'rgba(255, 255, 255, 0.92)',
+      backdropFilter: 'blur(4px)',
+      borderRadius: '8px',
+      boxShadow: '0 1px 8px rgba(0, 0, 0, 0.18)',
+      padding: '4px 10px',
+      fontSize: '13px',
+      color: '#1C1814',
+      whiteSpace: 'nowrap',
+      pointerEvents: 'none',
+      border: '1px solid rgba(0, 0, 0, 0.08)',
+    });
+    const poisPopupOverlay = new Overlay({
+      element: poisPopupEl,
+      positioning: 'bottom-center',
+      offset: [0, -14],
+      stopEvent: false,
+    });
+    map.addOverlay(poisPopupOverlay);
+    poisPopupOverlayRef.current = poisPopupOverlay;
 
     // Insert popup overlay (for touch route taps)
     const insertPopupEl = document.createElement('div');
@@ -982,12 +1113,32 @@ export default function PlannerMap({
           const geom = waypointFeature.getGeometry() as Point;
           showDeletePopup(geom.getCoordinates(), index);
         }
+        poisPopupOverlayRef.current?.setPosition(undefined);
         onCloseActivityPopupRef.current?.();
         return;
       }
 
-      // Hide popups on any non-waypoint click
-      const hadPopup = deleteTargetIndex !== null || insertCoord !== null;
+      // Check for POI feature hit
+      const poisFeature = poisLayerRef.current
+        ? map.forEachFeatureAtPixel(e.pixel, (f) => f, {
+            layerFilter: (layer) => layer === poisLayerRef.current,
+            hitTolerance: 8,
+          })
+        : null;
+      if (poisFeature) {
+        const name = (poisFeature as Feature).get('name') as string;
+        poisPopupOverlayRef.current!.getElement()!.textContent = name;
+        poisPopupOverlayRef.current!.setPosition(e.coordinate);
+        hideDeletePopup();
+        hideInsertPopup();
+        onCloseActivityPopupRef.current?.();
+        return;
+      }
+
+      // Hide popups on any non-waypoint/poi click
+      const hadPoiPopup = poisPopupOverlayRef.current?.getPosition() !== undefined;
+      if (hadPoiPopup) poisPopupOverlayRef.current!.setPosition(undefined);
+      const hadPopup = deleteTargetIndex !== null || insertCoord !== null || hadPoiPopup;
       if (deleteTargetIndex !== null) hideDeletePopup();
       if (insertCoord !== null) hideInsertPopup();
       if (hadPopup) return;
@@ -1106,6 +1257,16 @@ export default function PlannerMap({
         viewport.style.cursor = 'copy';
         return;
       }
+      if (poisLayerRef.current) {
+        const poisHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+          layerFilter: (layer) => layer === poisLayerRef.current,
+          hitTolerance: 8,
+        });
+        if (poisHit) {
+          viewport.style.cursor = 'pointer';
+          return;
+        }
+      }
       if (personalHeatmapEnabledRef.current && !addPointsRef.current) {
         viewport.style.cursor = 'pointer';
         return;
@@ -1127,6 +1288,8 @@ export default function PlannerMap({
       map.removeInteraction(waypointModify);
       map.removeOverlay(deleteOverlay);
       map.removeOverlay(insertOverlay);
+      map.removeOverlay(poisPopupOverlay);
+      poisPopupOverlayRef.current = null;
       waypointSourceRef.current = null;
       routeSourceRef.current = null;
     };
