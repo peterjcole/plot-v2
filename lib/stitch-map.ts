@@ -14,6 +14,7 @@ export interface StitchOptions {
   baseMap: BaseMap;
   osDark: boolean;
   hillshadeEnabled?: boolean;
+  useTopo?: boolean;
   width: number;
   height: number;
   renderZoom: number;
@@ -172,9 +173,10 @@ function buildSvg(
 }
 
 export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
-  const { route, center, baseMap, osDark, hillshadeEnabled, width, height, renderZoom, origin, bypassSecret } = opts;
+  const { route, center, baseMap, osDark, hillshadeEnabled, useTopo, width, height, renderZoom, origin, bypassSecret } = opts;
 
   const isSatellite = baseMap === 'satellite';
+  const isTopo = useTopo === true && !isSatellite;
   const isDark = isSatellite || osDark;
   const routeColor = isDark ? '#E09B45' : '#4A5A2B';
   const outlineColor = isDark ? '#5A2D00' : '#3A4722';
@@ -184,7 +186,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   const arrowOpacity = isDark ? routeOpacity : 0.85;
 
   const latLngToPixel = (lat: number, lng: number): [number, number] =>
-    isSatellite
+    (isSatellite || isTopo)
       ? mercatorLatLngToPixel(lat, lng, renderZoom)
       : osLatLngToPixel(lat, lng, renderZoom);
 
@@ -203,10 +205,15 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   const tilesWide = tileXMax - tileXMin + 1;
   const tilesTall = tileYMax - tileYMin + 1;
 
-  const tilePathPrefix = isSatellite ? '/api/satellite' : osDark ? '/api/maps/dark' : '/api/maps';
   const bypassParam = bypassSecret
     ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone`
     : '';
+
+  const getTileUrl = (tx: number, ty: number, z: number): string => {
+    if (isSatellite) return `${origin}/api/satellite?z=${z}&x=${tx}&y=${ty}${bypassParam}`;
+    if (isTopo) return `${origin}/api/maps/topo?z=${z}&x=${tx}&y=${ty}${osDark ? '&dark=1' : ''}${bypassParam}`;
+    return `${origin}${osDark ? '/api/maps/dark' : '/api/maps'}?z=${z}&x=${tx}&y=${ty}${bypassParam}`;
+  };
 
   // Fetch all tiles in parallel; silently skip failed tiles (canvas stays gray)
   const fetchPromises: Promise<{ left: number; top: number; input: Buffer } | null>[] = [];
@@ -215,7 +222,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
       const left = (tx - tileXMin) * 256;
       const top = (ty - tileYMin) * 256;
       fetchPromises.push(
-        fetch(`${origin}${tilePathPrefix}?z=${renderZoom}&x=${tx}&y=${ty}${bypassParam}`)
+        fetch(getTileUrl(tx, ty, renderZoom))
           .then(async (res) => {
             if (!res.ok) return null;
             return { left, top, input: Buffer.from(await res.arrayBuffer()) };
@@ -225,16 +232,61 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     }
   }
 
-  // Append hillshade overlay tiles (RGBA PNG) after OS tiles so Sharp composites them on top
+  // Append hillshade overlay tiles (RGBA PNG) after OS tiles so Sharp composites them on top.
+  // Fetch at 2 zoom levels below renderZoom to reduce tile count by ~16× and avoid timeouts
+  // from the large number of external terrarium elevation fetches per tile.
+  // Topo (non-GB) uses the EPSG:3857 /api/hillshade endpoint (global coverage);
+  // GB uses /api/hillshade27700 (BNG). Both are downscaled by 2 zoom levels to reduce
+  // the number of external terrarium fetches per tile.
   if (hillshadeEnabled && !isSatellite) {
     const darkParam = osDark ? '&dark=1' : '';
-    for (let ty = tileYMin; ty <= tileYMax; ty++) {
-      for (let tx = tileXMin; tx <= tileXMax; tx++) {
-        const left = (tx - tileXMin) * 256;
-        const top = (ty - tileYMin) * 256;
+    const hillshadeEndpoint = isTopo ? 'hillshade' : 'hillshade27700';
+    const zoomDiff = 2;
+    const hillshadeZoom = Math.max(0, renderZoom - zoomDiff);
+    const scaleFactor = 1 << (renderZoom - hillshadeZoom); // 4 when zoomDiff=2
+    const tileSizePx = scaleFactor * 256;
+
+    const hsTileXMin = Math.floor(tileXMin / scaleFactor);
+    const hsTileXMax = Math.floor(tileXMax / scaleFactor);
+    const hsTileYMin = Math.floor(tileYMin / scaleFactor);
+    const hsTileYMax = Math.floor(tileYMax / scaleFactor);
+
+    for (let hsTy = hsTileYMin; hsTy <= hsTileYMax; hsTy++) {
+      for (let hsTx = hsTileXMin; hsTx <= hsTileXMax; hsTx++) {
+        const hsLeft = (hsTx * scaleFactor - tileXMin) * 256;
+        const hsTop  = (hsTy * scaleFactor - tileYMin) * 256;
+
+        // Skip tiles entirely outside the canvas
+        if (hsLeft + tileSizePx <= 0 || hsTop + tileSizePx <= 0) continue;
+        if (hsLeft >= tilesWide * 256   || hsTop >= tilesTall * 256) continue;
+
+        const extractLeft = Math.max(0, -hsLeft);
+        const extractTop  = Math.max(0, -hsTop);
+        const left = Math.max(0, hsLeft);
+        const top  = Math.max(0, hsTop);
+
         fetchPromises.push(
-          fetch(`${origin}/api/hillshade27700?z=${renderZoom}&x=${tx}&y=${ty}${darkParam}${bypassParam}`)
-            .then(async r => r.ok ? { left, top, input: Buffer.from(await r.arrayBuffer()) } : null)
+          fetch(`${origin}/api/${hillshadeEndpoint}?z=${hillshadeZoom}&x=${hsTx}&y=${hsTy}${darkParam}${bypassParam}`)
+            .then(async r => {
+              if (!r.ok) return null;
+              const raw = Buffer.from(await r.arrayBuffer());
+              // Scale up to cover the scaleFactor-tile area in the canvas
+              let tile: Buffer = await sharp(raw)
+                .resize(tileSizePx, tileSizePx, { fit: 'fill', kernel: 'nearest' })
+                .toBuffer();
+              // Crop off any portion that falls outside the canvas (edge tiles)
+              if (extractLeft > 0 || extractTop > 0) {
+                tile = await sharp(tile)
+                  .extract({
+                    left: extractLeft,
+                    top:  extractTop,
+                    width:  tileSizePx - extractLeft,
+                    height: tileSizePx - extractTop,
+                  })
+                  .toBuffer();
+              }
+              return { left, top, input: tile };
+            })
             .catch(() => null)
         );
       }
