@@ -297,14 +297,13 @@ export default function PlannerClient() {
     }
   }, [activityPopup]);
 
-  const handlePhotoClick = useCallback((photo: PhotoItem, screenX: number, screenY: number) => {
+  const handlePhotoClick = useCallback(async (photo: PhotoItem, screenX: number, screenY: number) => {
     setActivityPopup(null);
+    setHoveredActivityRoute(null);
     setPhotoPopup({ photo, screenX, screenY });
-  }, []);
-
-  const handlePhotoRouteHighlight = useCallback(async (lat: number, lng: number) => {
+    // Highlight the route immediately using the photo's coordinates
     try {
-      const res = await fetch(`/api/tiles/activities?lat=${lat}&lng=${lng}`);
+      const res = await fetch(`/api/tiles/activities?lat=${photo.lat}&lng=${photo.lng}`);
       if (res.ok) {
         const data = await res.json();
         if (data.length > 0) {
@@ -426,7 +425,6 @@ export default function PlannerClient() {
           screenX={photoPopup.screenX}
           screenY={photoPopup.screenY}
           onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
-          onHighlightRoute={handlePhotoRouteHighlight}
         />
       )}
       {/* Logo panel — desktop only */}

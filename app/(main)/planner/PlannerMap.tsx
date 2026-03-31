@@ -488,7 +488,43 @@ export default function PlannerMap({
 
     const source = new VectorSource();
     const clusterSource = new Cluster({ source, distance: 40 });
-    const imageCache: Record<string, HTMLCanvasElement | null | undefined> = {};
+    const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
+    const pillCache: Record<number, HTMLCanvasElement> = {};
+
+    function makePill(count: number): HTMLCanvasElement {
+      if (pillCache[count]) return pillCache[count];
+      const label = String(count);
+      const h = 34;
+      const fontSize = 12;
+      const tmp = document.createElement('canvas').getContext('2d')!;
+      tmp.font = `600 ${fontSize}px sans-serif`;
+      const textW = tmp.measureText(label).width;
+      const w = Math.max(h, Math.ceil(textW) + 20);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      const r = h / 2;
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.arcTo(w, 0, w, h, r);
+      ctx.arcTo(w, h, 0, h, r);
+      ctx.arcTo(0, h, 0, 0, r);
+      ctx.arcTo(0, 0, w, 0, r);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(74,90,43,0.82)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(58,71,34,0.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'white';
+      ctx.font = `600 ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, w / 2, h / 2);
+      pillCache[count] = canvas;
+      return canvas;
+    }
 
     const layer = new VectorLayer({
       source: clusterSource,
@@ -500,14 +536,14 @@ export default function PlannerMap({
 
         if (size === 1) {
           const photoUrl = first.get('url') as string;
-          const cached = imageCache[photoUrl];
+          const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(photoUrl)}`;
+          const cached = thumbnailCache[proxyUrl];
           if (cached) {
             return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
           }
           if (cached === undefined) {
-            imageCache[photoUrl] = null;
+            thumbnailCache[proxyUrl] = null;
             const img = new window.Image();
-            img.crossOrigin = 'anonymous';
             img.onload = () => {
               const canvas = document.createElement('canvas');
               canvas.width = 40;
@@ -522,32 +558,26 @@ export default function PlannerMap({
               ctx.strokeStyle = 'white';
               ctx.lineWidth = 2.5;
               ctx.stroke();
-              imageCache[photoUrl] = canvas;
+              thumbnailCache[proxyUrl] = canvas;
               clusterSource.changed();
             };
-            img.onerror = () => { imageCache[photoUrl] = null; };
-            img.src = photoUrl;
+            img.onerror = () => { thumbnailCache[proxyUrl] = null; };
+            img.src = proxyUrl;
           }
+          // Placeholder while loading
           return new Style({
             image: new CircleStyle({
               radius: 14,
-              fill: new Fill({ color: 'rgba(255,255,255,0.9)' }),
-              stroke: new Stroke({ color: 'rgba(74,90,43,0.8)', width: 2 }),
+              fill: new Fill({ color: 'rgba(74,90,43,0.82)' }),
+              stroke: new Stroke({ color: 'rgba(58,71,34,0.9)', width: 2 }),
             }),
           });
         }
 
+        // Cluster pill — matches activity page style
+        const pill = makePill(size);
         return new Style({
-          image: new CircleStyle({
-            radius: 16,
-            fill: new Fill({ color: 'rgba(74,90,43,0.85)' }),
-            stroke: new Stroke({ color: 'white', width: 2 }),
-          }),
-          text: new Text({
-            text: String(size),
-            fill: new Fill({ color: 'white' }),
-            font: 'bold 11px sans-serif',
-          }),
+          image: new Icon({ img: pill, size: [pill.width, pill.height] }),
         });
       },
       zIndex: 4.8,

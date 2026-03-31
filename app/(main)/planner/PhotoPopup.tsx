@@ -1,6 +1,6 @@
 'use client';
 
-import { X, ExternalLink, MapPin } from 'lucide-react';
+import { X, ExternalLink } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { PhotoItem } from '@/lib/types';
 
@@ -24,17 +24,14 @@ interface PhotoPopupProps {
   screenX: number;
   screenY: number;
   onClose: () => void;
-  onHighlightRoute: (lat: number, lng: number) => void;
 }
 
-export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlightRoute }: PhotoPopupProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+export default function PhotoPopup({ photo, screenX, screenY, onClose }: PhotoPopupProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
-    onHighlightRoute(photo.lat, photo.lng);
-  }, [photo.lat, photo.lng, onHighlightRoute]);
+  }, []);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
@@ -48,7 +45,6 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlig
 
   return (
     <div
-      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={`Photo from ${photo.activityName}`}
@@ -60,7 +56,6 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlig
         transform: 'translateX(-50%) translateY(-100%)',
       }}
     >
-      {/* Photo */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photo.url}
@@ -68,7 +63,6 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlig
         className="w-full aspect-square object-cover"
       />
 
-      {/* Details */}
       <div className="px-3 py-2">
         <div className="flex items-start justify-between gap-1">
           <p className="text-xs font-medium text-text-primary truncate flex-1">{photo.activityName}</p>
@@ -85,7 +79,7 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlig
           {formatDate(photo.activityDate)}
           {photo.activityDistance != null && ` · ${formatDistance(photo.activityDistance)}`}
         </p>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="mt-2">
           <a
             href={`https://www.strava.com/activities/${photo.activityId}`}
             target="_blank"
@@ -95,13 +89,6 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose, onHighlig
             <ExternalLink size={12} />
             Open activity
           </a>
-          <button
-            onClick={() => onHighlightRoute(photo.lat, photo.lng)}
-            className="flex items-center gap-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <MapPin size={12} />
-            Show route
-          </button>
         </div>
       </div>
     </div>
