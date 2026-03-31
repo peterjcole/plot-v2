@@ -45,6 +45,18 @@ export interface HeatmapActivity {
   route: [number, number][]; // [lng, lat][] GeoJSON order
 }
 
+export interface PhotoItem {
+  photoId: string;
+  url: string;
+  lat: number;
+  lng: number;
+  activityId: number;
+  activityName: string;
+  activityDate: string;
+  activityDistance: number | null;
+  sportType: string | null;
+}
+
 export interface Waypoint {
   lat: number;
   lng: number;

@@ -17,7 +17,8 @@ import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
 import HeatmapActivityPopup from './HeatmapActivityPopup';
-import { Waypoint, HeatmapActivity } from '@/lib/types';
+import PhotoPopup from './PhotoPopup';
+import { Waypoint, HeatmapActivity, PhotoItem } from '@/lib/types';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
 import 'ol/ol.css';
@@ -68,6 +69,8 @@ export default function PlannerClient() {
   const [personalTilesAvailable, setPersonalTilesAvailable] = useState<boolean | null>(null);
   const [hillshadeEnabled, setHillshadeEnabled] = useState(() => savedHeatmapPrefs?.hillshadeEnabled ?? true);
   const [poisEnabled, setPoisEnabled] = useState(() => savedHeatmapPrefs?.poisEnabled ?? false);
+  const [photosEnabled, setPhotosEnabled] = useState(() => savedHeatmapPrefs?.photosEnabled ?? false);
+  const photosImportTriggeredRef = useRef(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [mapRotation, setMapRotation] = useState(0); // radians, 0 = north up
   const [gridNorthBearing, setGridNorthBearing] = useState(0); // degrees CW from true north to grid north
@@ -81,6 +84,7 @@ export default function PlannerClient() {
   const [popupLoading, setPopupLoading] = useState(false);
   const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
   const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
+  const [photoPopup, setPhotoPopup] = useState<{ photo: PhotoItem; screenX: number; screenY: number } | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,9 +121,10 @@ export default function PlannerClient() {
         explorerFilter,
         hillshadeEnabled,
         poisEnabled,
+        photosEnabled,
       }));
     } catch { /* ignore */ }
-  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter, hillshadeEnabled, poisEnabled]);
+  }, [baseMap, osMapMode, osMapFollowSystem, heatmapEnabled, heatmapSport, heatmapColor, dimBaseMap, personalHeatmapEnabled, explorerEnabled, explorerFilter, hillshadeEnabled, poisEnabled, photosEnabled]);
 
   // Check personal tile availability
   useEffect(() => {
@@ -128,6 +133,25 @@ export default function PlannerClient() {
       .then((data) => setPersonalTilesAvailable(data?.available ?? false))
       .catch(() => setPersonalTilesAvailable(false));
   }, []);
+
+  // Trigger photo catch-up import the first time "My photos" is enabled
+  useEffect(() => {
+    if (!photosEnabled || photosImportTriggeredRef.current) return;
+    try {
+      if (localStorage.getItem('plotv2-photos-import-triggered')) {
+        photosImportTriggeredRef.current = true;
+        return;
+      }
+    } catch { /* ignore */ }
+    photosImportTriggeredRef.current = true;
+    fetch('/api/photos/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then((res) => {
+        if (res.ok) {
+          try { localStorage.setItem('plotv2-photos-import-triggered', '1'); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => { /* silently ignore */ });
+  }, [photosEnabled]);
 
   // Load saved route on mount
   useEffect(() => {
@@ -273,6 +297,24 @@ export default function PlannerClient() {
     }
   }, [activityPopup]);
 
+  const handlePhotoClick = useCallback((photo: PhotoItem, screenX: number, screenY: number) => {
+    setActivityPopup(null);
+    setPhotoPopup({ photo, screenX, screenY });
+  }, []);
+
+  const handlePhotoRouteHighlight = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`/api/tiles/activities?lat=${lat}&lng=${lng}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.length > 0) {
+          setHoveredActivityRoute(data[0].route);
+          setHoveredActivityColor(null);
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   const handleZoomIn = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -365,6 +407,8 @@ export default function PlannerClient() {
         hoveredActivityRoute={hoveredActivityRoute}
         hoveredActivityColor={hoveredActivityColor}
         poisEnabled={poisEnabled}
+        photosEnabled={photosEnabled}
+        onPhotoClick={handlePhotoClick}
       />
       {activityPopup && (
         <HeatmapActivityPopup
@@ -374,6 +418,15 @@ export default function PlannerClient() {
           isLoading={popupLoading}
           onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
           onHoverActivity={(route, color) => { setHoveredActivityRoute(route); setHoveredActivityColor(color ?? null); }}
+        />
+      )}
+      {photoPopup && (
+        <PhotoPopup
+          photo={photoPopup.photo}
+          screenX={photoPopup.screenX}
+          screenY={photoPopup.screenY}
+          onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
+          onHighlightRoute={handlePhotoRouteHighlight}
         />
       )}
       {/* Logo panel — desktop only */}
@@ -440,6 +493,8 @@ export default function PlannerClient() {
         onHillshadeEnabledChange={setHillshadeEnabled}
         poisEnabled={poisEnabled}
         onPoisEnabledChange={setPoisEnabled}
+        photosEnabled={photosEnabled}
+        onPhotosEnabledChange={setPhotosEnabled}
       />
       <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar

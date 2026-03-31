@@ -31,6 +31,8 @@ interface LayersPanelProps {
   onHillshadeEnabledChange: (enabled: boolean) => void;
   poisEnabled: boolean;
   onPoisEnabledChange: (enabled: boolean) => void;
+  photosEnabled: boolean;
+  onPhotosEnabledChange: (enabled: boolean) => void;
 }
 
 const SPORTS = [
@@ -78,6 +80,8 @@ export default function LayersPanel({
   onHillshadeEnabledChange,
   poisEnabled,
   onPoisEnabledChange,
+  photosEnabled,
+  onPhotosEnabledChange,
 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
 
@@ -139,6 +143,13 @@ export default function LayersPanel({
           {/* Personal heatmap section — only shown for tile-enabled users */}
           {personalTilesAvailable === true && (
             <>
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-medium text-text-secondary">My photos</div>
+                  <Switch checked={photosEnabled} onCheckedChange={onPhotosEnabledChange} />
+                </div>
+              </div>
+
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-medium text-text-secondary">Personal heatmap</div>

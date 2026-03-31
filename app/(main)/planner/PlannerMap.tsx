@@ -9,7 +9,8 @@ import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { Style, Circle as CircleStyle, Fill, Stroke, Icon } from 'ol/style';
+import { Style, Circle as CircleStyle, Fill, Stroke, Icon, Text } from 'ol/style';
+import Cluster from 'ol/source/Cluster';
 import { DragPan, Modify } from 'ol/interaction';
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
@@ -21,7 +22,7 @@ import OlVectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import { useOpenLayersMap } from './useOpenLayersMap';
 import { RouteAction } from './useRouteHistory';
-import { Waypoint, RouteSegment } from '@/lib/types';
+import { Waypoint, RouteSegment, PhotoItem } from '@/lib/types';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
@@ -44,7 +45,9 @@ interface PlannerMapProps {
   hoveredElevationPoint?: { lat: number; lng: number; ele: number; distance: number } | null;
   hillshadeEnabled: boolean;
   poisEnabled: boolean;
+  photosEnabled: boolean;
   onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
+  onPhotoClick?: (photo: PhotoItem, screenX: number, screenY: number) => void;
   onCloseActivityPopup?: () => void;
   hoveredActivityRoute?: [number, number][] | null;
   hoveredActivityColor?: string | null;
@@ -202,7 +205,9 @@ export default function PlannerMap({
   hoveredElevationPoint,
   hillshadeEnabled,
   poisEnabled,
+  photosEnabled,
   onHeatmapClick,
+  onPhotoClick,
   onCloseActivityPopup,
   hoveredActivityRoute,
   hoveredActivityColor,
@@ -232,8 +237,12 @@ export default function PlannerMap({
   const poisLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const poisSourceRef = useRef<VectorSource | null>(null);
   const poisPopupOverlayRef = useRef<Overlay | null>(null);
+  const photosLayerRef = useRef<VectorLayer<Cluster> | null>(null);
+  const photosSourceRef = useRef<VectorSource | null>(null);
   const personalHeatmapEnabledRef = useRef(personalHeatmapEnabled);
+  const photosEnabledRef = useRef(photosEnabled);
   const onHeatmapClickRef = useRef(onHeatmapClick);
+  const onPhotoClickRef = useRef(onPhotoClick);
   const onCloseActivityPopupRef = useRef(onCloseActivityPopup);
 
   useEffect(() => {
@@ -257,8 +266,16 @@ export default function PlannerMap({
   }, [personalHeatmapEnabled]);
 
   useEffect(() => {
+    photosEnabledRef.current = photosEnabled;
+  }, [photosEnabled]);
+
+  useEffect(() => {
     onHeatmapClickRef.current = onHeatmapClick;
   }, [onHeatmapClick]);
+
+  useEffect(() => {
+    onPhotoClickRef.current = onPhotoClick;
+  }, [onPhotoClick]);
 
   useEffect(() => {
     onCloseActivityPopupRef.current = onCloseActivityPopup;
@@ -458,6 +475,151 @@ export default function PlannerMap({
       poisPopupOverlayRef.current?.setPosition(undefined);
     };
   }, [map, poisEnabled]);
+
+  // Manage photo cluster layer
+  useEffect(() => {
+    if (!map) return;
+    if (photosLayerRef.current) {
+      map.removeLayer(photosLayerRef.current);
+      photosLayerRef.current = null;
+      photosSourceRef.current = null;
+    }
+    if (!photosEnabled) return;
+
+    const source = new VectorSource();
+    const clusterSource = new Cluster({ source, distance: 40 });
+    const imageCache: Record<string, HTMLCanvasElement | null | undefined> = {};
+
+    const layer = new VectorLayer({
+      source: clusterSource,
+      style: (feature) => {
+        const features = (feature.get('features') as Feature[]) ?? [];
+        const size = features.length;
+        const first = features[0];
+        if (!first) return new Style();
+
+        if (size === 1) {
+          const photoUrl = first.get('url') as string;
+          const cached = imageCache[photoUrl];
+          if (cached) {
+            return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
+          }
+          if (cached === undefined) {
+            imageCache[photoUrl] = null;
+            const img = new window.Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 40;
+              canvas.height = 40;
+              const ctx = canvas.getContext('2d')!;
+              ctx.beginPath();
+              ctx.arc(20, 20, 19, 0, Math.PI * 2);
+              ctx.clip();
+              ctx.drawImage(img, 0, 0, 40, 40);
+              ctx.beginPath();
+              ctx.arc(20, 20, 19, 0, Math.PI * 2);
+              ctx.strokeStyle = 'white';
+              ctx.lineWidth = 2.5;
+              ctx.stroke();
+              imageCache[photoUrl] = canvas;
+              clusterSource.changed();
+            };
+            img.onerror = () => { imageCache[photoUrl] = null; };
+            img.src = photoUrl;
+          }
+          return new Style({
+            image: new CircleStyle({
+              radius: 14,
+              fill: new Fill({ color: 'rgba(255,255,255,0.9)' }),
+              stroke: new Stroke({ color: 'rgba(74,90,43,0.8)', width: 2 }),
+            }),
+          });
+        }
+
+        return new Style({
+          image: new CircleStyle({
+            radius: 16,
+            fill: new Fill({ color: 'rgba(74,90,43,0.85)' }),
+            stroke: new Stroke({ color: 'white', width: 2 }),
+          }),
+          text: new Text({
+            text: String(size),
+            fill: new Fill({ color: 'white' }),
+            font: 'bold 11px sans-serif',
+          }),
+        });
+      },
+      zIndex: 4.8,
+    });
+
+    map.addLayer(layer);
+    photosLayerRef.current = layer as VectorLayer<Cluster>;
+    photosSourceRef.current = source;
+
+    return () => {
+      map.removeLayer(layer);
+      photosLayerRef.current = null;
+      photosSourceRef.current = null;
+    };
+  }, [map, photosEnabled]);
+
+  // Fetch photos from API on viewport change
+  useEffect(() => {
+    if (!map || !photosEnabled) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let isCancelled = false;
+
+    const fetchPhotos = async () => {
+      const view = map.getView();
+      const zoom = view.getZoom() ?? 0;
+      if (zoom < 5) {
+        photosSourceRef.current?.clear();
+        return;
+      }
+      const size = map.getSize();
+      if (!size) return;
+      const extent = view.calculateExtent(size);
+      const [minLng, minLat, maxLng, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
+      try {
+        const res = await fetch(`/api/photos?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&limit=300`);
+        if (!res.ok || isCancelled) return;
+        const data = await res.json() as { photos: PhotoItem[] };
+        if (isCancelled) return;
+        const features = data.photos.map((p) => {
+          const f = new Feature({ geometry: new Point(fromLonLat([p.lng, p.lat], OS_PROJECTION.code)) });
+          f.set('photoId', p.photoId);
+          f.set('url', p.url);
+          f.set('lat', p.lat);
+          f.set('lng', p.lng);
+          f.set('activityId', p.activityId);
+          f.set('activityName', p.activityName);
+          f.set('activityDate', p.activityDate);
+          f.set('activityDistance', p.activityDistance);
+          f.set('sportType', p.sportType);
+          return f;
+        });
+        photosSourceRef.current?.clear();
+        photosSourceRef.current?.addFeatures(features);
+      } catch { /* silently fail */ }
+    };
+
+    const onMoveEnd = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchPhotos, 400);
+    };
+
+    const key = map.on('moveend', onMoveEnd);
+    fetchPhotos();
+
+    return () => {
+      isCancelled = true;
+      unByKey(key);
+      clearTimeout(debounceTimer);
+      photosSourceRef.current?.clear();
+    };
+  }, [map, photosEnabled]);
 
   // Manage hillshade tile layer
   useEffect(() => {
@@ -1135,6 +1297,41 @@ export default function PlannerMap({
         return;
       }
 
+      // Check for photo feature hit
+      if (photosLayerRef.current && !addPointsRef.current) {
+        const photoClusterFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f as Feature, {
+          layerFilter: (layer) => layer === photosLayerRef.current,
+          hitTolerance: 10,
+        });
+        if (photoClusterFeature) {
+          const clusterFeatures = (photoClusterFeature.get('features') as Feature[]) ?? [];
+          const clusterSize = clusterFeatures.length;
+          const evt = e.originalEvent as MouseEvent;
+          if (clusterSize > 1) {
+            const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
+            map.getView().animate({ center, zoom: (map.getView().getZoom() ?? 5) + 2, duration: 300 });
+          } else if (clusterSize === 1) {
+            const f = clusterFeatures[0];
+            const photo: PhotoItem = {
+              photoId: f.get('photoId'),
+              url: f.get('url'),
+              lat: f.get('lat'),
+              lng: f.get('lng'),
+              activityId: f.get('activityId'),
+              activityName: f.get('activityName'),
+              activityDate: f.get('activityDate'),
+              activityDistance: f.get('activityDistance'),
+              sportType: f.get('sportType'),
+            };
+            onPhotoClickRef.current?.(photo, evt.clientX, evt.clientY);
+          }
+          hideDeletePopup();
+          hideInsertPopup();
+          poisPopupOverlayRef.current?.setPosition(undefined);
+          return;
+        }
+      }
+
       // Hide popups on any non-waypoint/poi click
       const hadPoiPopup = poisPopupOverlayRef.current?.getPosition() !== undefined;
       if (hadPoiPopup) poisPopupOverlayRef.current!.setPosition(undefined);
@@ -1263,6 +1460,16 @@ export default function PlannerMap({
           hitTolerance: 8,
         });
         if (poisHit) {
+          viewport.style.cursor = 'pointer';
+          return;
+        }
+      }
+      if (photosLayerRef.current && !addPointsRef.current) {
+        const photosHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+          layerFilter: (layer) => layer === photosLayerRef.current,
+          hitTolerance: 10,
+        });
+        if (photosHit) {
           viewport.style.cursor = 'pointer';
           return;
         }
