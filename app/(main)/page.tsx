@@ -33,6 +33,7 @@ export default async function Home({
         }
         redirect('/api/auth/logout');
       }
+      console.error('[home] getAthleteActivities failed:', error instanceof StravaApiError ? `HTTP ${error.status}` : error);
       activitiesError = true;
     }
   }
