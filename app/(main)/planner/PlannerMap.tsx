@@ -48,6 +48,7 @@ interface PlannerMapProps {
   photosEnabled: boolean;
   onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
   onPhotoClick?: (photo: PhotoItem, screenX: number, screenY: number) => void;
+  onClusterPhotosClick?: (photos: PhotoItem[], screenX: number, screenY: number) => void;
   onCloseActivityPopup?: () => void;
   hoveredActivityRoute?: [number, number][] | null;
   hoveredActivityColor?: string | null;
@@ -208,6 +209,7 @@ export default function PlannerMap({
   photosEnabled,
   onHeatmapClick,
   onPhotoClick,
+  onClusterPhotosClick,
   onCloseActivityPopup,
   hoveredActivityRoute,
   hoveredActivityColor,
@@ -243,6 +245,7 @@ export default function PlannerMap({
   const photosEnabledRef = useRef(photosEnabled);
   const onHeatmapClickRef = useRef(onHeatmapClick);
   const onPhotoClickRef = useRef(onPhotoClick);
+  const onClusterPhotosClickRef = useRef(onClusterPhotosClick);
   const onCloseActivityPopupRef = useRef(onCloseActivityPopup);
 
   useEffect(() => {
@@ -276,6 +279,10 @@ export default function PlannerMap({
   useEffect(() => {
     onPhotoClickRef.current = onPhotoClick;
   }, [onPhotoClick]);
+
+  useEffect(() => {
+    onClusterPhotosClickRef.current = onClusterPhotosClick;
+  }, [onClusterPhotosClick]);
 
   useEffect(() => {
     onCloseActivityPopupRef.current = onCloseActivityPopup;
@@ -489,40 +496,81 @@ export default function PlannerMap({
     const source = new VectorSource();
     const clusterSource = new Cluster({ source, distance: 40 });
     const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
-    const pillCache: Record<number, HTMLCanvasElement> = {};
 
-    function makePill(count: number): HTMLCanvasElement {
-      if (pillCache[count]) return pillCache[count];
-      const label = String(count);
-      const h = 34;
-      const fontSize = 12;
-      const tmp = document.createElement('canvas').getContext('2d')!;
-      tmp.font = `600 ${fontSize}px sans-serif`;
-      const textW = tmp.measureText(label).width;
-      const w = Math.max(h, Math.ceil(textW) + 20);
+    // Load a URL into thumbnailCache as a 40×40 circular-clipped canvas with a white ring.
+    // Calls clusterSource.changed() once loaded so the style re-evaluates.
+    function loadThumbnail(proxyUrl: string) {
+      thumbnailCache[proxyUrl] = null;
+      const img = new window.Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 40; c.height = 40;
+        const ctx = c.getContext('2d')!;
+        ctx.beginPath();
+        ctx.arc(20, 20, 19, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, 0, 0, 40, 40);
+        ctx.beginPath();
+        ctx.arc(20, 20, 19, 0, Math.PI * 2);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        thumbnailCache[proxyUrl] = c;
+        clusterSource.changed();
+      };
+      img.onerror = () => { thumbnailCache[proxyUrl] = null; };
+      img.src = proxyUrl;
+    }
+
+    // Draw the stacked-photos cluster icon: shadow circles behind + top photo circle (with ring
+    // already baked in) + count badge
+    function makeClusterCanvas(count: number, topPhotoCanvas: HTMLCanvasElement): HTMLCanvasElement {
+      const SIZE = 52; // total canvas size (extra room for shadow offset + badge)
+      const PHOTO_R = 19; // radius of the photo circle
+      const cx = 22; // centre-x of top photo circle
+      const cy = 22; // centre-y of top photo circle
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = SIZE;
+      canvas.height = SIZE;
       const ctx = canvas.getContext('2d')!;
-      const r = h / 2;
+
+      // Draw 2 stacked shadow circles offset to bottom-right
+      for (let i = 2; i >= 1; i--) {
+        ctx.beginPath();
+        ctx.arc(cx + i * 3, cy + i * 3, PHOTO_R, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${0.18 * i})`;
+        ctx.fill();
+      }
+
+      // Draw top photo thumbnail (already circular with white ring baked in)
+      ctx.drawImage(topPhotoCanvas, cx - PHOTO_R, cy - PHOTO_R, PHOTO_R * 2, PHOTO_R * 2);
+
+      // Count badge — pill bottom-right
+      const label = String(count);
+      const fontSize = 11;
+      const tmp = document.createElement('canvas').getContext('2d')!;
+      tmp.font = `700 ${fontSize}px sans-serif`;
+      const textW = tmp.measureText(label).width;
+      const bw = Math.max(18, Math.ceil(textW) + 10);
+      const bh = 16;
+      const bx = cx + PHOTO_R - bw / 2 + 4;
+      const by = cy + PHOTO_R - bh / 2 + 4;
+      const br = bh / 2;
       ctx.beginPath();
-      ctx.moveTo(r, 0);
-      ctx.arcTo(w, 0, w, h, r);
-      ctx.arcTo(w, h, 0, h, r);
-      ctx.arcTo(0, h, 0, 0, r);
-      ctx.arcTo(0, 0, w, 0, r);
+      ctx.moveTo(bx + br, by);
+      ctx.arcTo(bx + bw, by, bx + bw, by + bh, br);
+      ctx.arcTo(bx + bw, by + bh, bx, by + bh, br);
+      ctx.arcTo(bx, by + bh, bx, by, br);
+      ctx.arcTo(bx, by, bx + bw, by, br);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(74,90,43,0.82)';
+      ctx.fillStyle = 'rgba(15,15,15,0.92)';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(58,71,34,0.9)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
       ctx.fillStyle = 'white';
-      ctx.font = `600 ${fontSize}px sans-serif`;
+      ctx.font = `700 ${fontSize}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, w / 2, h / 2);
-      pillCache[count] = canvas;
+      ctx.fillText(label, bx + bw / 2, by + bh / 2);
+
       return canvas;
     }
 
@@ -542,27 +590,7 @@ export default function PlannerMap({
             return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
           }
           if (cached === undefined) {
-            thumbnailCache[proxyUrl] = null;
-            const img = new window.Image();
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = 40;
-              canvas.height = 40;
-              const ctx = canvas.getContext('2d')!;
-              ctx.beginPath();
-              ctx.arc(20, 20, 19, 0, Math.PI * 2);
-              ctx.clip();
-              ctx.drawImage(img, 0, 0, 40, 40);
-              ctx.beginPath();
-              ctx.arc(20, 20, 19, 0, Math.PI * 2);
-              ctx.strokeStyle = 'white';
-              ctx.lineWidth = 2.5;
-              ctx.stroke();
-              thumbnailCache[proxyUrl] = canvas;
-              clusterSource.changed();
-            };
-            img.onerror = () => { thumbnailCache[proxyUrl] = null; };
-            img.src = proxyUrl;
+            loadThumbnail(proxyUrl);
           }
           // Placeholder while loading
           return new Style({
@@ -574,10 +602,25 @@ export default function PlannerMap({
           });
         }
 
-        // Cluster pill — matches activity page style
-        const pill = makePill(size);
+        // Cluster — stacked photos with count badge
+        // Use top (first/most-recent) photo as thumbnail
+        const topPhotoUrl = first.get('url') as string;
+        const topProxyUrl = `/api/photos/proxy?url=${encodeURIComponent(topPhotoUrl)}`;
+        const topCached = thumbnailCache[topProxyUrl];
+        if (topCached) {
+          const clusterCanvas = makeClusterCanvas(size, topCached);
+          return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
+        }
+        if (topCached === undefined) {
+          loadThumbnail(topProxyUrl);
+        }
+        // Placeholder while loading
         return new Style({
-          image: new Icon({ img: pill, size: [pill.width, pill.height] }),
+          image: new CircleStyle({
+            radius: 19,
+            fill: new Fill({ color: 'rgba(20,20,20,0.85)' }),
+            stroke: new Stroke({ color: 'white', width: 2 }),
+          }),
         });
       },
       zIndex: 4.8,
@@ -1338,8 +1381,25 @@ export default function PlannerMap({
           const clusterSize = clusterFeatures.length;
           const evt = e.originalEvent as MouseEvent;
           if (clusterSize > 1) {
+            const currentZoom = map.getView().getZoom() ?? 0;
             const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
-            map.getView().animate({ center, zoom: (map.getView().getZoom() ?? 5) + 2, duration: 300 });
+            if (currentZoom < 18) {
+              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+            } else {
+              // Too zoomed in to de-cluster — open cluster popup
+              const clusterPhotos: PhotoItem[] = clusterFeatures.map((f) => ({
+                photoId: f.get('photoId'),
+                url: f.get('url'),
+                lat: f.get('lat'),
+                lng: f.get('lng'),
+                activityId: f.get('activityId'),
+                activityName: f.get('activityName'),
+                activityDate: f.get('activityDate'),
+                activityDistance: f.get('activityDistance'),
+                sportType: f.get('sportType'),
+              }));
+              onClusterPhotosClickRef.current?.(clusterPhotos, evt.clientX, evt.clientY);
+            }
           } else if (clusterSize === 1) {
             const f = clusterFeatures[0];
             const photo: PhotoItem = {

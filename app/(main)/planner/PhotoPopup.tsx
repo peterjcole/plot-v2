@@ -1,6 +1,7 @@
 'use client';
 
-import { X, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import type { PhotoItem } from '@/lib/types';
 
@@ -80,15 +81,12 @@ export default function PhotoPopup({ photo, screenX, screenY, onClose }: PhotoPo
           {photo.activityDistance != null && ` · ${formatDistance(photo.activityDistance)}`}
         </p>
         <div className="mt-2">
-          <a
-            href={`https://www.strava.com/activities/${photo.activityId}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/activity/${photo.activityId}`}
             className="flex items-center gap-1 text-xs text-accent hover:underline"
           >
-            <ExternalLink size={12} />
-            Open activity
-          </a>
+            Open activity →
+          </Link>
         </div>
       </div>
     </div>

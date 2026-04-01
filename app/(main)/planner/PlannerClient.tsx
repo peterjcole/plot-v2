@@ -18,6 +18,7 @@ import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
 import HeatmapActivityPopup from './HeatmapActivityPopup';
 import PhotoPopup from './PhotoPopup';
+import ClusterPhotosPopup from './ClusterPhotosPopup';
 import { Waypoint, HeatmapActivity, PhotoItem } from '@/lib/types';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
@@ -85,6 +86,7 @@ export default function PlannerClient() {
   const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
   const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
   const [photoPopup, setPhotoPopup] = useState<{ photo: PhotoItem; screenX: number; screenY: number } | null>(null);
+  const [clusterPhotosPopup, setClusterPhotosPopup] = useState<{ photos: PhotoItem[]; screenX: number; screenY: number } | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -297,8 +299,16 @@ export default function PlannerClient() {
     }
   }, [activityPopup]);
 
+  const handleClusterPhotosClick = useCallback((photos: PhotoItem[], screenX: number, screenY: number) => {
+    setActivityPopup(null);
+    setPhotoPopup(null);
+    setHoveredActivityRoute(null);
+    setClusterPhotosPopup({ photos, screenX, screenY });
+  }, []);
+
   const handlePhotoClick = useCallback(async (photo: PhotoItem, screenX: number, screenY: number) => {
     setActivityPopup(null);
+    setClusterPhotosPopup(null);
     setHoveredActivityRoute(null);
     setPhotoPopup({ photo, screenX, screenY });
     // Highlight the route immediately using the photo's coordinates
@@ -408,6 +418,7 @@ export default function PlannerClient() {
         poisEnabled={poisEnabled}
         photosEnabled={photosEnabled}
         onPhotoClick={handlePhotoClick}
+        onClusterPhotosClick={handleClusterPhotosClick}
       />
       {activityPopup && (
         <HeatmapActivityPopup
@@ -425,6 +436,18 @@ export default function PlannerClient() {
           screenX={photoPopup.screenX}
           screenY={photoPopup.screenY}
           onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
+        />
+      )}
+      {clusterPhotosPopup && (
+        <ClusterPhotosPopup
+          photos={clusterPhotosPopup.photos}
+          screenX={clusterPhotosPopup.screenX}
+          screenY={clusterPhotosPopup.screenY}
+          onClose={() => setClusterPhotosPopup(null)}
+          onPhotoSelect={(photo, sx, sy) => {
+            setClusterPhotosPopup(null);
+            handlePhotoClick(photo, sx, sy);
+          }}
         />
       )}
       {/* Logo panel — desktop only */}
