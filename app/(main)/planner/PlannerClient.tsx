@@ -315,9 +315,10 @@ export default function PlannerClient() {
     try {
       const res = await fetch(`/api/tiles/activities?lat=${photo.lat}&lng=${photo.lng}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.length > 0) {
-          setHoveredActivityRoute(data[0].route);
+        const data = await res.json() as { id: number; route: [number, number][] }[];
+        const match = data.find((a) => a.id === photo.activityId) ?? data[0];
+        if (match) {
+          setHoveredActivityRoute(match.route);
           setHoveredActivityColor(null);
         }
       }
