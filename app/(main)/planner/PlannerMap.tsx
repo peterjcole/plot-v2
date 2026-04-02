@@ -1382,11 +1382,12 @@ export default function PlannerMap({
           const evt = e.originalEvent as MouseEvent;
           if (clusterSize > 1) {
             const currentZoom = map.getView().getZoom() ?? 0;
+            const maxZoom = map.getView().getMaxZoom() ?? 12;
             const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
-            if (currentZoom < 18) {
+            if (currentZoom < maxZoom) {
               map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
             } else {
-              // Too zoomed in to de-cluster — open cluster popup
+              // Already at max zoom — open cluster popup
               const clusterPhotos: PhotoItem[] = clusterFeatures.map((f) => ({
                 photoId: f.get('photoId'),
                 url: f.get('url'),
