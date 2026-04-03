@@ -37,34 +37,35 @@ export default function StatusBar({ avatarInitials = '?' }: StatusBarProps) {
       <div style={{ flex: 1 }} />
 
       {/* Sync indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
         <span
           style={{
             width: 6,
             height: 6,
             borderRadius: '50%',
             background: 'var(--grn)',
-            boxShadow: '0 0 4px var(--grn)',
-            display: 'block',
+            boxShadow: '0 0 5px var(--grn)',
+            display: 'inline-block',
+            flexShrink: 0,
           }}
         />
-        <span style={{ fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>synced</span>
+        <span style={{ fontSize: 10, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.02em' }}>synced</span>
       </div>
 
       {/* Avatar */}
       <div
         style={{
-          width: 18,
-          height: 18,
+          width: 20,
+          height: 20,
           borderRadius: '50%',
-          background: 'var(--p3)',
-          border: '1px solid var(--p4)',
+          background: 'var(--ora)',
+          flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: 9,
-          fontWeight: 600,
-          color: 'var(--fog)',
+          fontWeight: 700,
+          color: '#fff',
           fontFamily: 'var(--mono)',
           letterSpacing: 0,
         }}
