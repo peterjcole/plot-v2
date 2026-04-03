@@ -26,6 +26,8 @@ import { Waypoint, RouteSegment, PhotoItem } from '@/lib/types';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
+const CLUSTER_ZOOM_THRESHOLD = 8;
+
 interface PlannerMapProps {
   waypoints: Waypoint[];
   segments: RouteSegment[];
@@ -658,7 +660,6 @@ export default function PlannerMap({
   // Fetch photos on viewport change — server-side clusters at low zoom, individual photos at high zoom
   useEffect(() => {
     if (!map || !photosEnabled) return;
-    const CLUSTER_ZOOM_THRESHOLD = 8;
     let debounceTimer: ReturnType<typeof setTimeout>;
     let isCancelled = false;
 
@@ -674,13 +675,17 @@ export default function PlannerMap({
       if (zoom < CLUSTER_ZOOM_THRESHOLD) {
         const res = await fetch(`/api/photos/clusters?zoom=${Math.floor(zoom)}&minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
         if (!res.ok || isCancelled) return;
-        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string }> };
+        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string; minLat: number; maxLat: number; minLng: number; maxLng: number }> };
         if (isCancelled) return;
         const features = data.clusters.map((c) => {
           const f = new Feature({ geometry: new Point(fromLonLat([c.lng, c.lat], OS_PROJECTION.code)) });
           f.set('serverCluster', true);
           f.set('photoCount', c.photoCount);
           f.set('url', c.url);
+          f.set('minLat', c.minLat);
+          f.set('maxLat', c.maxLat);
+          f.set('minLng', c.minLng);
+          f.set('maxLng', c.maxLng);
           return f;
         });
         photosSourceRef.current?.addFeatures(features);
@@ -1398,13 +1403,54 @@ export default function PlannerMap({
           const clusterFeatures = (photoClusterFeature.get('features') as Feature[]) ?? [];
           const clusterSize = clusterFeatures.length;
           const evt = e.originalEvent as MouseEvent;
+
+          // Zoom to fit all photos in a server-side cluster by using the cluster's bounding box.
+          // Falls back to zoom+2 if bounds are missing (e.g. stale cached response).
+          // If all photos are within ~111m (point cluster), jumps directly past CLUSTER_ZOOM_THRESHOLD.
+          const fitToServerClusters = (serverFeatures: Feature[]) => {
+            const POINT_SPAN_THRESHOLD = 0.001;
+            let aggMinLat = Infinity, aggMaxLat = -Infinity;
+            let aggMinLng = Infinity, aggMaxLng = -Infinity;
+            for (const sf of serverFeatures) {
+              const sfMinLat = sf.get('minLat') as number;
+              const sfMaxLat = sf.get('maxLat') as number;
+              const sfMinLng = sf.get('minLng') as number;
+              const sfMaxLng = sf.get('maxLng') as number;
+              if (typeof sfMinLat === 'number') {
+                aggMinLat = Math.min(aggMinLat, sfMinLat);
+                aggMaxLat = Math.max(aggMaxLat, sfMaxLat);
+                aggMinLng = Math.min(aggMinLng, sfMinLng);
+                aggMaxLng = Math.max(aggMaxLng, sfMaxLng);
+              }
+            }
+            if (!isFinite(aggMinLat)) {
+              // Bounds missing — fall back to simple zoom+2
+              const currentZoom = map.getView().getZoom() ?? 0;
+              const center = (serverFeatures[0].getGeometry() as Point).getCoordinates();
+              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+              return;
+            }
+            const latSpan = aggMaxLat - aggMinLat;
+            const lngSpan = aggMaxLng - aggMinLng;
+            if (latSpan < POINT_SPAN_THRESHOLD && lngSpan < POINT_SPAN_THRESHOLD) {
+              // All photos at essentially the same location — jump past threshold to load individual photos
+              const center = fromLonLat([(aggMinLng + aggMaxLng) / 2, (aggMinLat + aggMaxLat) / 2], OS_PROJECTION.code);
+              map.getView().animate({ center, zoom: CLUSTER_ZOOM_THRESHOLD + 1, duration: 300 });
+            } else {
+              const extent = transformExtent([aggMinLng, aggMinLat, aggMaxLng, aggMaxLat], 'EPSG:4326', OS_PROJECTION.code);
+              map.getView().fit(extent, { padding: [80, 80, 80, 80], duration: 300 });
+            }
+          };
+
           if (clusterSize > 1) {
             const currentZoom = map.getView().getZoom() ?? 0;
             const maxZoom = map.getView().getMaxZoom() ?? 12;
             const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
             const hasServerCluster = clusterFeatures.some((f) => f.get('serverCluster'));
-            if (hasServerCluster || currentZoom < maxZoom) {
-              // Server-side clusters always zoom in; OL-merged individual photos zoom in unless at max
+            if (hasServerCluster) {
+              fitToServerClusters(clusterFeatures.filter((f) => f.get('serverCluster')));
+            } else if (currentZoom < maxZoom) {
+              // OL-merged individual photos — zoom in until max zoom
               map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
             } else {
               // OL-merged individual photos at max zoom — open cluster popup
@@ -1424,10 +1470,7 @@ export default function PlannerMap({
           } else if (clusterSize === 1) {
             const f = clusterFeatures[0];
             if (f.get('serverCluster')) {
-              // Single server-side cluster — zoom in to reveal individual photos
-              const currentZoom = map.getView().getZoom() ?? 0;
-              const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
-              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+              fitToServerClusters([f]);
             } else {
               const photo: PhotoItem = {
                 photoId: f.get('photoId'),
