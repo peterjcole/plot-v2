@@ -582,7 +582,30 @@ export default function PlannerMap({
         const first = features[0];
         if (!first) return new Style();
 
+        // Server-side cluster (or OL-merged set of server-side clusters): show stacked icon
+        if (first.get('serverCluster')) {
+          const count = size === 1
+            ? (first.get('photoCount') as number)
+            : features.reduce((s, f) => s + ((f.get('photoCount') as number) || 1), 0);
+          const topPhotoUrl = first.get('url') as string;
+          const topProxyUrl = `/api/photos/proxy?url=${encodeURIComponent(topPhotoUrl)}`;
+          const topCached = thumbnailCache[topProxyUrl];
+          if (topCached) {
+            const clusterCanvas = makeClusterCanvas(count, topCached);
+            return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
+          }
+          if (topCached === undefined) loadThumbnail(topProxyUrl);
+          return new Style({
+            image: new CircleStyle({
+              radius: 19,
+              fill: new Fill({ color: 'rgba(20,20,20,0.85)' }),
+              stroke: new Stroke({ color: 'white', width: 2 }),
+            }),
+          });
+        }
+
         if (size === 1) {
+          // Individual photo thumbnail
           const photoUrl = first.get('url') as string;
           const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(photoUrl)}`;
           const cached = thumbnailCache[proxyUrl];
@@ -592,7 +615,6 @@ export default function PlannerMap({
           if (cached === undefined) {
             loadThumbnail(proxyUrl);
           }
-          // Placeholder while loading
           return new Style({
             image: new CircleStyle({
               radius: 14,
@@ -602,8 +624,7 @@ export default function PlannerMap({
           });
         }
 
-        // Cluster — stacked photos with count badge
-        // Use top (first/most-recent) photo as thumbnail
+        // OL-merged individual photos — stacked icon with count
         const topPhotoUrl = first.get('url') as string;
         const topProxyUrl = `/api/photos/proxy?url=${encodeURIComponent(topPhotoUrl)}`;
         const topCached = thumbnailCache[topProxyUrl];
@@ -611,10 +632,7 @@ export default function PlannerMap({
           const clusterCanvas = makeClusterCanvas(size, topCached);
           return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
         }
-        if (topCached === undefined) {
-          loadThumbnail(topProxyUrl);
-        }
-        // Placeholder while loading
+        if (topCached === undefined) loadThumbnail(topProxyUrl);
         return new Style({
           image: new CircleStyle({
             radius: 19,
@@ -637,25 +655,36 @@ export default function PlannerMap({
     };
   }, [map, photosEnabled]);
 
-  // Fetch photos from API on viewport change
+  // Fetch photos on viewport change — server-side clusters at low zoom, individual photos at high zoom
   useEffect(() => {
     if (!map || !photosEnabled) return;
-
+    const CLUSTER_ZOOM_THRESHOLD = 8;
     let debounceTimer: ReturnType<typeof setTimeout>;
     let isCancelled = false;
 
     const fetchPhotos = async () => {
       const view = map.getView();
       const zoom = view.getZoom() ?? 0;
-      if (zoom < 5) {
-        photosSourceRef.current?.clear();
-        return;
-      }
       const size = map.getSize();
       if (!size) return;
       const extent = view.calculateExtent(size);
       const [minLng, minLat, maxLng, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
-      try {
+      photosSourceRef.current?.clear();
+
+      if (zoom < CLUSTER_ZOOM_THRESHOLD) {
+        const res = await fetch(`/api/photos/clusters?zoom=${Math.floor(zoom)}&minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
+        if (!res.ok || isCancelled) return;
+        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string }> };
+        if (isCancelled) return;
+        const features = data.clusters.map((c) => {
+          const f = new Feature({ geometry: new Point(fromLonLat([c.lng, c.lat], OS_PROJECTION.code)) });
+          f.set('serverCluster', true);
+          f.set('photoCount', c.photoCount);
+          f.set('url', c.url);
+          return f;
+        });
+        photosSourceRef.current?.addFeatures(features);
+      } else {
         const res = await fetch(`/api/photos?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&limit=300`);
         if (!res.ok || isCancelled) return;
         const data = await res.json() as { photos: PhotoItem[] };
@@ -673,25 +702,14 @@ export default function PlannerMap({
           f.set('sportType', p.sportType);
           return f;
         });
-        photosSourceRef.current?.clear();
         photosSourceRef.current?.addFeatures(features);
-      } catch { /* silently fail */ }
+      }
     };
 
-    const onMoveEnd = () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(fetchPhotos, 400);
-    };
-
+    const onMoveEnd = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchPhotos, 400); };
     const key = map.on('moveend', onMoveEnd);
     fetchPhotos();
-
-    return () => {
-      isCancelled = true;
-      unByKey(key);
-      clearTimeout(debounceTimer);
-      photosSourceRef.current?.clear();
-    };
+    return () => { isCancelled = true; unByKey(key); clearTimeout(debounceTimer); photosSourceRef.current?.clear(); };
   }, [map, photosEnabled]);
 
   // Manage hillshade tile layer
@@ -1384,10 +1402,12 @@ export default function PlannerMap({
             const currentZoom = map.getView().getZoom() ?? 0;
             const maxZoom = map.getView().getMaxZoom() ?? 12;
             const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
-            if (currentZoom < maxZoom) {
+            const hasServerCluster = clusterFeatures.some((f) => f.get('serverCluster'));
+            if (hasServerCluster || currentZoom < maxZoom) {
+              // Server-side clusters always zoom in; OL-merged individual photos zoom in unless at max
               map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
             } else {
-              // Already at max zoom — open cluster popup
+              // OL-merged individual photos at max zoom — open cluster popup
               const clusterPhotos: PhotoItem[] = clusterFeatures.map((f) => ({
                 photoId: f.get('photoId'),
                 url: f.get('url'),
@@ -1403,18 +1423,25 @@ export default function PlannerMap({
             }
           } else if (clusterSize === 1) {
             const f = clusterFeatures[0];
-            const photo: PhotoItem = {
-              photoId: f.get('photoId'),
-              url: f.get('url'),
-              lat: f.get('lat'),
-              lng: f.get('lng'),
-              activityId: f.get('activityId'),
-              activityName: f.get('activityName'),
-              activityDate: f.get('activityDate'),
-              activityDistance: f.get('activityDistance'),
-              sportType: f.get('sportType'),
-            };
-            onPhotoClickRef.current?.(photo, evt.clientX, evt.clientY);
+            if (f.get('serverCluster')) {
+              // Single server-side cluster — zoom in to reveal individual photos
+              const currentZoom = map.getView().getZoom() ?? 0;
+              const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
+              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+            } else {
+              const photo: PhotoItem = {
+                photoId: f.get('photoId'),
+                url: f.get('url'),
+                lat: f.get('lat'),
+                lng: f.get('lng'),
+                activityId: f.get('activityId'),
+                activityName: f.get('activityName'),
+                activityDate: f.get('activityDate'),
+                activityDistance: f.get('activityDistance'),
+                sportType: f.get('sportType'),
+              };
+              onPhotoClickRef.current?.(photo, evt.clientX, evt.clientY);
+            }
           }
           hideDeletePopup();
           hideInsertPopup();
