@@ -675,17 +675,17 @@ export default function PlannerMap({
       if (zoom < CLUSTER_ZOOM_THRESHOLD) {
         const res = await fetch(`/api/photos/clusters?zoom=${Math.floor(zoom)}&minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
         if (!res.ok || isCancelled) return;
-        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string; minLat: number; maxLat: number; minLng: number; maxLng: number }> };
+        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string; cellMinLat: number; cellMaxLat: number; cellMinLng: number; cellMaxLng: number }> };
         if (isCancelled) return;
         const features = data.clusters.map((c) => {
           const f = new Feature({ geometry: new Point(fromLonLat([c.lng, c.lat], OS_PROJECTION.code)) });
           f.set('serverCluster', true);
           f.set('photoCount', c.photoCount);
           f.set('url', c.url);
-          f.set('minLat', c.minLat);
-          f.set('maxLat', c.maxLat);
-          f.set('minLng', c.minLng);
-          f.set('maxLng', c.maxLng);
+          f.set('cellMinLat', c.cellMinLat);
+          f.set('cellMaxLat', c.cellMaxLat);
+          f.set('cellMinLng', c.cellMinLng);
+          f.set('cellMaxLng', c.cellMaxLng);
           return f;
         });
         photosSourceRef.current?.addFeatures(features);
@@ -1404,53 +1404,33 @@ export default function PlannerMap({
           const clusterSize = clusterFeatures.length;
           const evt = e.originalEvent as MouseEvent;
 
-          // Zoom to fit all photos in a server-side cluster by using the cluster's bounding box.
-          // Falls back to zoom+2 if bounds are missing (e.g. stale cached response).
-          // If all photos are within ~111m (point cluster), jumps directly past CLUSTER_ZOOM_THRESHOLD.
+          // Zoom to fit the grid cell(s) of the clicked server cluster(s).
+          // Cell bounds are stable and deterministic — fitting to them ensures all photos
+          // in the cluster are within the new viewport, so sub-clusters appear with correct counts.
           const fitToServerClusters = (serverFeatures: Feature[]) => {
-            const POINT_SPAN_THRESHOLD = 0.001;
-            let aggMinLat = Infinity, aggMaxLat = -Infinity;
-            let aggMinLng = Infinity, aggMaxLng = -Infinity;
+            let cellMinLat = Infinity, cellMaxLat = -Infinity;
+            let cellMinLng = Infinity, cellMaxLng = -Infinity;
             for (const sf of serverFeatures) {
-              const sfMinLat = sf.get('minLat') as number;
-              const sfMaxLat = sf.get('maxLat') as number;
-              const sfMinLng = sf.get('minLng') as number;
-              const sfMaxLng = sf.get('maxLng') as number;
-              if (typeof sfMinLat === 'number') {
-                aggMinLat = Math.min(aggMinLat, sfMinLat);
-                aggMaxLat = Math.max(aggMaxLat, sfMaxLat);
-                aggMinLng = Math.min(aggMinLng, sfMinLng);
-                aggMaxLng = Math.max(aggMaxLng, sfMaxLng);
+              const sMinLat = sf.get('cellMinLat') as number;
+              const sMaxLat = sf.get('cellMaxLat') as number;
+              const sMinLng = sf.get('cellMinLng') as number;
+              const sMaxLng = sf.get('cellMaxLng') as number;
+              if (typeof sMinLat === 'number') {
+                cellMinLat = Math.min(cellMinLat, sMinLat);
+                cellMaxLat = Math.max(cellMaxLat, sMaxLat);
+                cellMinLng = Math.min(cellMinLng, sMinLng);
+                cellMaxLng = Math.max(cellMaxLng, sMaxLng);
               }
             }
-            if (!isFinite(aggMinLat)) {
-              // Bounds missing — fall back to simple zoom+2
+            if (!isFinite(cellMinLat)) {
+              // Cell bounds missing (stale cache) — fall back to zoom+2
               const currentZoom = map.getView().getZoom() ?? 0;
               const center = (serverFeatures[0].getGeometry() as Point).getCoordinates();
               map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
               return;
             }
-            const center = fromLonLat([(aggMinLng + aggMaxLng) / 2, (aggMinLat + aggMaxLat) / 2], OS_PROJECTION.code);
-            const latSpan = aggMaxLat - aggMinLat;
-            const lngSpan = aggMaxLng - aggMinLng;
-            if (latSpan < POINT_SPAN_THRESHOLD && lngSpan < POINT_SPAN_THRESHOLD) {
-              // All photos at essentially the same location — jump past threshold to load individual photos
-              map.getView().animate({ center, zoom: CLUSTER_ZOOM_THRESHOLD + 1, duration: 300 });
-            } else {
-              // Only use fit() if it would actually zoom IN — otherwise zoom+2 toward cluster center.
-              // fit() zooms out for extents larger than the current viewport, which feels broken.
-              const extent = transformExtent([aggMinLng, aggMinLat, aggMaxLng, aggMaxLat], 'EPSG:4326', OS_PROJECTION.code);
-              const currentZoom = map.getView().getZoom() ?? 0;
-              const mapSize = map.getSize();
-              const paddedSize = mapSize ? [mapSize[0] - 160, mapSize[1] - 160] as [number, number] : null;
-              const fitRes = paddedSize ? map.getView().getResolutionForExtent(extent, paddedSize) : null;
-              const fitZoom = fitRes ? (map.getView().getZoomForResolution(fitRes) ?? 0) : 0;
-              if (fitZoom >= currentZoom + 1) {
-                map.getView().fit(extent, { padding: [80, 80, 80, 80], duration: 300 });
-              } else {
-                map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
-              }
-            }
+            const extent = transformExtent([cellMinLng, cellMinLat, cellMaxLng, cellMaxLat], 'EPSG:4326', OS_PROJECTION.code);
+            map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 300 });
           };
 
           if (clusterSize > 1) {
