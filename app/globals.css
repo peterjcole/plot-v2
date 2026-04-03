@@ -1,85 +1,52 @@
 @import "tailwindcss";
 
-/* ===== Light Mode Tokens ===== */
-/* Inspired by Ordnance Survey maps: footpath green (#01A751) and contour orange (#F78F47) */
+/* ===== Design Tokens ===== */
 :root {
-  --background: #FFF8EC;
-  --foreground: #1C1814;
+  /* Background scale */
+  --p0: #070E14;
+  --p1: #0E2830;
+  --p2: #163840;
+  --p3: #1E4858;
+  --p4: #2A5860;
 
-  --surface: #FFF8EC;
-  --surface-raised: #FFFFFF;
-  --surface-muted: #F5E2C6;
+  /* Activity type / accent colours */
+  --ora: #E07020;
+  --grn: #40B060;
+  --blu: #4080C0;
 
-  --border: #E8CCA8;
-  --border-strong: #D4B696;
+  /* Text */
+  --ice: #F0F8FA;
+  --fog: rgba(240, 248, 250, 0.72);
+  --fog-dim: rgba(240, 248, 250, 0.45);
+  --fog-ghost: rgba(240, 248, 250, 0.08);
 
-  --text-primary: #1C1814;
-  --text-secondary: #4D463D;
-  --text-tertiary: #7A7168;
+  /* Layout */
+  --panel-w: 300px;
 
-  --primary: #4A5A2B;
-  --primary-light: #6B7F3F;
-  --primary-lighter: #8FA45A;
-  --primary-dark: #3A4722;
-
-  --accent: #D4872B;
-  --accent-light: #E09B45;
-}
-
-/* ===== Dark Mode Tokens ===== */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #1C1008;
-    --foreground: #F0ECE6;
-
-    --surface: #1C1008;
-    --surface-raised: #2A1810;
-    --surface-muted: #382414;
-
-    --border: #4A3420;
-    --border-strong: #604830;
-
-    --text-primary: #F0ECE6;
-    --text-secondary: #C0B8AC;
-    --text-tertiary: #8E857A;
-
-    --primary: #A3B86E;
-    --primary-light: #B8CC83;
-    --primary-lighter: #CDDF9C;
-    --primary-dark: #8FA45A;
-
-    --accent: #E09B45;
-    --accent-light: #EBAF62;
-  }
+  /* Fonts */
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Ribeye Marrow', serif;
 }
 
 /* ===== Tailwind Theme Integration ===== */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-muted: var(--surface-muted);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-tertiary: var(--text-tertiary);
-  --color-primary: var(--primary);
-  --color-primary-light: var(--primary-light);
-  --color-primary-lighter: var(--primary-lighter);
-  --color-primary-dark: var(--primary-dark);
-  --color-accent: var(--accent);
-  --color-accent-light: var(--accent-light);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-p0: var(--p0);
+  --color-p1: var(--p1);
+  --color-p2: var(--p2);
+  --color-p3: var(--p3);
+  --color-p4: var(--p4);
+  --color-ora: var(--ora);
+  --color-grn: var(--grn);
+  --color-blu: var(--blu);
+  --color-ice: var(--ice);
+  --font-mono: var(--font-ibm-plex-mono);
   --font-logo: var(--font-ribeye-marrow);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--p0);
+  color: var(--ice);
+  font-family: var(--mono);
 }
 
 /* Pin map rendering to light mode so dark mode never affects route line, pins, or overlay */
@@ -182,7 +149,7 @@ body {
   border: none;
   border-radius: 6px;
   background: #dcfce7;
-  color: var(--primary-dark, #3A4722);
+  color: #3A4722;
   cursor: pointer;
   transition: background 0.15s;
 }

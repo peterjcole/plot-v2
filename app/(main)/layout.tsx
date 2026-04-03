@@ -1,17 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Ribeye_Marrow } from "next/font/google";
+import { IBM_Plex_Mono, Ribeye_Marrow } from "next/font/google";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
 import "../globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: "--font-ibm-plex-mono",
 });
 
 const ribeyeMarrow = Ribeye_Marrow({
@@ -41,7 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${ribeyeMarrow.variable} antialiased`}
+        className={`${ibmPlexMono.variable} ${ribeyeMarrow.variable} antialiased`}
       >
         {children}
         <Analytics />
