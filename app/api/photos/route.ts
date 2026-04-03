@@ -15,27 +15,20 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const minLat = searchParams.get('minLat');
-  const maxLat = searchParams.get('maxLat');
-  const minLng = searchParams.get('minLng');
-  const maxLng = searchParams.get('maxLng');
-  const limit = searchParams.get('limit') ?? '300';
-
-  if (!minLat || !maxLat || !minLng || !maxLng) {
-    return NextResponse.json({ error: 'minLat, maxLat, minLng, maxLng required' }, { status: 400 });
-  }
+  // Forward all provided query params to the backend unchanged.
+  // When no bbox params are given the backend returns all photos (for client-side clustering).
+  const backendUrl = new URL(`${tilesBackendUrl}/photos`);
+  new URL(request.url).searchParams.forEach((value, key) => {
+    backendUrl.searchParams.set(key, value);
+  });
 
   try {
-    const res = await fetch(
-      `${tilesBackendUrl}/photos?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&limit=${limit}`,
-      {
-        headers: {
-          Authorization: `Bearer ${tilesBearerToken}`,
-          'X-Athlete-Id': tilesAthleteId,
-        },
+    const res = await fetch(backendUrl.toString(), {
+      headers: {
+        Authorization: `Bearer ${tilesBearerToken}`,
+        'X-Athlete-Id': tilesAthleteId,
       },
-    );
+    });
 
     if (!res.ok) {
       return new NextResponse(null, { status: res.status });

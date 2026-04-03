@@ -10,7 +10,7 @@ import Polygon from 'ol/geom/Polygon';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Style, Circle as CircleStyle, Fill, Stroke, Icon, Text } from 'ol/style';
-import Cluster from 'ol/source/Cluster';
+import Supercluster from 'supercluster';
 import { DragPan, Modify } from 'ol/interaction';
 import { fromLonLat, toLonLat, transformExtent } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
@@ -26,7 +26,6 @@ import { Waypoint, RouteSegment, PhotoItem } from '@/lib/types';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
-const CLUSTER_ZOOM_THRESHOLD = 11;
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
@@ -241,8 +240,9 @@ export default function PlannerMap({
   const poisLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const poisSourceRef = useRef<VectorSource | null>(null);
   const poisPopupOverlayRef = useRef<Overlay | null>(null);
-  const photosLayerRef = useRef<VectorLayer<Cluster> | null>(null);
+  const photosLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const photosSourceRef = useRef<VectorSource | null>(null);
+  const superclusterRef = useRef<Supercluster | null>(null);
   const personalHeatmapEnabledRef = useRef(personalHeatmapEnabled);
   const photosEnabledRef = useRef(photosEnabled);
   const onHeatmapClickRef = useRef(onHeatmapClick);
@@ -485,22 +485,22 @@ export default function PlannerMap({
     };
   }, [map, poisEnabled]);
 
-  // Manage photo cluster layer
+  // Photo layer: load all photos once, cluster client-side with supercluster (no viewport fetches → no flicker)
   useEffect(() => {
     if (!map) return;
+    const m = map;
     if (photosLayerRef.current) {
-      map.removeLayer(photosLayerRef.current);
+      m.removeLayer(photosLayerRef.current);
       photosLayerRef.current = null;
       photosSourceRef.current = null;
     }
+    superclusterRef.current = null;
     if (!photosEnabled) return;
 
     const source = new VectorSource();
-    const clusterSource = new Cluster({ source, distance: 20 });
     const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
 
     // Load a URL into thumbnailCache as a 40×40 circular-clipped canvas with a white ring.
-    // Calls clusterSource.changed() once loaded so the style re-evaluates.
     function loadThumbnail(proxyUrl: string) {
       thumbnailCache[proxyUrl] = null;
       const img = new window.Image();
@@ -518,36 +518,29 @@ export default function PlannerMap({
         ctx.lineWidth = 2.5;
         ctx.stroke();
         thumbnailCache[proxyUrl] = c;
-        clusterSource.changed();
+        source.changed(); // trigger re-render once thumbnail is ready
       };
       img.onerror = () => { thumbnailCache[proxyUrl] = null; };
       img.src = proxyUrl;
     }
 
-    // Draw the stacked-photos cluster icon: shadow circles behind + top photo circle (with ring
-    // already baked in) + count badge
+    // Draw the stacked-photos cluster icon: shadow circles behind + top photo circle + count badge
     function makeClusterCanvas(count: number, topPhotoCanvas: HTMLCanvasElement): HTMLCanvasElement {
-      const SIZE = 52; // total canvas size (extra room for shadow offset + badge)
-      const PHOTO_R = 19; // radius of the photo circle
-      const cx = 22; // centre-x of top photo circle
-      const cy = 22; // centre-y of top photo circle
+      const SIZE = 52;
+      const PHOTO_R = 19;
+      const cx = 22;
+      const cy = 22;
       const canvas = document.createElement('canvas');
       canvas.width = SIZE;
       canvas.height = SIZE;
       const ctx = canvas.getContext('2d')!;
-
-      // Draw 2 stacked shadow circles offset to bottom-right
       for (let i = 2; i >= 1; i--) {
         ctx.beginPath();
         ctx.arc(cx + i * 3, cy + i * 3, PHOTO_R, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(0,0,0,${0.18 * i})`;
         ctx.fill();
       }
-
-      // Draw top photo thumbnail (already circular with white ring baked in)
       ctx.drawImage(topPhotoCanvas, cx - PHOTO_R, cy - PHOTO_R, PHOTO_R * 2, PHOTO_R * 2);
-
-      // Count badge — pill bottom-right
       const label = String(count);
       const fontSize = 11;
       const tmp = document.createElement('canvas').getContext('2d')!;
@@ -572,31 +565,23 @@ export default function PlannerMap({
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, bx + bw / 2, by + bh / 2);
-
       return canvas;
     }
 
     const layer = new VectorLayer({
-      source: clusterSource,
+      source,
       style: (feature) => {
-        const features = (feature.get('features') as Feature[]) ?? [];
-        const size = features.length;
-        const first = features[0];
-        if (!first) return new Style();
+        const url = feature.get('url') as string;
+        const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(url)}`;
 
-        // Server-side cluster (or OL-merged set of server-side clusters): show stacked icon
-        if (first.get('serverCluster')) {
-          const count = size === 1
-            ? (first.get('photoCount') as number)
-            : features.reduce((s, f) => s + ((f.get('photoCount') as number) || 1), 0);
-          const topPhotoUrl = first.get('url') as string;
-          const topProxyUrl = `/api/photos/proxy?url=${encodeURIComponent(topPhotoUrl)}`;
-          const topCached = thumbnailCache[topProxyUrl];
-          if (topCached) {
-            const clusterCanvas = makeClusterCanvas(count, topCached);
+        if (feature.get('isCluster')) {
+          const count = feature.get('pointCount') as number;
+          const cached = thumbnailCache[proxyUrl];
+          if (cached) {
+            const clusterCanvas = makeClusterCanvas(count, cached);
             return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
           }
-          if (topCached === undefined) loadThumbnail(topProxyUrl);
+          if (cached === undefined) loadThumbnail(proxyUrl);
           return new Style({
             image: new CircleStyle({
               radius: 19,
@@ -606,98 +591,66 @@ export default function PlannerMap({
           });
         }
 
-        if (size === 1) {
-          // Individual photo thumbnail
-          const photoUrl = first.get('url') as string;
-          const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(photoUrl)}`;
-          const cached = thumbnailCache[proxyUrl];
-          if (cached) {
-            return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
-          }
-          if (cached === undefined) {
-            loadThumbnail(proxyUrl);
-          }
-          return new Style({
-            image: new CircleStyle({
-              radius: 14,
-              fill: new Fill({ color: 'rgba(74,90,43,0.82)' }),
-              stroke: new Stroke({ color: 'rgba(58,71,34,0.9)', width: 2 }),
-            }),
-          });
+        // Individual photo
+        const cached = thumbnailCache[proxyUrl];
+        if (cached) {
+          return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
         }
-
-        // OL-merged individual photos — stacked icon with count
-        const topPhotoUrl = first.get('url') as string;
-        const topProxyUrl = `/api/photos/proxy?url=${encodeURIComponent(topPhotoUrl)}`;
-        const topCached = thumbnailCache[topProxyUrl];
-        if (topCached) {
-          const clusterCanvas = makeClusterCanvas(size, topCached);
-          return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
-        }
-        if (topCached === undefined) loadThumbnail(topProxyUrl);
+        if (cached === undefined) loadThumbnail(proxyUrl);
         return new Style({
           image: new CircleStyle({
-            radius: 19,
-            fill: new Fill({ color: 'rgba(20,20,20,0.85)' }),
-            stroke: new Stroke({ color: 'white', width: 2 }),
+            radius: 14,
+            fill: new Fill({ color: 'rgba(74,90,43,0.82)' }),
+            stroke: new Stroke({ color: 'rgba(58,71,34,0.9)', width: 2 }),
           }),
         });
       },
       zIndex: 4.8,
     });
 
-    map.addLayer(layer);
-    photosLayerRef.current = layer as VectorLayer<Cluster>;
+    m.addLayer(layer);
+    photosLayerRef.current = layer;
     photosSourceRef.current = source;
 
-    return () => {
-      map.removeLayer(layer);
-      photosLayerRef.current = null;
-      photosSourceRef.current = null;
-    };
-  }, [map, photosEnabled]);
+    // Convert the map's current resolution to an equivalent web-mercator zoom level.
+    // Needed because supercluster clusters in WM tile space but the map uses EPSG:27700.
+    function getSupercluserZoom(): number {
+      const view = m.getView();
+      const resolution = view.getResolution() ?? 1;
+      const center = view.getCenter() ?? [0, 0];
+      const [, centerLat] = toLonLat(center, OS_PROJECTION.code);
+      const centerLatRad = centerLat * Math.PI / 180;
+      const wmZoom = Math.log2(156543.03 * Math.cos(centerLatRad) / resolution);
+      return Math.max(0, Math.min(14, Math.floor(wmZoom)));
+    }
 
-  // Fetch photos on viewport change — server-side clusters at low zoom, individual photos at high zoom
-  useEffect(() => {
-    if (!map || !photosEnabled) return;
-    let debounceTimer: ReturnType<typeof setTimeout>;
-    let isCancelled = false;
-
-    const fetchPhotos = async () => {
-      const view = map.getView();
-      const zoom = view.getZoom() ?? 0;
-      const size = map.getSize();
+    // Synchronously rebuild the OL source from the supercluster index for the current viewport.
+    // clear() + addFeatures() in the same synchronous call → no intermediate blank state → no flicker.
+    function updateClusters() {
+      if (!superclusterRef.current) return;
+      const view = m.getView();
+      const size = m.getSize();
       if (!size) return;
       const extent = view.calculateExtent(size);
       const [minLng, minLat, maxLng, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
-      photosSourceRef.current?.clear();
+      const scZoom = getSupercluserZoom();
 
-      if (zoom < CLUSTER_ZOOM_THRESHOLD) {
-        const res = await fetch(`/api/photos/clusters?zoom=${Math.floor(zoom)}&minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
-        if (!res.ok || isCancelled) return;
-        const data = await res.json() as { clusters: Array<{ photoCount: number; lat: number; lng: number; url: string; cellMinLat: number; cellMaxLat: number; cellMinLng: number; cellMaxLng: number }> };
-        if (isCancelled) return;
-        const features = data.clusters.map((c) => {
-          const f = new Feature({ geometry: new Point(fromLonLat([c.lng, c.lat], OS_PROJECTION.code)) });
-          f.set('serverCluster', true);
-          f.set('photoCount', c.photoCount);
-          f.set('url', c.url);
-          f.set('cellMinLat', c.cellMinLat);
-          f.set('cellMaxLat', c.cellMaxLat);
-          f.set('cellMinLng', c.cellMinLng);
-          f.set('cellMaxLng', c.cellMaxLng);
-          return f;
-        });
-        photosSourceRef.current?.addFeatures(features);
-      } else {
-        const res = await fetch(`/api/photos?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}&limit=300`);
-        if (!res.ok || isCancelled) return;
-        const data = await res.json() as { photos: PhotoItem[] };
-        if (isCancelled) return;
-        const features = data.photos.map((p) => {
-          const f = new Feature({ geometry: new Point(fromLonLat([p.lng, p.lat], OS_PROJECTION.code)) });
-          f.set('photoId', p.photoId);
+      const clusters = superclusterRef.current.getClusters([minLng, minLat, maxLng, maxLat], scZoom);
+
+      const features = clusters.map((c) => {
+        const [lng, lat] = c.geometry.coordinates as [number, number];
+        const f = new Feature({ geometry: new Point(fromLonLat([lng, lat], OS_PROJECTION.code)) });
+        if (c.properties.cluster) {
+          const leaf = superclusterRef.current!.getLeaves(c.properties.cluster_id, 1)[0];
+          f.set('isCluster', true);
+          f.set('clusterId', c.properties.cluster_id);
+          f.set('pointCount', c.properties.point_count);
+          f.set('url', (leaf?.properties as PhotoItem | undefined)?.url ?? '');
+        } else {
+          const p = c.properties as PhotoItem;
+          f.set('isCluster', false);
           f.set('url', p.url);
+          f.set('photoId', p.photoId);
           f.set('lat', p.lat);
           f.set('lng', p.lng);
           f.set('activityId', p.activityId);
@@ -705,16 +658,41 @@ export default function PlannerMap({
           f.set('activityDate', p.activityDate);
           f.set('activityDistance', p.activityDistance);
           f.set('sportType', p.sportType);
-          return f;
-        });
-        photosSourceRef.current?.addFeatures(features);
-      }
-    };
+        }
+        return f;
+      });
 
-    const onMoveEnd = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(fetchPhotos, 400); };
-    const key = map.on('moveend', onMoveEnd);
-    fetchPhotos();
-    return () => { isCancelled = true; unByKey(key); clearTimeout(debounceTimer); photosSourceRef.current?.clear(); };
+      source.clear();
+      source.addFeatures(features);
+    }
+
+    // Load all photos once, then set up moveend to re-cluster synchronously
+    let isCancelled = false;
+    fetch('/api/photos')
+      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
+      .then((data: { photos: PhotoItem[] }) => {
+        if (isCancelled) return;
+        const index = new Supercluster({ radius: 60, maxZoom: 14 });
+        index.load(data.photos.map((p) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+          properties: p,
+        })));
+        superclusterRef.current = index;
+        updateClusters();
+      })
+      .catch(() => { /* photos unavailable — layer stays empty */ });
+
+    const moveKey = m.on('moveend', updateClusters);
+
+    return () => {
+      isCancelled = true;
+      unByKey(moveKey);
+      m.removeLayer(layer);
+      photosLayerRef.current = null;
+      photosSourceRef.current = null;
+      superclusterRef.current = null;
+    };
   }, [map, photosEnabled]);
 
   // Manage hillshade tile layer
@@ -1400,82 +1378,46 @@ export default function PlannerMap({
           hitTolerance: 10,
         });
         if (photoClusterFeature) {
-          const clusterFeatures = (photoClusterFeature.get('features') as Feature[]) ?? [];
-          const clusterSize = clusterFeatures.length;
           const evt = e.originalEvent as MouseEvent;
 
-          // Zoom to fit the grid cell(s) of the clicked server cluster(s).
-          // Cell bounds are stable and deterministic — fitting to them ensures all photos
-          // in the cluster are within the new viewport, so sub-clusters appear with correct counts.
-          const fitToServerClusters = (serverFeatures: Feature[]) => {
-            let cellMinLat = Infinity, cellMaxLat = -Infinity;
-            let cellMinLng = Infinity, cellMaxLng = -Infinity;
-            for (const sf of serverFeatures) {
-              const sMinLat = sf.get('cellMinLat') as number;
-              const sMaxLat = sf.get('cellMaxLat') as number;
-              const sMinLng = sf.get('cellMinLng') as number;
-              const sMaxLng = sf.get('cellMaxLng') as number;
-              if (typeof sMinLat === 'number') {
-                cellMinLat = Math.min(cellMinLat, sMinLat);
-                cellMaxLat = Math.max(cellMaxLat, sMaxLat);
-                cellMinLng = Math.min(cellMinLng, sMinLng);
-                cellMaxLng = Math.max(cellMaxLng, sMaxLng);
-              }
-            }
-            if (!isFinite(cellMinLat)) {
-              // Cell bounds missing (stale cache) — fall back to zoom+2
-              const currentZoom = map.getView().getZoom() ?? 0;
-              const center = (serverFeatures[0].getGeometry() as Point).getCoordinates();
-              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
-              return;
-            }
-            const extent = transformExtent([cellMinLng, cellMinLat, cellMaxLng, cellMaxLat], 'EPSG:4326', OS_PROJECTION.code);
-            map.getView().fit(extent, { padding: [60, 60, 60, 60], duration: 300 });
-          };
-
-          if (clusterSize > 1) {
-            const currentZoom = map.getView().getZoom() ?? 0;
-            const maxZoom = map.getView().getMaxZoom() ?? 12;
+          if (photoClusterFeature.get('isCluster')) {
+            const clusterId = photoClusterFeature.get('clusterId') as number;
             const center = (photoClusterFeature.getGeometry() as Point).getCoordinates();
-            const hasServerCluster = clusterFeatures.some((f) => f.get('serverCluster'));
-            if (hasServerCluster) {
-              fitToServerClusters(clusterFeatures.filter((f) => f.get('serverCluster')));
-            } else if (currentZoom < maxZoom) {
-              // OL-merged individual photos — zoom in until max zoom
-              map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+            const olZoom = map.getView().getZoom() ?? 0;
+            const maxZoom = map.getView().getMaxZoom() ?? 14;
+
+            // Recompute supercluster zoom to match what updateClusters used
+            const resolution = map.getView().getResolution() ?? 1;
+            const [, centerLat] = toLonLat(map.getView().getCenter() ?? [0, 0], OS_PROJECTION.code);
+            const centerLatRad = centerLat * Math.PI / 180;
+            const wmZoom = Math.log2(156543.03 * Math.cos(centerLatRad) / resolution);
+            const scZoom = Math.max(0, Math.min(14, Math.floor(wmZoom)));
+
+            const scExpansion = superclusterRef.current!.getClusterExpansionZoom(clusterId);
+            // Delta between SC zoom scales maps 1:1 to OL zoom levels (both are powers-of-2)
+            const targetOlZoom = Math.min(olZoom + (scExpansion - scZoom), maxZoom);
+
+            if (targetOlZoom > olZoom) {
+              map.getView().animate({ center, zoom: targetOlZoom, duration: 300 });
             } else {
-              // OL-merged individual photos at max zoom — open cluster popup
-              const clusterPhotos: PhotoItem[] = clusterFeatures.map((f) => ({
-                photoId: f.get('photoId'),
-                url: f.get('url'),
-                lat: f.get('lat'),
-                lng: f.get('lng'),
-                activityId: f.get('activityId'),
-                activityName: f.get('activityName'),
-                activityDate: f.get('activityDate'),
-                activityDistance: f.get('activityDistance'),
-                sportType: f.get('sportType'),
-              }));
+              // Can't expand further — photos at same location, show popup
+              const leaves = superclusterRef.current!.getLeaves(clusterId, Infinity);
+              const clusterPhotos: PhotoItem[] = leaves.map((l) => l.properties as PhotoItem);
               onClusterPhotosClickRef.current?.(clusterPhotos, evt.clientX, evt.clientY);
             }
-          } else if (clusterSize === 1) {
-            const f = clusterFeatures[0];
-            if (f.get('serverCluster')) {
-              fitToServerClusters([f]);
-            } else {
-              const photo: PhotoItem = {
-                photoId: f.get('photoId'),
-                url: f.get('url'),
-                lat: f.get('lat'),
-                lng: f.get('lng'),
-                activityId: f.get('activityId'),
-                activityName: f.get('activityName'),
-                activityDate: f.get('activityDate'),
-                activityDistance: f.get('activityDistance'),
-                sportType: f.get('sportType'),
-              };
-              onPhotoClickRef.current?.(photo, evt.clientX, evt.clientY);
-            }
+          } else {
+            const photo: PhotoItem = {
+              photoId: photoClusterFeature.get('photoId'),
+              url: photoClusterFeature.get('url'),
+              lat: photoClusterFeature.get('lat'),
+              lng: photoClusterFeature.get('lng'),
+              activityId: photoClusterFeature.get('activityId'),
+              activityName: photoClusterFeature.get('activityName'),
+              activityDate: photoClusterFeature.get('activityDate'),
+              activityDistance: photoClusterFeature.get('activityDistance'),
+              sportType: photoClusterFeature.get('sportType'),
+            };
+            onPhotoClickRef.current?.(photo, evt.clientX, evt.clientY);
           }
           hideDeletePopup();
           hideInsertPopup();
