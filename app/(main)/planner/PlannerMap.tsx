@@ -1445,7 +1445,7 @@ export default function PlannerMap({
               const paddedSize = mapSize ? [mapSize[0] - 160, mapSize[1] - 160] as [number, number] : null;
               const fitRes = paddedSize ? map.getView().getResolutionForExtent(extent, paddedSize) : null;
               const fitZoom = fitRes ? (map.getView().getZoomForResolution(fitRes) ?? 0) : 0;
-              if (fitZoom > currentZoom) {
+              if (fitZoom >= currentZoom + 1) {
                 map.getView().fit(extent, { padding: [80, 80, 80, 80], duration: 300 });
               } else {
                 map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
