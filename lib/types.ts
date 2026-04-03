@@ -33,6 +33,7 @@ export interface ActivitySummary {
   movingTime: number; // in seconds
   elevationGain: number; // in meters
   photoCount: number;
+  route?: [number, number][]; // [lat, lng][] decoded from summary_polyline
 }
 
 export interface HeatmapActivity {

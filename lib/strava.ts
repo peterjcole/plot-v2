@@ -70,6 +70,7 @@ export async function getAthleteActivities(
     movingTime: a.moving_time,
     elevationGain: a.total_elevation_gain,
     photoCount: a.total_photo_count ?? 0,
+    route: a.map?.summary_polyline ? decodePolyline(a.map.summary_polyline) : undefined,
   }));
 }
 

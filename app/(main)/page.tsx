@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import LeftPanel from '@/app/components/shell/LeftPanel';
-import MapArea from '@/app/components/shell/MapArea';
+import { getAthleteActivities, refreshTokenIfNeeded, StravaApiError } from '@/lib/strava';
+import MapShell from '@/app/components/shell/MapShell';
+import { ActivitySummary } from '@/lib/types';
 
 export default async function Home() {
   const session = await getSession();
@@ -13,6 +14,21 @@ export default async function Home() {
     if (isExpired && session.refreshToken) {
       redirect('/api/auth/refresh?next=/');
     }
+    if (await refreshTokenIfNeeded(session)) {
+      await session.save();
+    }
+  }
+
+  let activities: ActivitySummary[] = [];
+  if (isLoggedIn && session.accessToken) {
+    try {
+      activities = await getAthleteActivities(session.accessToken, 1, 50);
+    } catch (error) {
+      if (error instanceof StravaApiError && error.status === 401) {
+        redirect('/api/auth/logout');
+      }
+      // Non-fatal — render with empty list
+    }
   }
 
   const avatarInitials = session.athlete
@@ -20,17 +36,9 @@ export default async function Home() {
     : '?';
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: '100vh',
-        width: '100vw',
-        overflow: 'hidden',
-        background: 'var(--p0)',
-      }}
-    >
-      <LeftPanel avatarInitials={avatarInitials} />
-      <MapArea />
-    </div>
+    <MapShell
+      activities={activities}
+      avatarInitials={avatarInitials}
+    />
   );
 }

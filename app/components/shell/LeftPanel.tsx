@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import StatusBar from './StatusBar';
 
 type Tab = 'activities' | 'planner';
 
 interface LeftPanelProps {
   avatarInitials?: string;
+  activeTab?: Tab;
+  onTabChange?: (tab: Tab) => void;
   children?: React.ReactNode;
 }
 
-export default function LeftPanel({ avatarInitials, children }: LeftPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('activities');
+export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, children }: LeftPanelProps) {
 
   return (
     <div
@@ -19,7 +19,7 @@ export default function LeftPanel({ avatarInitials, children }: LeftPanelProps) 
         width: 'var(--panel-w)',
         height: '100%',
         background: 'var(--p1)',
-        borderRight: '1px solid var(--fog-ghost)',
+        borderRight: '1px solid var(--p3)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
@@ -63,7 +63,7 @@ export default function LeftPanel({ avatarInitials, children }: LeftPanelProps) 
         {(['activities', 'planner'] as Tab[]).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => onTabChange?.(tab)}
             style={{
               flex: 1,
               background: 'none',
