@@ -26,7 +26,7 @@ import { Waypoint, RouteSegment, PhotoItem } from '@/lib/types';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { DEFAULT_SPORT_COLOR, hexToRgba } from '@/lib/sport-colors';
 
-const CLUSTER_ZOOM_THRESHOLD = 8;
+const CLUSTER_ZOOM_THRESHOLD = 11;
 
 interface PlannerMapProps {
   waypoints: Waypoint[];
@@ -496,7 +496,7 @@ export default function PlannerMap({
     if (!photosEnabled) return;
 
     const source = new VectorSource();
-    const clusterSource = new Cluster({ source, distance: 40 });
+    const clusterSource = new Cluster({ source, distance: 20 });
     const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
 
     // Load a URL into thumbnailCache as a 40×40 circular-clipped canvas with a white ring.
@@ -1430,15 +1430,26 @@ export default function PlannerMap({
               map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
               return;
             }
+            const center = fromLonLat([(aggMinLng + aggMaxLng) / 2, (aggMinLat + aggMaxLat) / 2], OS_PROJECTION.code);
             const latSpan = aggMaxLat - aggMinLat;
             const lngSpan = aggMaxLng - aggMinLng;
             if (latSpan < POINT_SPAN_THRESHOLD && lngSpan < POINT_SPAN_THRESHOLD) {
               // All photos at essentially the same location — jump past threshold to load individual photos
-              const center = fromLonLat([(aggMinLng + aggMaxLng) / 2, (aggMinLat + aggMaxLat) / 2], OS_PROJECTION.code);
               map.getView().animate({ center, zoom: CLUSTER_ZOOM_THRESHOLD + 1, duration: 300 });
             } else {
+              // Only use fit() if it would actually zoom IN — otherwise zoom+2 toward cluster center.
+              // fit() zooms out for extents larger than the current viewport, which feels broken.
               const extent = transformExtent([aggMinLng, aggMinLat, aggMaxLng, aggMaxLat], 'EPSG:4326', OS_PROJECTION.code);
-              map.getView().fit(extent, { padding: [80, 80, 80, 80], duration: 300 });
+              const currentZoom = map.getView().getZoom() ?? 0;
+              const mapSize = map.getSize();
+              const paddedSize = mapSize ? [mapSize[0] - 160, mapSize[1] - 160] as [number, number] : null;
+              const fitRes = paddedSize ? map.getView().getResolutionForExtent(extent, paddedSize) : null;
+              const fitZoom = fitRes ? (map.getView().getZoomForResolution(fitRes) ?? 0) : 0;
+              if (fitZoom > currentZoom) {
+                map.getView().fit(extent, { padding: [80, 80, 80, 80], duration: 300 });
+              } else {
+                map.getView().animate({ center, zoom: currentZoom + 2, duration: 300 });
+              }
             }
           };
 
