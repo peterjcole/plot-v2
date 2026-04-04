@@ -7,6 +7,7 @@ import { type MapLayer } from '@/app/components/MainMap';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
+import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileLegend from './MobileLegend';
 import MobileBottomSheet from './MobileBottomSheet';
@@ -18,9 +19,10 @@ export type PanelMode = 'browse' | 'detail' | 'planner';
 interface MapShellProps {
   activities: ActivitySummary[];
   avatarInitials: string;
+  isLoggedIn?: boolean;
 }
 
-export default function MapShell({ activities, avatarInitials }: MapShellProps) {
+export default function MapShell({ activities, avatarInitials, isLoggedIn = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>('browse');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
@@ -76,11 +78,9 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
           onTabChange={handleTabChange}
         >
           {mode === 'browse' && (
-            <BrowsePanel
-              activities={activities}
-              selectedId={selectedId}
-              onSelectActivity={handleSelectActivity}
-            />
+            isLoggedIn
+              ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} />
+              : <UnauthPanel />
           )}
           {mode === 'detail' && (
             detailLoading || !activityDetail ? (
@@ -88,10 +88,7 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
                 {detailLoading ? 'Loading…' : 'No data'}
               </div>
             ) : (
-              <DetailPanel
-                activity={activityDetail}
-                onBack={handleBack}
-              />
+              <DetailPanel activity={activityDetail} onBack={handleBack} />
             )
           )}
           {mode === 'planner' && (
@@ -119,7 +116,7 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : 'Activities';
-  const sheetCount = mode === 'browse' ? activities.length : undefined;
+  const sheetCount = mode === 'browse' && isLoggedIn ? activities.length : undefined;
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
@@ -169,11 +166,9 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
         forceExpanded={mode === 'detail'}
       >
         {mode === 'browse' && (
-          <BrowsePanel
-            activities={activities}
-            selectedId={selectedId}
-            onSelectActivity={handleSelectActivity}
-          />
+          isLoggedIn
+            ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} />
+            : <UnauthPanel />
         )}
         {mode === 'detail' && (
           detailLoading || !activityDetail ? (
@@ -181,10 +176,7 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
               {detailLoading ? 'Loading…' : 'No data'}
             </div>
           ) : (
-            <DetailPanel
-              activity={activityDetail}
-              onBack={handleBack}
-            />
+            <DetailPanel activity={activityDetail} onBack={handleBack} />
           )
         )}
       </MobileBottomSheet>

@@ -39,6 +39,7 @@ export default async function Home() {
     <MapShell
       activities={activities}
       avatarInitials={avatarInitials}
+      isLoggedIn={isLoggedIn}
     />
   );
 }

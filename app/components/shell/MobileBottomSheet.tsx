@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const COLLAPSED_HEIGHT = 130;
-const EXPANDED_HEIGHT_VH = 72;
+const COLLAPSED = 130;
 
 interface MobileBottomSheetProps {
   title?: string;
@@ -18,20 +17,52 @@ export default function MobileBottomSheet({
   forceExpanded,
   children,
 }: MobileBottomSheetProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [snapExpanded, setSnapExpanded] = useState(520);
+  const [height, setHeight] = useState(COLLAPSED);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
-  // Auto-expand when parent forces it (e.g. detail mode)
+  // Compute expanded snap point after mount (depends on window height)
   useEffect(() => {
-    if (forceExpanded) setIsExpanded(true);
-  }, [forceExpanded]);
+    setSnapExpanded(Math.round(window.innerHeight * 0.72));
+  }, []);
 
-  const sheetHeight = isExpanded ? `${EXPANDED_HEIGHT_VH}vh` : `${COLLAPSED_HEIGHT}px`;
+  // Auto-snap to expanded when parent forces it
+  useEffect(() => {
+    if (forceExpanded) setHeight((h) => Math.max(h, snapExpanded));
+  }, [forceExpanded, snapExpanded]);
+
+  const isExpanded = height > COLLAPSED + 20;
+
+  function handleTouchStart(e: React.TouchEvent) {
+    dragRef.current = { startY: e.touches[0].clientY, startHeight: height };
+    setIsDragging(true);
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!dragRef.current) return;
+    const delta = dragRef.current.startY - e.touches[0].clientY;
+    const next = Math.max(COLLAPSED, Math.min(window.innerHeight * 0.9, dragRef.current.startHeight + delta));
+    setHeight(next);
+  }
+
+  function handleTouchEnd() {
+    if (!dragRef.current) return;
+    setIsDragging(false);
+    const mid = (COLLAPSED + snapExpanded) / 2;
+    setHeight(height >= mid ? snapExpanded : COLLAPSED);
+    dragRef.current = null;
+  }
+
+  function toggleExpand() {
+    setHeight((h) => (h > COLLAPSED + 20 ? COLLAPSED : snapExpanded));
+  }
 
   return (
     <div style={{
       position: 'fixed',
       bottom: 0, left: 0, right: 0,
-      height: sheetHeight,
+      height,
       background: 'var(--p1)',
       borderRadius: '16px 16px 0 0',
       borderTop: '1px solid var(--p3)',
@@ -39,14 +70,18 @@ export default function MobileBottomSheet({
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      transition: 'height 0.3s ease',
+      transition: isDragging ? 'none' : 'height 0.3s ease',
+      touchAction: 'none',
     }}>
-      {/* Handle */}
+      {/* Draggable handle */}
       <div
-        onClick={() => setIsExpanded((v) => !v)}
-        style={{ padding: '10px 0 6px', cursor: 'pointer', flexShrink: 0 }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={toggleExpand}
+        style={{ padding: '10px 0 6px', cursor: 'grab', flexShrink: 0, userSelect: 'none' }}
         role="button"
-        aria-label={isExpanded ? 'Collapse sheet' : 'Expand sheet'}
+        aria-label={isExpanded ? 'Collapse' : 'Expand'}
       >
         <div style={{
           width: 36, height: 4,
@@ -57,7 +92,10 @@ export default function MobileBottomSheet({
 
       {/* Sheet header (always visible) */}
       <div
-        onClick={() => !isExpanded && setIsExpanded(true)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => !isExpanded && toggleExpand()}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -65,6 +103,7 @@ export default function MobileBottomSheet({
           padding: '4px 16px 8px',
           flexShrink: 0,
           cursor: isExpanded ? 'default' : 'pointer',
+          userSelect: 'none',
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', flex: 1 }}>
@@ -76,7 +115,8 @@ export default function MobileBottomSheet({
           </span>
         )}
         <button
-          onClick={(e) => { e.stopPropagation(); setIsExpanded(true); }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); if (!isExpanded) toggleExpand(); }}
           style={{
             width: 28, height: 28, borderRadius: 4,
             border: '1px solid var(--p3)', background: 'transparent',
@@ -91,12 +131,12 @@ export default function MobileBottomSheet({
         </button>
       </div>
 
-      {/* Scrollable content — only visible when expanded */}
+      {/* Scrollable content */}
       <div style={{
         flex: 1,
-        overflow: isExpanded ? 'auto' : 'hidden',
+        overflowY: isExpanded ? 'auto' : 'hidden',
         opacity: isExpanded ? 1 : 0,
-        transition: 'opacity 0.2s ease',
+        transition: isDragging ? 'none' : 'opacity 0.2s ease',
       }}>
         {children}
       </div>
