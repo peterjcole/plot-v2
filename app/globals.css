@@ -55,6 +55,10 @@ body {
   color: #1C1814;
 }
 
+/* Suppress unused OL built-in controls */
+.ol-rotate { display: none !important; }
+.ol-zoom   { display: none !important; }
+
 /* Waypoint popup (delete + snap toggles, imperative DOM, outside React) */
 .ol-waypoint-popup {
   display: flex;

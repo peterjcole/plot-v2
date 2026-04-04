@@ -135,8 +135,6 @@ export default function MobileBottomSheet({
       <div style={{
         flex: 1,
         overflowY: isExpanded ? 'auto' : 'hidden',
-        opacity: isExpanded ? 1 : 0,
-        transition: isDragging ? 'none' : 'opacity 0.2s ease',
       }}>
         {children}
       </div>

@@ -24,7 +24,7 @@ import { ActivitySummary, ActivityPhoto } from '@/lib/types';
 import { getActivityColor } from '@/lib/activity-categories';
 import 'ol/ol.css';
 
-export type MapLayer = 'topo' | 'os' | 'satellite';
+export type MapLayer = 'topo' | 'satellite';
 
 interface MainMapProps {
   activities: ActivitySummary[];
@@ -175,12 +175,12 @@ export default function MainMap({
   // Sync tile layer visibility when baseLayer prop changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    const isTopo = baseLayer === 'topo';
-    const isOS = baseLayer === 'os';
     const isSat = baseLayer === 'satellite';
-    topoLayerRef.current?.setVisible(isTopo);
-    osOverviewLayerRef.current?.setVisible(isOS);
-    os25kLayerRef.current?.setVisible(isOS);
+    // Topo + OS layers always shown together (OS sits on top of topo for GBR;
+    // topo returns transparent for GBR tiles)
+    topoLayerRef.current?.setVisible(!isSat);
+    osOverviewLayerRef.current?.setVisible(!isSat);
+    os25kLayerRef.current?.setVisible(!isSat);
     satelliteLayerRef.current?.setVisible(isSat);
   }, [baseLayer]);
 
@@ -283,47 +283,6 @@ export default function MainMap({
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
-
-      {/* Layer toggle */}
-      {onBaseLayerChange && (
-        <div style={{
-          position: 'absolute',
-          bottom: 16,
-          right: 16,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-          zIndex: 100,
-        }}>
-          {(['topo', 'os', 'satellite'] as MapLayer[]).map((l) => (
-            <button
-              key={l}
-              onClick={() => onBaseLayerChange(l)}
-              title={l === 'topo' ? 'Topo' : l === 'os' ? 'OS (UK)' : 'Satellite'}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 4,
-                border: `1px solid ${baseLayer === l ? 'var(--ora)' : 'var(--p3)'}`,
-                background: baseLayer === l ? 'rgba(224,112,32,0.18)' : 'rgba(7,14,20,0.75)',
-                color: baseLayer === l ? 'var(--ora)' : 'var(--fog-dim)',
-                fontFamily: 'var(--mono)',
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backdropFilter: 'blur(4px)',
-              }}
-            >
-              {l === 'topo' ? 'T' : l === 'os' ? 'OS' : 'S'}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

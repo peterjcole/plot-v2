@@ -16,6 +16,53 @@ const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false }
 
 export type PanelMode = 'browse' | 'detail' | 'planner';
 
+function LayerToggle({ baseLayer, onBaseLayerChange, bottom, fixed }: {
+  baseLayer: MapLayer;
+  onBaseLayerChange: (l: MapLayer) => void;
+  bottom: number;
+  fixed?: boolean;
+}) {
+  return (
+    <div style={{
+      position: fixed ? 'fixed' : 'absolute',
+      bottom,
+      right: 16,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
+      zIndex: 15,
+    }}>
+      {(['topo', 'satellite'] as MapLayer[]).map((l) => (
+        <button
+          key={l}
+          onClick={() => onBaseLayerChange(l)}
+          title={l === 'topo' ? 'Topo' : 'Satellite'}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 4,
+            border: `1px solid ${baseLayer === l ? 'var(--ora)' : 'var(--p3)'}`,
+            background: baseLayer === l ? 'rgba(224,112,32,0.18)' : 'rgba(7,14,20,0.75)',
+            color: baseLayer === l ? 'var(--ora)' : 'var(--fog-dim)',
+            fontFamily: 'var(--mono)',
+            fontSize: 9,
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          {l === 'topo' ? 'T' : 'S'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface MapShellProps {
   activities: ActivitySummary[];
   avatarInitials: string;
@@ -109,6 +156,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             baseLayer={baseLayer}
             onBaseLayerChange={setBaseLayer}
           />
+          <LayerToggle baseLayer={baseLayer} onBaseLayerChange={setBaseLayer} bottom={16} />
         </div>
       </div>
     );
@@ -135,10 +183,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       <MobileHeader avatarInitials={avatarInitials} />
       <MobileLegend />
 
+      <LayerToggle baseLayer={baseLayer} onBaseLayerChange={setBaseLayer} bottom={198} fixed />
+
       {/* FAB */}
       <button
         style={{
-          position: 'absolute',
+          position: 'fixed',
           right: 16,
           bottom: 142, // above collapsed sheet
           width: 48,
@@ -151,7 +201,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          zIndex: 15,
+          zIndex: 18,
         }}
         aria-label="New route"
       >
