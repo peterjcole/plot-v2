@@ -183,6 +183,7 @@ export async function getActivityDetail(
   return {
     id: String(activity.id),
     name: activity.name,
+    type: activity.type || activity.sport_type || undefined,
     description: activity.description || undefined,
     route,
     photos,
@@ -193,7 +194,11 @@ export async function getActivityDetail(
       averageSpeed: activity.average_speed,
       maxSpeed: activity.max_speed,
       startDate: activity.start_date,
+      avgHeartrate: activity.average_heartrate || undefined,
+      elevHigh: activity.elev_high || undefined,
+      calories: activity.calories || undefined,
     },
+    gear: activity.gear?.name || undefined,
   };
 }
 

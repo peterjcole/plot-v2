@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { ActivitySummary } from '@/lib/types';
+import { ActivitySummary, ActivityData } from '@/lib/types';
+import { type MapLayer } from '@/app/components/MainMap';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
+import DetailPanel from './DetailPanel';
+import MobileHeader from './MobileHeader';
+import MobileLegend from './MobileLegend';
+import MobileBottomSheet from './MobileBottomSheet';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -18,28 +23,150 @@ interface MapShellProps {
 export default function MapShell({ activities, avatarInitials }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>('browse');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [baseLayer, setBaseLayer] = useState<MapLayer>('topo');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Mobile detection (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Fetch full activity detail when selection changes
+  useEffect(() => {
+    if (!selectedId) { setActivityDetail(null); return; }
+    setDetailLoading(true);
+    fetch(`/api/activities/${selectedId}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+      .then((data: ActivityData) => { setActivityDetail(data); setDetailLoading(false); })
+      .catch(() => setDetailLoading(false));
+  }, [selectedId]);
 
   const handleSelectActivity = useCallback((id: string) => {
     setSelectedId(id);
     setMode('detail');
   }, []);
 
+  const handleBack = useCallback(() => {
+    setMode('browse');
+    setSelectedId(null);
+    setActivityDetail(null);
+  }, []);
+
   const handleTabChange = useCallback((tab: 'activities' | 'planner') => {
-    if (tab === 'planner') {
-      setMode('planner');
-    } else {
-      setMode(mode === 'planner' ? 'browse' : mode);
-    }
+    if (tab === 'planner') setMode('planner');
+    else if (mode === 'planner') setMode('browse');
   }, [mode]);
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
+  const photoMarkers = activityDetail?.photos ?? undefined;
+
+  // ── Desktop layout ─────────────────────────────────────────────────────────
+  if (!isMobile) {
+    return (
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
+        <LeftPanel
+          avatarInitials={avatarInitials}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        >
+          {mode === 'browse' && (
+            <BrowsePanel
+              activities={activities}
+              selectedId={selectedId}
+              onSelectActivity={handleSelectActivity}
+            />
+          )}
+          {mode === 'detail' && (
+            detailLoading || !activityDetail ? (
+              <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+                {detailLoading ? 'Loading…' : 'No data'}
+              </div>
+            ) : (
+              <DetailPanel
+                activity={activityDetail}
+                onBack={handleBack}
+              />
+            )
+          )}
+          {mode === 'planner' && (
+            <div style={{ padding: 12 }}>
+              <p style={{ fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+                Planner coming in Phase 4
+              </p>
+            </div>
+          )}
+        </LeftPanel>
+
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <MainMap
+            activities={activities}
+            highlightedId={selectedId}
+            photoMarkers={photoMarkers}
+            onActivitySelect={handleSelectActivity}
+            baseLayer={baseLayer}
+            onBaseLayerChange={setBaseLayer}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mobile layout ──────────────────────────────────────────────────────────
+  const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : 'Activities';
+  const sheetCount = mode === 'browse' ? activities.length : undefined;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
-      <LeftPanel
-        avatarInitials={avatarInitials}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
+    <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
+      {/* Full-bleed map */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <MainMap
+          activities={activities}
+          highlightedId={selectedId}
+          photoMarkers={photoMarkers}
+          onActivitySelect={handleSelectActivity}
+          baseLayer={baseLayer}
+          onBaseLayerChange={setBaseLayer}
+        />
+      </div>
+
+      <MobileHeader avatarInitials={avatarInitials} />
+      <MobileLegend />
+
+      {/* FAB */}
+      <button
+        style={{
+          position: 'absolute',
+          right: 16,
+          bottom: 142, // above collapsed sheet
+          width: 48,
+          height: 48,
+          borderRadius: 6,
+          background: 'var(--ora)',
+          border: 'none',
+          color: 'var(--p0)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 15,
+        }}
+        aria-label="New route"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+
+      <MobileBottomSheet
+        title={sheetTitle}
+        count={sheetCount}
+        forceExpanded={mode === 'detail'}
       >
         {mode === 'browse' && (
           <BrowsePanel
@@ -49,49 +176,18 @@ export default function MapShell({ activities, avatarInitials }: MapShellProps) 
           />
         )}
         {mode === 'detail' && (
-          <div style={{ padding: 12 }}>
-            <button
-              onClick={() => { setMode('browse'); setSelectedId(null); }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--fog)',
-                fontFamily: 'var(--mono)',
-                fontSize: 11,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: 0,
-                marginBottom: 12,
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m15 18-6-6 6-6"/>
-              </svg>
-              Back
-            </button>
-            <p style={{ fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-              Activity detail coming in Phase 3
-            </p>
-          </div>
+          detailLoading || !activityDetail ? (
+            <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+              {detailLoading ? 'Loading…' : 'No data'}
+            </div>
+          ) : (
+            <DetailPanel
+              activity={activityDetail}
+              onBack={handleBack}
+            />
+          )
         )}
-        {mode === 'planner' && (
-          <div style={{ padding: 12 }}>
-            <p style={{ fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-              Planner coming in Phase 4
-            </p>
-          </div>
-        )}
-      </LeftPanel>
-
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <MainMap
-          activities={activities}
-          highlightedId={selectedId}
-          onActivitySelect={handleSelectActivity}
-        />
-      </div>
+      </MobileBottomSheet>
     </div>
   );
 }
