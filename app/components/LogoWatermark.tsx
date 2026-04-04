@@ -15,7 +15,7 @@ export default function LogoWatermark() {
         style={{
           fontFamily: "'Ribeye Marrow', serif",
           fontSize: 16,
-          color: 'var(--primary)',
+          color: '#4A5A2B',
           lineHeight: 1,
         }}
       >

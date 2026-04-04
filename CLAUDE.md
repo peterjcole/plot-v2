@@ -12,7 +12,9 @@ No test framework is configured.
 
 ## Architecture
 
-This is a Next.js 16 app (App Router, TypeScript, Tailwind v4) that generates screenshot images of activity maps. It renders a Leaflet map with an activity route, photos, and stats, then uses Puppeteer to capture the result as a PNG/JPEG.
+This is a Next.js 16 app (App Router, TypeScript, Tailwind v4). The current codebase is primarily a screenshot generator — it renders a Leaflet map with an activity route, photos, and stats, then uses Puppeteer to capture the result as a PNG/JPEG.
+
+**Planned direction:** The app is being redesigned into a full activity browsing + route planning product (combined map view, see `mockup-h.html`). The screenshot pipeline is one feature of this broader product, not the entire app. When touching architecture, bear this in mind.
 
 ### Route Groups
 
@@ -34,6 +36,16 @@ This is a Next.js 16 app (App Router, TypeScript, Tailwind v4) that generates sc
 ### Data Layer
 
 `lib/strava.ts` currently returns mock data. It's designed to be replaced with real Strava API calls. Types are defined in `lib/types.ts` (`ActivityData`, `ActivityPhoto`, `ActivityStats`).
+
+The Strava API returns more fields than the current types expose. Fields available from `GET /activities/{id}` not yet in `ActivityStats`: `elev_high`, `elev_low`, `average_heartrate`, `max_heartrate`, `average_cadence`, `calories`, `gear.name`. Photos come from `GET /activities/{id}/photos?size=600` — each has `urls`, `location[lat, lng]`, `caption`.
+
+### Icons
+
+Lucide is already a project dependency. Use inline SVG paths with `stroke="currentColor"` rather than Unicode characters or emoji. Never use Unicode symbols (↩ ↪ ⊗ etc.) as UI icons.
+
+### Design / Mockups
+
+Standalone HTML mockup files (`mockup-a.html` through `mockup-h.html`) live at the project root. These are design references only — not app code. The most current target design is `mockup-h.html` (combined map: activities + planner on a single full-bleed map surface). See project memory for design tokens and UX decisions.
 
 ### Path Alias
 

@@ -13,15 +13,21 @@ export interface ActivityStats {
   averageSpeed: number; // in m/s
   maxSpeed: number; // in m/s
   startDate: string; // ISO date string
+  // Optional extended fields (not always present)
+  avgHeartrate?: number;
+  elevHigh?: number; // meters
+  calories?: number;
 }
 
 export interface ActivityData {
   id: string;
   name: string;
+  type?: string;
   description?: string;
   route: [number, number][]; // [lat, lng][]
   photos: ActivityPhoto[];
   stats: ActivityStats;
+  gear?: string; // gear name
 }
 
 export interface ActivitySummary {
@@ -33,6 +39,7 @@ export interface ActivitySummary {
   movingTime: number; // in seconds
   elevationGain: number; // in meters
   photoCount: number;
+  route?: [number, number][]; // [lat, lng][] decoded from summary_polyline
 }
 
 export interface HeatmapActivity {

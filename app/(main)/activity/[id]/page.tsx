@@ -36,6 +36,11 @@ export default async function ActivityPage({ params, searchParams }: ActivityPag
   const { id } = await params;
   const { photos, orientation } = await searchParams;
 
+  // Redirect real activities to the unified map view
+  if (id !== 'mock') {
+    redirect(`/?activity=${id}`);
+  }
+
   let activity;
   if (id === 'mock') {
     const mockOptions = {
