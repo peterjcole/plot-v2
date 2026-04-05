@@ -1,12 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import ThemeToggle from './ThemeToggle';
+import { type Theme } from '@/lib/theme';
 
 interface MobileHeaderProps {
   avatarInitials?: string;
+  theme?: Theme;
+  onThemeChange?: (t: Theme) => void;
 }
 
-export default function MobileHeader({ avatarInitials = '?' }: MobileHeaderProps) {
+export default function MobileHeader({ avatarInitials = '?', theme = 'system', onThemeChange }: MobileHeaderProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -24,9 +28,15 @@ export default function MobileHeader({ avatarInitials = '?' }: MobileHeaderProps
       zIndex: 30,
       borderBottom: '1px solid var(--p3)',
     }}>
-      <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', flex: 1, lineHeight: 1 }}>
+      <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', lineHeight: 1, marginRight: 12 }}>
         plot
       </span>
+
+      {mounted && onThemeChange && (
+        <ThemeToggle theme={theme} onChange={onThemeChange} />
+      )}
+
+      <div style={{ flex: 1 }} />
 
       {mounted && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

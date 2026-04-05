@@ -375,7 +375,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         />
       </div>
 
-      <MobileHeader avatarInitials={avatarInitials} />
+      <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />
       <MobileLegend />
 
       {mode !== 'planner' && (
