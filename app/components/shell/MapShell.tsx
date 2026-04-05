@@ -149,20 +149,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     const dark = sysMq.matches;
     setSysDark(dark);
     setTheme(stored);
-    applyThemeToDocument(stored, dark);
-    const handler = (e: MediaQueryListEvent) => {
-      setSysDark(e.matches);
-      setTheme((t) => { applyThemeToDocument(t, e.matches); return t; });
-    };
+    const handler = (e: MediaQueryListEvent) => setSysDark(e.matches);
     sysMq.addEventListener('change', handler);
     return () => sysMq.removeEventListener('change', handler);
   }, []);
 
+  // Apply theme to document whenever theme or sysDark changes
+  useEffect(() => {
+    applyThemeToDocument(theme, sysDark);
+  }, [theme, sysDark]);
+
   const handleThemeChange = useCallback((t: Theme) => {
     setTheme(t);
     saveTheme(t);
-    applyThemeToDocument(t, sysDark);
-  }, [sysDark]);
+  }, []);
 
   // Fetch activity detail
   useEffect(() => {
@@ -372,6 +372,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onBaseLayerChange={setBaseLayer}
           plannerProps={plannerProps}
           onMapReady={handleMapReady}
+          osDark={osDark}
         />
       </div>
 

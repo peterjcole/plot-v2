@@ -35,10 +35,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${ibmPlexMono.variable} ${ribeyeMarrow.variable} antialiased`}
       >
+        {/* Apply stored theme before first paint — must be first child of body */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('plot-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'':'light';}catch(e){}` }} />
         {children}
         <Analytics />
         <Script

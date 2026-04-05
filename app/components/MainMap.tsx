@@ -331,12 +331,12 @@ export default function MainMap({
 
   // Swap OS tile URLs when dark/light theme changes
   useEffect(() => {
-    const topoSrc = topoLayerRef.current?.getSource();
-    const ovSrc = osOverviewLayerRef.current?.getSource();
-    const hkSrc = os25kLayerRef.current?.getSource();
-    if (topoSrc) (topoSrc as XYZ).setUrl(osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL);
-    if (ovSrc) (ovSrc as XYZ).setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL);
-    if (hkSrc) (hkSrc as XYZ).setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL);
+    const topoSrc = topoLayerRef.current?.getSource() as XYZ | null;
+    const ovSrc = osOverviewLayerRef.current?.getSource() as XYZ | null;
+    const hkSrc = os25kLayerRef.current?.getSource() as XYZ | null;
+    if (topoSrc) { topoSrc.setUrl(osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL); topoSrc.refresh(); }
+    if (ovSrc) { ovSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); ovSrc.refresh(); }
+    if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
   }, [osDark]);
 
   // Sync activity route features (dim in planner mode)

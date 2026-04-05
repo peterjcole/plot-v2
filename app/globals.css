@@ -1,54 +1,58 @@
 @import "tailwindcss";
 
-/* ===== Design Tokens ===== */
-:root {
-  /* Background scale */
-  --p0: #070E14;
-  --p1: #0E2830;
-  --p2: #163840;
-  --p3: #1E4858;
-  --p4: #2A5860;
+/* ===== Design Tokens — wrapped in @layer base to survive Lightning CSS dead-code elimination ===== */
+@layer base {
+  :root {
+    /* Background scale */
+    --p0: #070E14;
+    --p1: #0E2830;
+    --p2: #163840;
+    --p3: #1E4858;
+    --p4: #2A5860;
 
-  /* Activity type / accent colours */
-  --ora: #E07020;
-  --grn: #40B060;
-  --blu: #4080C0;
+    /* Activity type / accent colours */
+    --ora: #E07020;
+    --grn: #40B060;
+    --blu: #4080C0;
 
-  /* Text */
-  --ice: #F0F8FA;
-  --fog: rgba(240, 248, 250, 0.72);
-  --fog-dim: rgba(240, 248, 250, 0.45);
-  --fog-ghost: rgba(240, 248, 250, 0.08);
+    /* Text */
+    --ice: #F0F8FA;
+    --fog: rgba(240, 248, 250, 0.72);
+    --fog-dim: rgba(240, 248, 250, 0.45);
+    --fog-ghost: rgba(240, 248, 250, 0.08);
 
-  /* Glass overlays */
-  --glass: rgba(7,14,20,0.82);
-  --glass-hvy: rgba(7,14,20,0.94);
+    /* Glass overlays */
+    --glass: rgba(7, 14, 20, 0.82);
+    --glass-hvy: rgba(7, 14, 20, 0.94);
 
-  /* Layout */
-  --panel-w: 300px;
+    /* Layout */
+    --panel-w: 300px;
 
-  /* Fonts */
-  --mono: 'IBM Plex Mono', monospace;
-  --display: 'Ribeye Marrow', serif;
-}
+    /* Fonts */
+    --mono: 'IBM Plex Mono', monospace;
+    --display: 'Ribeye Marrow', serif;
+  }
 
-[data-theme="light"] {
-  --p0: #DDD8C4;
-  --p1: #EEE8D5;
-  --p2: #E4DCCA;
-  --p3: #BDAE84;
-  --p4: #A89860;
-  --ice: #073642;
-  --fog: rgba(7,54,66,0.72);
-  --fog-dim: rgba(7,54,66,0.44);
-  --fog-ghost: rgba(7,54,66,0.07);
-  --grn: #1F7A3A;
-  --blu: #1E60A8;
-  --glass: rgba(238,232,213,0.93);
-  --glass-hvy: rgba(238,232,213,0.97);
+  [data-theme="light"] {
+    --p0: #DDD8C4;
+    --p1: #EEE8D5;
+    --p2: #E4DCCA;
+    --p3: #BDAE84;
+    --p4: #A89860;
+    --ice: #073642;
+    --fog: rgba(7, 54, 66, 0.72);
+    --fog-dim: rgba(7, 54, 66, 0.44);
+    --fog-ghost: rgba(7, 54, 66, 0.07);
+    --grn: #1F7A3A;
+    --blu: #1E60A8;
+    --glass: rgba(238, 232, 213, 0.93);
+    --glass-hvy: rgba(238, 232, 213, 0.97);
+  }
 }
 
 /* ===== Tailwind Theme Integration ===== */
+/* @theme inline maps our CSS vars to Tailwind utility classes.
+   All vars listed here are also protected from Lightning CSS stripping. */
 @theme inline {
   --color-p0: var(--p0);
   --color-p1: var(--p1);
@@ -59,6 +63,11 @@
   --color-grn: var(--grn);
   --color-blu: var(--blu);
   --color-ice: var(--ice);
+  --color-fog: var(--fog);
+  --color-fog-dim: var(--fog-dim);
+  --color-fog-ghost: var(--fog-ghost);
+  --color-glass: var(--glass);
+  --color-glass-hvy: var(--glass-hvy);
   --font-mono: var(--font-ibm-plex-mono);
   --font-logo: var(--font-ribeye-marrow);
 }

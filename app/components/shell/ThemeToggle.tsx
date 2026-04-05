@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { type Theme } from '@/lib/theme';
 
 interface ThemeToggleProps {
@@ -7,10 +8,36 @@ interface ThemeToggleProps {
   onChange: (t: Theme) => void;
 }
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'Sys' },
-  { value: 'light', label: 'Light' },
+function MoonIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+    </svg>
+  );
+}
+
+function MonitorIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="20" height="14" x="2" y="3" rx="2"/>
+      <path d="M8 21h8m-4-4v4"/>
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"/>
+    </svg>
+  );
+}
+
+const THEMES: { value: Theme; label: string; Icon: () => React.ReactElement }[] = [
+  { value: 'dark', label: 'Dark theme', Icon: MoonIcon },
+  { value: 'system', label: 'System theme', Icon: MonitorIcon },
+  { value: 'light', label: 'Light theme', Icon: SunIcon },
 ];
 
 export default function ThemeToggle({ theme, onChange }: ThemeToggleProps) {
@@ -27,31 +54,30 @@ export default function ThemeToggle({ theme, onChange }: ThemeToggleProps) {
         flexShrink: 0,
       }}
     >
-      {THEMES.map(({ value, label }) => {
+      {THEMES.map(({ value, label, Icon }) => {
         const active = theme === value;
         return (
           <button
             key={value}
             onClick={() => onChange(value)}
-            aria-label={`${label} theme`}
+            aria-label={label}
             aria-pressed={active}
             style={{
               background: active ? 'var(--ora)' : 'transparent',
               color: active ? '#fff' : 'var(--fog-dim)',
               border: 'none',
               borderRadius: 16,
-              padding: '3px 8px',
-              fontFamily: 'var(--mono)',
-              fontSize: 9,
-              fontWeight: active ? 600 : 400,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
+              width: 24,
+              height: 24,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
-              lineHeight: 1,
               transition: 'background 0.15s, color 0.15s',
+              flexShrink: 0,
             }}
           >
-            {label}
+            <Icon />
           </button>
         );
       })}
