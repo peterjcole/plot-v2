@@ -20,12 +20,32 @@
   --fog-dim: rgba(240, 248, 250, 0.45);
   --fog-ghost: rgba(240, 248, 250, 0.08);
 
+  /* Glass overlays */
+  --glass: rgba(7,14,20,0.82);
+  --glass-hvy: rgba(7,14,20,0.94);
+
   /* Layout */
   --panel-w: 300px;
 
   /* Fonts */
   --mono: 'IBM Plex Mono', monospace;
   --display: 'Ribeye Marrow', serif;
+}
+
+[data-theme="light"] {
+  --p0: #DDD8C4;
+  --p1: #EEE8D5;
+  --p2: #E4DCCA;
+  --p3: #BDAE84;
+  --p4: #A89860;
+  --ice: #073642;
+  --fog: rgba(7,54,66,0.72);
+  --fog-dim: rgba(7,54,66,0.44);
+  --fog-ghost: rgba(7,54,66,0.07);
+  --grn: #1F7A3A;
+  --blu: #1E60A8;
+  --glass: rgba(238,232,213,0.93);
+  --glass-hvy: rgba(238,232,213,0.97);
 }
 
 /* ===== Tailwind Theme Integration ===== */

@@ -15,7 +15,7 @@ export default function MobileHeader({ avatarInitials = '?' }: MobileHeaderProps
       position: 'absolute',
       top: 0, left: 0, right: 0,
       height: 50,
-      background: 'rgba(7,14,20,0.86)',
+      background: 'var(--glass)',
       backdropFilter: 'blur(8px)',
       WebkitBackdropFilter: 'blur(8px)',
       display: 'flex',

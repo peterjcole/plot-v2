@@ -13,6 +13,7 @@ import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { OS_PROJECTION } from '@/lib/map-config';
+import { type Theme, loadTheme, saveTheme, applyThemeToDocument } from '@/lib/theme';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
@@ -99,6 +100,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [baseLayer, setBaseLayer] = useState<MapLayer>('topo');
   const [isMobile, setIsMobile] = useState(false);
 
+  // Theme
+  const [theme, setTheme] = useState<Theme>('system');
+  const [sysDark, setSysDark] = useState(false);
+  const osDark = theme === 'dark' || (theme === 'system' && sysDark);
+
   // Planner state
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
@@ -135,6 +141,28 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
+
+  // Theme initialisation + system preference tracking
+  useEffect(() => {
+    const stored = loadTheme();
+    const sysMq = window.matchMedia('(prefers-color-scheme: dark)');
+    const dark = sysMq.matches;
+    setSysDark(dark);
+    setTheme(stored);
+    applyThemeToDocument(stored, dark);
+    const handler = (e: MediaQueryListEvent) => {
+      setSysDark(e.matches);
+      setTheme((t) => { applyThemeToDocument(t, e.matches); return t; });
+    };
+    sysMq.addEventListener('change', handler);
+    return () => sysMq.removeEventListener('change', handler);
+  }, []);
+
+  const handleThemeChange = useCallback((t: Theme) => {
+    setTheme(t);
+    saveTheme(t);
+    applyThemeToDocument(t, sysDark);
+  }, [sysDark]);
 
   // Fetch activity detail
   useEffect(() => {
@@ -264,6 +292,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           avatarInitials={avatarInitials}
           activeTab={activeTab}
           onTabChange={handleTabChange}
+          theme={theme}
+          onThemeChange={handleThemeChange}
         >
           {mode === 'browse' && (
             isLoggedIn
@@ -294,6 +324,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onBaseLayerChange={setBaseLayer}
             plannerProps={plannerProps}
             onMapReady={handleMapReady}
+            osDark={osDark}
           />
           {mode !== 'planner' && (
             <LayerToggle baseLayer={baseLayer} onBaseLayerChange={setBaseLayer} bottom={16} />

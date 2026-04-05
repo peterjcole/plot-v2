@@ -1,6 +1,8 @@
 'use client';
 
 import StatusBar from './StatusBar';
+import ThemeToggle from './ThemeToggle';
+import { type Theme } from '@/lib/theme';
 
 type Tab = 'activities' | 'planner';
 
@@ -8,10 +10,12 @@ interface LeftPanelProps {
   avatarInitials?: string;
   activeTab?: Tab;
   onTabChange?: (tab: Tab) => void;
+  theme?: Theme;
+  onThemeChange?: (t: Theme) => void;
   children?: React.ReactNode;
 }
 
-export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, children }: LeftPanelProps) {
+export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, theme = 'system', onThemeChange, children }: LeftPanelProps) {
 
   return (
     <div
@@ -34,6 +38,7 @@ export default function LeftPanel({ avatarInitials, activeTab = 'activities', on
           height: 52,
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           padding: '0 14px',
           borderBottom: '1px solid var(--fog-ghost)',
           flexShrink: 0,
@@ -49,6 +54,7 @@ export default function LeftPanel({ avatarInitials, activeTab = 'activities', on
         >
           plot
         </span>
+        <ThemeToggle theme={theme} onChange={onThemeChange ?? (() => {})} />
       </div>
 
       {/* Tab bar */}

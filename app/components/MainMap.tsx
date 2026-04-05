@@ -18,7 +18,7 @@ import { get as getProjection, fromLonLat, toLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
 import {
-  OS_PROJECTION, OS_DARK_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
+  OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
   OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
 import { ActivitySummary, ActivityPhoto, Waypoint, RouteSegment } from '@/lib/types';
@@ -43,6 +43,7 @@ interface MainMapProps {
   onBaseLayerChange?: (layer: MapLayer) => void;
   plannerProps?: PlannerProps;
   onMapReady?: (map: Map) => void;
+  osDark?: boolean;
 }
 
 // ── Activity trace styles ────────────────────────────────────────────────────
@@ -55,11 +56,12 @@ function hexToComponents(hex: string): [number, number, number] {
   ];
 }
 
-function routeStyles(color: string, alpha: number): Style[] {
+function routeStyles(color: string, alpha: number, isDark = true): Style[] {
   const [r, g, b] = hexToComponents(color);
+  const overlay = isDark ? `rgba(7,14,20,${alpha * 0.6})` : 'rgba(255,255,255,0.30)';
   return [
     new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 5 }) }),
-    new Style({ stroke: new Stroke({ color: `rgba(7,14,20,${alpha * 0.6})`, width: 2 }) }),
+    new Style({ stroke: new Stroke({ color: overlay, width: 2 }) }),
   ];
 }
 
@@ -152,6 +154,7 @@ export default function MainMap({
   onBaseLayerChange,
   plannerProps,
   onMapReady,
+  osDark = true,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -326,6 +329,16 @@ export default function MainMap({
     satelliteLayerRef.current?.setVisible(isSat);
   }, [baseLayer]);
 
+  // Swap OS tile URLs when dark/light theme changes
+  useEffect(() => {
+    const topoSrc = topoLayerRef.current?.getSource();
+    const ovSrc = osOverviewLayerRef.current?.getSource();
+    const hkSrc = os25kLayerRef.current?.getSource();
+    if (topoSrc) (topoSrc as XYZ).setUrl(osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL);
+    if (ovSrc) (ovSrc as XYZ).setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL);
+    if (hkSrc) (hkSrc as XYZ).setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL);
+  }, [osDark]);
+
   // Sync activity route features (dim in planner mode)
   useEffect(() => {
     const source = routeSourceRef.current;
@@ -343,12 +356,13 @@ export default function MainMap({
       );
       const feature = new Feature({ geometry: new LineString(coords), activityId: id });
       const color = getActivityColor(activity.type);
+      const defaultAlpha = osDark ? 0.28 : 0.55;
       const alpha = inPlanner
         ? 0.08
         : highlightedId
           ? highlightedId === id ? 0.9 : 0.1
-          : 0.28;
-      feature.setStyle(routeStyles(color, alpha));
+          : defaultAlpha;
+      feature.setStyle(routeStyles(color, alpha, osDark));
       source.addFeature(feature);
     }
 
@@ -359,7 +373,7 @@ export default function MainMap({
         fittedRef.current = true;
       }
     }
-  }, [activities, highlightedId, !!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activities, highlightedId, !!plannerProps, osDark]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync photo pin markers
   useEffect(() => {
