@@ -29,6 +29,7 @@ interface PlannerToolbarProps {
   onFitToRoute?: (waypoints: Waypoint[]) => void;
   onExportImage?: () => void;
   isExportingImage?: boolean;
+  onBack?: () => void;
 }
 
 function formatDistance(meters: number): string {
@@ -58,6 +59,7 @@ export default function PlannerToolbar({
   onFitToRoute,
   onExportImage,
   isExportingImage = false,
+  onBack,
 }: PlannerToolbarProps) {
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef<HTMLDivElement>(null);
@@ -223,11 +225,17 @@ export default function PlannerToolbar({
             <Upload size={18} />
           </button>
 
-          {/* Home — mobile only, far right */}
+          {/* Home/Back — mobile only, far right */}
           <div className="sm:hidden w-px h-6 bg-border shrink-0" />
-          <Link href="/" title="Home" className={`${btnClass} sm:hidden`}>
-            <Home size={18} />
-          </Link>
+          {onBack ? (
+            <button onClick={onBack} title="Back to activities" className={`${btnClass} sm:hidden`}>
+              <Home size={18} />
+            </button>
+          ) : (
+            <Link href="/" title="Home" className={`${btnClass} sm:hidden`}>
+              <Home size={18} />
+            </Link>
+          )}
         </div>
 
         {/* Elevation tray — slides down from under the toolbar */}

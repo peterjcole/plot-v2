@@ -10,9 +10,7 @@ import { useRouteSnapping } from './useRouteSnapping';
 import { useElevationProfile } from './useElevationProfile';
 import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
-import Link from 'next/link';
 import { Plus, Minus, CircleArrowUp } from 'lucide-react';
-import Logo from '@/app/components/Logo';
 import PlannerToolbar from './PlannerToolbar';
 import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
@@ -39,7 +37,12 @@ function computeGridNorthBearing(center: number[]): number {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-export default function PlannerClient() {
+interface PlannerClientProps {
+  onBack?: () => void;
+  onStatsChange?: (distance: number, elevGain: number) => void;
+}
+
+export default function PlannerClient({ onBack, onStatsChange }: PlannerClientProps = {}) {
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -193,6 +196,20 @@ export default function PlannerClient() {
     () => calculateDistance(waypoints, segments),
     [waypoints, segments]
   );
+
+  const elevGain = useMemo(() => {
+    if (!elevationData || elevationData.length < 2) return 0;
+    let gain = 0;
+    for (let i = 1; i < elevationData.length; i++) {
+      const delta = elevationData[i].ele - elevationData[i - 1].ele;
+      if (delta > 0) gain += delta;
+    }
+    return gain;
+  }, [elevationData]);
+
+  useEffect(() => {
+    onStatsChange?.(distance, elevGain);
+  }, [distance, elevGain, onStatsChange]);
 
   const handleFitToRoute = useCallback((wps: Waypoint[]) => {
     const map = mapInstanceRef.current;
@@ -393,7 +410,7 @@ export default function PlannerClient() {
   const compassDeg = ((mapRotation * 180 / Math.PI - gridNorthBearing) % 360 + 360) % 360;
 
   return (
-    <div className="fixed inset-0">
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <PlannerMap
         waypoints={waypoints}
         segments={segments}
@@ -451,13 +468,6 @@ export default function PlannerClient() {
           }}
         />
       )}
-      {/* Logo panel — desktop only */}
-      <Link
-        href="/"
-        className="absolute top-3 left-3 z-10 hidden sm:flex bg-surface-raised/70 backdrop-blur-sm rounded-xl shadow-lg border border-border"
-      >
-        <Logo size="sm" />
-      </Link>
       {/* Compass — only visible when map is rotated away from north */}
       {compassDeg > 0.1 && compassDeg < 359.9 && (
         <button
@@ -526,6 +536,7 @@ export default function PlannerClient() {
         canUndo={canUndo}
         canRedo={canRedo}
         dispatch={dispatch}
+        onBack={onBack}
         onGeolocate={handleGeolocate}
         addPointsEnabled={addPointsEnabled}
         onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}

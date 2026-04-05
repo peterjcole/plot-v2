@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect } from 'react';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import { defaults as defaultControls } from 'ol/control';
@@ -13,18 +13,26 @@ import Feature from 'ol/Feature';
 import LineString from 'ol/geom/LineString';
 import Point from 'ol/geom/Point';
 import { Style, Stroke, Icon } from 'ol/style';
-import { get as getProjection, fromLonLat } from 'ol/proj';
+import { Modify } from 'ol/interaction';
+import { get as getProjection, fromLonLat, toLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
 import {
   OS_PROJECTION, OS_DARK_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
   OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
-import { ActivitySummary, ActivityPhoto } from '@/lib/types';
+import { ActivitySummary, ActivityPhoto, Waypoint, RouteSegment } from '@/lib/types';
 import { getActivityColor } from '@/lib/activity-categories';
+import type { RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import 'ol/ol.css';
 
 export type MapLayer = 'topo' | 'satellite';
+
+export interface PlannerProps {
+  waypoints: Waypoint[];
+  segments: RouteSegment[];
+  dispatch: React.Dispatch<RouteAction>;
+}
 
 interface MainMapProps {
   activities: ActivitySummary[];
@@ -33,7 +41,11 @@ interface MainMapProps {
   onActivitySelect?: (id: string) => void;
   baseLayer?: MapLayer;
   onBaseLayerChange?: (layer: MapLayer) => void;
+  plannerProps?: PlannerProps;
+  onMapReady?: (map: Map) => void;
 }
+
+// ── Activity trace styles ────────────────────────────────────────────────────
 
 function hexToComponents(hex: string): [number, number, number] {
   return [
@@ -59,6 +71,78 @@ function pinIconSvg(hasPhoto: boolean): string {
   </svg>`;
 }
 
+// ── Planner drawing styles ───────────────────────────────────────────────────
+
+const snappedRouteStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 16 }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 10 }) }),
+];
+const unsnappedRouteStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 13, lineDash: [12, 14] }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 8, lineDash: [12, 14] }) }),
+];
+const routingPendingStyle = [
+  new Style({ stroke: new Stroke({ color: '#3A4722', width: 10, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: '#A8C476', width: 6, lineDash: [2, 6] }) }),
+];
+
+function waypointPinSvg(index: number): string {
+  return (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">' +
+    '<path d="M16 44c-3-10-14-18-14-28a14 14 0 1 1 28 0c0 10-11 18-14 28Z" ' +
+    'fill="rgba(74,90,43,0.85)" stroke="rgba(255,255,255,0.75)" stroke-width="2.5"/>' +
+    '<text x="16" y="15" text-anchor="middle" dominant-baseline="central" ' +
+    `fill="rgba(255,255,255,0.95)" font-size="13" font-weight="bold" font-family="sans-serif">${index + 1}</text>` +
+    '</svg>'
+  );
+}
+
+function waypointStyle(index: number): Style {
+  return new Style({
+    image: new Icon({
+      src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(waypointPinSvg(index))}`,
+      anchor: [0.5, 1],
+      anchorXUnits: 'fraction',
+      anchorYUnits: 'fraction',
+    }),
+  });
+}
+
+function syncPlannerFeatures(
+  wpSource: VectorSource,
+  routeSource: VectorSource,
+  waypoints: Waypoint[],
+  segments: RouteSegment[],
+) {
+  wpSource.clear();
+  waypoints.forEach((wp, i) => {
+    const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
+    const feature = new Feature({ geometry: new Point(coord), waypointIndex: i });
+    feature.setStyle(waypointStyle(i));
+    wpSource.addFeature(feature);
+  });
+
+  routeSource.clear();
+  if (waypoints.length >= 2) {
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const seg = segments[i];
+      const coords = seg?.coordinates.length >= 2
+        ? seg.coordinates.map((c) => fromLonLat([c.lng, c.lat], OS_PROJECTION.code))
+        : [
+            fromLonLat([waypoints[i].lng, waypoints[i].lat], OS_PROJECTION.code),
+            fromLonLat([waypoints[i + 1].lng, waypoints[i + 1].lat], OS_PROJECTION.code),
+          ];
+      const feature = new Feature({ geometry: new LineString(coords), segmentIndex: i, snapped: seg?.snapped ?? false });
+      if (seg?.snapped && seg.coordinates.length >= 2) feature.setStyle(snappedRouteStyle);
+      else if (seg?.snapped && seg.coordinates.length === 0) feature.setStyle(routingPendingStyle);
+      else feature.setStyle(unsnappedRouteStyle);
+      routeSource.addFeature(feature);
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export default function MainMap({
   activities,
   highlightedId,
@@ -66,6 +150,8 @@ export default function MainMap({
   onActivitySelect,
   baseLayer = 'topo',
   onBaseLayerChange,
+  plannerProps,
+  onMapReady,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -77,6 +163,15 @@ export default function MainMap({
   const os25kLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const fittedRef = useRef(false);
+
+  // Planner drawing refs
+  const plannerWpSourceRef = useRef<VectorSource | null>(null);
+  const plannerRouteSourceRef = useRef<VectorSource | null>(null);
+  const plannerWpLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const plannerRouteLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const plannerModifyRef = useRef<Modify | null>(null);
+  const plannerPropsRef = useRef(plannerProps);
+  useEffect(() => { plannerPropsRef.current = plannerProps; }, [plannerProps]);
 
   // Initialise map once
   useEffect(() => {
@@ -97,14 +192,11 @@ export default function MainMap({
       origin: OS_PROJECTION.origin,
     });
 
-    // Topo (default, worldwide)
     const topoLayer = new TileLayer({
       source: new XYZ({ url: TOPO_DARK_TILE_URL, maxZoom: 16 }),
       visible: true,
       zIndex: 0,
     });
-
-    // OS overview tiles (UK only, EPSG:27700)
     const osOverviewLayer = new TileLayer({
       source: new XYZ({ url: OS_DARK_TILE_URL, projection, tileGrid: overviewTileGrid }),
       maxZoom: 6,
@@ -117,8 +209,6 @@ export default function MainMap({
       visible: false,
       zIndex: 0,
     });
-
-    // Satellite
     const satelliteLayer = new TileLayer({
       source: new XYZ({ url: SATELLITE_TILE_URL, maxZoom: 18 }),
       visible: false,
@@ -131,6 +221,26 @@ export default function MainMap({
     const photoSource = new VectorSource();
     const photoLayer = new VectorLayer({ source: photoSource, zIndex: 20 });
 
+    // Planner layers (always present, toggled visible in planner mode)
+    const plannerRouteSource = new VectorSource();
+    const plannerRouteLayer = new VectorLayer({ source: plannerRouteSource, zIndex: 25, visible: false });
+    const plannerWpSource = new VectorSource();
+    const plannerWpLayer = new VectorLayer({ source: plannerWpSource, zIndex: 30, visible: false });
+
+    // Planner Modify interaction (added/removed based on plannerProps)
+    const plannerModify = new Modify({
+      source: plannerWpSource,
+      hitDetection: plannerWpLayer,
+    });
+    plannerModify.on('modifyend', (e) => {
+      for (const feature of e.features.getArray()) {
+        const index = feature.get('waypointIndex') as number;
+        const geom = feature.getGeometry() as Point;
+        const [lng, lat] = toLonLat(geom.getCoordinates(), OS_PROJECTION.code);
+        plannerPropsRef.current?.dispatch({ type: 'MOVE_WAYPOINT', index, waypoint: { lat, lng } });
+      }
+    });
+
     topoLayerRef.current = topoLayer;
     osOverviewLayerRef.current = osOverviewLayer;
     os25kLayerRef.current = os25kLayer;
@@ -138,6 +248,11 @@ export default function MainMap({
     routeSourceRef.current = routeSource;
     routeLayerRef.current = routeLayer;
     photoSourceRef.current = photoSource;
+    plannerWpSourceRef.current = plannerWpSource;
+    plannerRouteSourceRef.current = plannerRouteSource;
+    plannerWpLayerRef.current = plannerWpLayer;
+    plannerRouteLayerRef.current = plannerRouteLayer;
+    plannerModifyRef.current = plannerModify;
 
     const center = fromLonLat([OS_DEFAULT_CENTER.lng, OS_DEFAULT_CENTER.lat], OS_PROJECTION.code);
     const viewResolutions = [...OS_PROJECTION.resolutions, 0.875, 0.4375, 0.21875];
@@ -145,7 +260,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, routeLayer, photoLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, routeLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
       view: new View({
         projection,
         center,
@@ -157,6 +272,7 @@ export default function MainMap({
     });
 
     mapInstanceRef.current = olMap;
+    onMapReady?.(olMap);
 
     return () => {
       olMap.setTarget(undefined);
@@ -168,23 +284,49 @@ export default function MainMap({
       osOverviewLayerRef.current = null;
       os25kLayerRef.current = null;
       satelliteLayerRef.current = null;
+      plannerWpSourceRef.current = null;
+      plannerRouteSourceRef.current = null;
+      plannerWpLayerRef.current = null;
+      plannerRouteLayerRef.current = null;
+      plannerModifyRef.current = null;
       fittedRef.current = false;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toggle planner layers and Modify interaction
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const active = !!plannerProps;
+    plannerWpLayerRef.current?.setVisible(active);
+    plannerRouteLayerRef.current?.setVisible(active);
+    if (map && plannerModifyRef.current) {
+      if (active) map.addInteraction(plannerModifyRef.current);
+      else map.removeInteraction(plannerModifyRef.current);
+    }
+  }, [!!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync planner features
+  useEffect(() => {
+    if (!plannerProps || !plannerWpSourceRef.current || !plannerRouteSourceRef.current) return;
+    syncPlannerFeatures(
+      plannerWpSourceRef.current,
+      plannerRouteSourceRef.current,
+      plannerProps.waypoints,
+      plannerProps.segments,
+    );
+  }, [plannerProps?.waypoints, plannerProps?.segments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync tile layer visibility when baseLayer prop changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const isSat = baseLayer === 'satellite';
-    // Topo + OS layers always shown together (OS sits on top of topo for GBR;
-    // topo returns transparent for GBR tiles)
     topoLayerRef.current?.setVisible(!isSat);
     osOverviewLayerRef.current?.setVisible(!isSat);
     os25kLayerRef.current?.setVisible(!isSat);
     satelliteLayerRef.current?.setVisible(isSat);
   }, [baseLayer]);
 
-  // Sync route features
+  // Sync activity route features (dim in planner mode)
   useEffect(() => {
     const source = routeSourceRef.current;
     const map = mapInstanceRef.current;
@@ -192,6 +334,7 @@ export default function MainMap({
 
     source.clear();
     const withRoutes = activities.filter((a) => a.route && a.route.length > 1);
+    const inPlanner = !!plannerProps;
 
     for (const activity of withRoutes) {
       const id = String(activity.id);
@@ -200,21 +343,23 @@ export default function MainMap({
       );
       const feature = new Feature({ geometry: new LineString(coords), activityId: id });
       const color = getActivityColor(activity.type);
-      const alpha = highlightedId
-        ? highlightedId === id ? 0.9 : 0.1
-        : 0.28;
+      const alpha = inPlanner
+        ? 0.08
+        : highlightedId
+          ? highlightedId === id ? 0.9 : 0.1
+          : 0.28;
       feature.setStyle(routeStyles(color, alpha));
       source.addFeature(feature);
     }
 
-    if (!fittedRef.current && withRoutes.length > 0 && map) {
+    if (!fittedRef.current && !inPlanner && withRoutes.length > 0 && map) {
       const extent = source.getExtent();
       if (isFinite(extent[0])) {
         map.getView().fit(extent, { padding: [40, 40, 40, 40], maxZoom: 9, duration: 400 });
         fittedRef.current = true;
       }
     }
-  }, [activities, highlightedId]);
+  }, [activities, highlightedId, !!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync photo pin markers
   useEffect(() => {
@@ -244,18 +389,29 @@ export default function MainMap({
     }
   }, [photoMarkers]);
 
-  // Click handler — routes and photo pins
+  // Click handler — planner adds waypoints, browse selects activities
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onClick = (e: any) => {
-      let handled = false;
+      const pp = plannerPropsRef.current;
+      if (pp) {
+        // In planner mode: check for waypoint hit (skip adding) otherwise add
+        const wpHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+          layerFilter: (l) => l === plannerWpLayerRef.current,
+          hitTolerance: 10,
+        });
+        if (wpHit) return;
+        const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+        pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
+        return;
+      }
+      // Browse mode: select activity
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
-        if (handled) return;
         const actId = feature.get('activityId');
-        if (actId && onActivitySelect) { onActivitySelect(actId); handled = true; }
+        if (actId && onActivitySelect) onActivitySelect(actId);
       });
     };
 
@@ -263,17 +419,26 @@ export default function MainMap({
     return () => map.un('click', onClick);
   }, [onActivitySelect]);
 
-  // Pointer cursor on hover
+  // Cursor — crosshair in planner mode, pointer on activity hover in browse mode
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onMove = (e: any) => {
+      const el = map.getTargetElement() as HTMLElement;
+      if (plannerPropsRef.current) {
+        const wpHit = map.hasFeatureAtPixel(e.pixel, {
+          layerFilter: (l) => l === plannerWpLayerRef.current,
+          hitTolerance: 10,
+        });
+        el.style.cursor = wpHit ? 'move' : 'crosshair';
+        return;
+      }
       const hit = map.hasFeatureAtPixel(e.pixel, {
         layerFilter: (l) => l === routeLayerRef.current,
       });
-      (map.getTargetElement() as HTMLElement).style.cursor = hit ? 'pointer' : '';
+      el.style.cursor = hit ? 'pointer' : '';
     };
 
     map.on('pointermove', onMove);

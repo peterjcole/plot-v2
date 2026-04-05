@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getAthleteActivities, refreshTokenIfNeeded, StravaApiError } from '@/lib/strava';
-import MapShell from '@/app/components/shell/MapShell';
+import MapShell, { type PanelMode } from '@/app/components/shell/MapShell';
 import { ActivitySummary } from '@/lib/types';
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const { mode } = await searchParams;
+  const initialMode: PanelMode = mode === 'planner' ? 'planner' : 'browse';
   const session = await getSession();
   const isLoggedIn = !!session.accessToken;
 
@@ -40,6 +42,7 @@ export default async function Home() {
       activities={activities}
       avatarInitials={avatarInitials}
       isLoggedIn={isLoggedIn}
+      initialMode={initialMode}
     />
   );
 }
