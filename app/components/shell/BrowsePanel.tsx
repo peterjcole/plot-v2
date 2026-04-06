@@ -23,9 +23,10 @@ interface BrowsePanelProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  authError?: boolean;
 }
 
-export default function BrowsePanel({ activities, selectedId, onSelectActivity, hoveredId, onHoverActivity, hasMore, isLoadingMore, onLoadMore }: BrowsePanelProps) {
+export default function BrowsePanel({ activities, selectedId, onSelectActivity, hoveredId, onHoverActivity, hasMore, isLoadingMore, onLoadMore, authError }: BrowsePanelProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -109,6 +110,40 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity, 
           </button>
         ))}
       </div>
+
+      {/* Auth error banner */}
+      {authError && (
+        <div
+          role="alert"
+          style={{
+            margin: '8px 10px',
+            padding: '10px 12px',
+            background: 'rgba(224,112,32,0.08)',
+            border: '1px solid rgba(224,112,32,0.3)',
+            borderRadius: 4,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ora)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+            <path d="M12 9v4"/><path d="M12 17h.01"/>
+          </svg>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ice)', fontFamily: 'var(--mono)', marginBottom: 4 }}>
+              Session expired
+            </div>
+            <a
+              href="/api/auth/strava"
+              style={{ fontSize: 10, color: 'var(--ora)', fontFamily: 'var(--mono)', textDecoration: 'none', letterSpacing: '0.04em' }}
+            >
+              Reconnect Strava →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Activity list */}
       <div style={{ flex: 1, overflowY: 'auto' }}>

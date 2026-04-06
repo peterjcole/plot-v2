@@ -22,14 +22,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   }
 
   let activities: ActivitySummary[] = [];
+  let authError = false;
   if (isLoggedIn && session.accessToken) {
     try {
       activities = await getAthleteActivities(session.accessToken, 1, 50);
     } catch (error) {
       if (error instanceof StravaApiError && error.status === 401) {
-        redirect('/api/auth/logout');
+        authError = true;
       }
-      // Non-fatal — render with empty list
+      // Non-fatal — render with empty list (or banner for auth errors)
     }
   }
 
@@ -43,6 +44,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
       avatarInitials={avatarInitials}
       isLoggedIn={isLoggedIn}
       initialMode={initialMode}
+      authError={authError}
     />
   );
 }

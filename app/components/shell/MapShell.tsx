@@ -47,9 +47,10 @@ interface MapShellProps {
   avatarInitials: string;
   isLoggedIn?: boolean;
   initialMode?: PanelMode;
+  authError?: boolean;
 }
 
-export default function MapShell({ activities, avatarInitials, isLoggedIn = false, initialMode = 'browse' }: MapShellProps) {
+export default function MapShell({ activities, avatarInitials, isLoggedIn = false, initialMode = 'browse', authError = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>(initialMode);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
@@ -285,7 +286,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         >
           {mode === 'browse' && (
             isLoggedIn
-              ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} />
+              ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
               : <UnauthPanel />
           )}
           {mode === 'detail' && (
@@ -423,7 +424,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           >
             {mode === 'browse' && (
               isLoggedIn
-                ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} />
+                ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
                 : <UnauthPanel />
             )}
             {mode === 'detail' && (
