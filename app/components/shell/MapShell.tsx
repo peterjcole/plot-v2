@@ -7,6 +7,7 @@ import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
 import { ActivitySummary, ActivityData } from '@/lib/types';
 import { type MapLayer, type PlannerProps } from '@/app/components/MainMap';
+import LayersPanel, { type LayerState, DEFAULT_LAYER_STATE } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
@@ -28,52 +29,6 @@ const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false }
 
 export type PanelMode = 'browse' | 'detail' | 'planner';
 
-function LayerToggle({ baseLayer, onBaseLayerChange, bottom, fixed }: {
-  baseLayer: MapLayer;
-  onBaseLayerChange: (l: MapLayer) => void;
-  bottom: number;
-  fixed?: boolean;
-}) {
-  return (
-    <div style={{
-      position: fixed ? 'fixed' : 'absolute',
-      bottom,
-      right: 16,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
-      zIndex: 15,
-    }}>
-      {(['topo', 'satellite'] as MapLayer[]).map((l) => (
-        <button
-          key={l}
-          onClick={() => onBaseLayerChange(l)}
-          title={l === 'topo' ? 'Topo' : 'Satellite'}
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 4,
-            border: `1px solid ${baseLayer === l ? 'var(--ora)' : 'var(--p3)'}`,
-            background: baseLayer === l ? 'rgba(224,112,32,0.18)' : 'rgba(7,14,20,0.75)',
-            color: baseLayer === l ? 'var(--ora)' : 'var(--fog-dim)',
-            fontFamily: 'var(--mono)',
-            fontSize: 9,
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          {l === 'topo' ? 'T' : 'S'}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function computeGridNorthBearing(center: number[]): number {
   const c = transform(center, OS_PROJECTION.code, 'EPSG:4326') as [number, number];
@@ -97,7 +52,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [baseLayer, setBaseLayer] = useState<MapLayer>('topo');
+  const [layerState, setLayerState] = useState<LayerState>(DEFAULT_LAYER_STATE);
+  const patchLayers = useCallback((patch: Partial<LayerState>) => setLayerState(prev => ({ ...prev, ...patch })), []);
   const [isMobile, setIsMobile] = useState(false);
 
   // Theme
@@ -320,15 +276,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             highlightedId={selectedId}
             photoMarkers={photoMarkers}
             onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
-            baseLayer={baseLayer}
-            onBaseLayerChange={setBaseLayer}
+            baseLayer={layerState.baseLayer}
             plannerProps={plannerProps}
             onMapReady={handleMapReady}
             osDark={osDark}
+            showHillshade={layerState.showHillshade}
+            showPhotos={layerState.showPhotos}
+            dimBaseMap={layerState.dimBaseMap}
           />
-          {mode !== 'planner' && (
-            <LayerToggle baseLayer={baseLayer} onBaseLayerChange={setBaseLayer} bottom={16} />
-          )}
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} />
           {mode === 'planner' && (
             <PlannerToolbar
               waypoints={waypoints}
@@ -368,11 +324,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           highlightedId={selectedId}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
-          baseLayer={baseLayer}
-          onBaseLayerChange={setBaseLayer}
+          baseLayer={layerState.baseLayer}
           plannerProps={plannerProps}
           onMapReady={handleMapReady}
           osDark={osDark}
+          showHillshade={layerState.showHillshade}
+          showPhotos={layerState.showPhotos}
+          dimBaseMap={layerState.dimBaseMap}
         />
       </div>
 
@@ -381,7 +339,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
       {mode !== 'planner' && (
         <>
-          <LayerToggle baseLayer={baseLayer} onBaseLayerChange={setBaseLayer} bottom={198} fixed />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={198} fixed />
           <button
             onClick={handleOpenPlanner}
             style={{

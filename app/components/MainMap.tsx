@@ -19,7 +19,7 @@ import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
-  OS_DEFAULT_CENTER, OS_ZOOM,
+  HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
 import { ActivitySummary, ActivityPhoto, Waypoint, RouteSegment } from '@/lib/types';
 import { getActivityColor } from '@/lib/activity-categories';
@@ -40,10 +40,12 @@ interface MainMapProps {
   photoMarkers?: ActivityPhoto[];
   onActivitySelect?: (id: string) => void;
   baseLayer?: MapLayer;
-  onBaseLayerChange?: (layer: MapLayer) => void;
   plannerProps?: PlannerProps;
   onMapReady?: (map: Map) => void;
   osDark?: boolean;
+  showHillshade?: boolean;
+  showPhotos?: boolean;
+  dimBaseMap?: boolean;
 }
 
 // ── Activity trace styles ────────────────────────────────────────────────────
@@ -151,20 +153,24 @@ export default function MainMap({
   photoMarkers,
   onActivitySelect,
   baseLayer = 'topo',
-  onBaseLayerChange,
   plannerProps,
   onMapReady,
   osDark = true,
+  showHillshade = false,
+  showPhotos = true,
+  dimBaseMap = false,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const routeSourceRef = useRef<VectorSource | null>(null);
   const routeLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const photoSourceRef = useRef<VectorSource | null>(null);
+  const photoLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const topoLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const osOverviewLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const os25kLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const fittedRef = useRef(false);
 
   // Planner drawing refs
@@ -218,6 +224,13 @@ export default function MainMap({
       zIndex: 0,
     });
 
+    const hillshadeLayer = new TileLayer({
+      source: new XYZ({ url: HILLSHADE_TILE_URL, projection, tileGrid: overviewTileGrid }),
+      opacity: 0.45,
+      visible: false,
+      zIndex: 5,
+    });
+
     const routeSource = new VectorSource();
     const routeLayer = new VectorLayer({ source: routeSource, zIndex: 10 });
 
@@ -248,9 +261,11 @@ export default function MainMap({
     osOverviewLayerRef.current = osOverviewLayer;
     os25kLayerRef.current = os25kLayer;
     satelliteLayerRef.current = satelliteLayer;
+    hillshadeLayerRef.current = hillshadeLayer;
     routeSourceRef.current = routeSource;
     routeLayerRef.current = routeLayer;
     photoSourceRef.current = photoSource;
+    photoLayerRef.current = photoLayer;
     plannerWpSourceRef.current = plannerWpSource;
     plannerRouteSourceRef.current = plannerRouteSource;
     plannerWpLayerRef.current = plannerWpLayer;
@@ -263,7 +278,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, routeLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, hillshadeLayer, routeLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
       view: new View({
         projection,
         center,
@@ -287,6 +302,8 @@ export default function MainMap({
       osOverviewLayerRef.current = null;
       os25kLayerRef.current = null;
       satelliteLayerRef.current = null;
+      hillshadeLayerRef.current = null;
+      photoLayerRef.current = null;
       plannerWpSourceRef.current = null;
       plannerRouteSourceRef.current = null;
       plannerWpLayerRef.current = null;
@@ -338,6 +355,24 @@ export default function MainMap({
     if (ovSrc) { ovSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); ovSrc.refresh(); }
     if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
   }, [osDark]);
+
+  // Hillshade visibility
+  useEffect(() => {
+    hillshadeLayerRef.current?.setVisible(showHillshade);
+  }, [showHillshade]);
+
+  // Photo markers visibility
+  useEffect(() => {
+    photoLayerRef.current?.setVisible(showPhotos);
+  }, [showPhotos]);
+
+  // Dim base map — reduce opacity of topo/OS layers
+  useEffect(() => {
+    const opacity = dimBaseMap ? 0.45 : 1;
+    topoLayerRef.current?.setOpacity(opacity);
+    osOverviewLayerRef.current?.setOpacity(opacity);
+    os25kLayerRef.current?.setOpacity(opacity);
+  }, [dimBaseMap]);
 
   // Sync activity route features (dim in planner mode)
   useEffect(() => {
