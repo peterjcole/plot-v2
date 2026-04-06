@@ -299,17 +299,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           />
           {/* Map chrome — bottom-left cluster */}
           <LayersPanel state={layerState} onChange={patchLayers} bottom={16} />
-          <Compass
-            bearing={compassBearing}
-            onResetNorth={handleResetNorth}
-            style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 15 }}
-          />
-          {mode !== 'planner' && (
-            <ScaleBar
-              metersPerPixel={mapResolution}
-              style={{ position: 'absolute', bottom: 78, left: 56, zIndex: 15 }}
-            />
-          )}
+          <div style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
+            {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
+          </div>
           {/* Activity legend — top-right */}
           {mode !== 'planner' && (
             <MapLegend style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }} />
@@ -371,17 +364,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
 
       {/* Map chrome — bottom-left cluster (above the buttons) */}
-      <Compass
-        bearing={compassBearing}
-        onResetNorth={handleResetNorth}
-        style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 15 }}
-      />
-      {mode !== 'planner' && (
-        <ScaleBar
-          metersPerPixel={mapResolution}
-          style={{ position: 'fixed', bottom: 204, left: 56, zIndex: 15 }}
-        />
-      )}
+      <div style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
+        {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
+      </div>
 
       {mode !== 'planner' && (
         <>

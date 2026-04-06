@@ -3,10 +3,9 @@
 interface CompassProps {
   bearing: number; // degrees CW from north (positive = clockwise rotation needed)
   onResetNorth: () => void;
-  style?: React.CSSProperties;
 }
 
-export default function Compass({ bearing, onResetNorth, style }: CompassProps) {
+export default function Compass({ bearing, onResetNorth }: CompassProps) {
   const norm = ((bearing % 360) + 360) % 360;
   if (norm < 0.5 || norm > 359.5) return null;
 
@@ -26,7 +25,6 @@ export default function Compass({ bearing, onResetNorth, style }: CompassProps) 
         cursor: 'pointer',
         flexShrink: 0,
         overflow: 'hidden',
-        ...style,
       }}
     >
       <svg

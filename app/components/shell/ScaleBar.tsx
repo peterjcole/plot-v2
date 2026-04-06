@@ -2,13 +2,12 @@
 
 interface ScaleBarProps {
   metersPerPixel: number;
-  style?: React.CSSProperties;
 }
 
 const SNAP_VALUES = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
 const TARGET_PX = 60;
 
-export default function ScaleBar({ metersPerPixel, style }: ScaleBarProps) {
+export default function ScaleBar({ metersPerPixel }: ScaleBarProps) {
   if (!metersPerPixel || metersPerPixel <= 0) return null;
 
   const ideal = metersPerPixel * TARGET_PX;
@@ -31,7 +30,6 @@ export default function ScaleBar({ metersPerPixel, style }: ScaleBarProps) {
         WebkitBackdropFilter: 'blur(6px)',
         borderRadius: 4,
         padding: '5px 6px',
-        ...style,
       }}
     >
       <div style={{
