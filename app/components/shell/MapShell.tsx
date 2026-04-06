@@ -21,9 +21,11 @@ import DetailPanel from './DetailPanel';
 import PlannerPanel from './PlannerPanel';
 import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
-import MobileLegend from './MobileLegend';
 import MobileBottomSheet from './MobileBottomSheet';
 import PlannerToolbar from '@/app/(main)/planner/PlannerToolbar';
+import Compass from './Compass';
+import ScaleBar from './ScaleBar';
+import MapLegend from './MapLegend';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -55,6 +57,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [layerState, setLayerState] = useState<LayerState>(DEFAULT_LAYER_STATE);
   const patchLayers = useCallback((patch: Partial<LayerState>) => setLayerState(prev => ({ ...prev, ...patch })), []);
   const [isMobile, setIsMobile] = useState(false);
+  const [compassBearing, setCompassBearing] = useState(0);
+  const [mapResolution, setMapResolution] = useState(10);
 
   // Theme
   const [theme, setTheme] = useState<Theme>('system');
@@ -149,6 +153,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     }, 500);
   }, [waypoints, segments]);
 
+  const handleResetNorth = useCallback(() => {
+    mapInstanceRef.current?.getView().animate({ rotation: 0, duration: 300 });
+    setCompassBearing(0);
+  }, []);
+
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
     const stored = loadRoute();
@@ -156,11 +165,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       map.getView().setCenter(stored!.mapCenter);
       map.getView().setZoom(stored!.mapZoom);
     }
+    // Set initial resolution
+    setMapResolution(map.getView().getResolution() ?? 10);
     map.on('moveend', () => {
       const view = map.getView();
       const center = view.getCenter() as [number, number];
       const zoom = view.getZoom() ?? 7;
       if (center) saveRoute(waypointsRef.current, segmentsRef.current, center, zoom);
+      setCompassBearing(view.getRotation() * 180 / Math.PI);
+      setMapResolution(view.getResolution() ?? 10);
     });
   }, []);
 
@@ -284,7 +297,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             showPhotos={layerState.showPhotos}
             dimBaseMap={layerState.dimBaseMap}
           />
+          {/* Map chrome — bottom-left cluster */}
           <LayersPanel state={layerState} onChange={patchLayers} bottom={16} />
+          <Compass
+            bearing={compassBearing}
+            onResetNorth={handleResetNorth}
+            style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 15 }}
+          />
+          {mode !== 'planner' && (
+            <ScaleBar
+              metersPerPixel={mapResolution}
+              style={{ position: 'absolute', bottom: 78, left: 56, zIndex: 15 }}
+            />
+          )}
+          {/* Activity legend — top-right */}
+          {mode !== 'planner' && (
+            <MapLegend style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }} />
+          )}
           {mode === 'planner' && (
             <PlannerToolbar
               waypoints={waypoints}
@@ -335,11 +364,28 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       </div>
 
       <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />
-      <MobileLegend />
+
+      {/* Activity legend below header */}
+      {mode !== 'planner' && (
+        <MapLegend style={{ position: 'absolute', top: 58, right: 12, zIndex: 10 }} />
+      )}
+
+      {/* Map chrome — bottom-left cluster (above the buttons) */}
+      <Compass
+        bearing={compassBearing}
+        onResetNorth={handleResetNorth}
+        style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 15 }}
+      />
+      {mode !== 'planner' && (
+        <ScaleBar
+          metersPerPixel={mapResolution}
+          style={{ position: 'fixed', bottom: 204, left: 56, zIndex: 15 }}
+        />
+      )}
 
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={198} fixed />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={142} fixed />
           <button
             onClick={handleOpenPlanner}
             style={{
