@@ -32,9 +32,10 @@ interface DetailPanelProps {
   activity: ActivityData;
   onBack: () => void;
   onOpenPlanner?: () => void;
+  onPhotoClick?: (index: number) => void;
 }
 
-export default function DetailPanel({ activity, onBack, onOpenPlanner }: DetailPanelProps) {
+export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick }: DetailPanelProps) {
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
 
@@ -82,13 +83,16 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner }: DetailP
               Photos
             </div>
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
-              {activity.photos.map((photo) => (
-                <div
+              {activity.photos.map((photo, i) => (
+                <button
                   key={photo.id}
+                  onClick={() => onPhotoClick?.(i)}
+                  aria-label={`Open photo ${i + 1}${photo.caption ? ': ' + photo.caption : ''}`}
                   style={{
                     width: 80, height: 60, flexShrink: 0, borderRadius: 4,
                     background: 'var(--p2)', overflow: 'hidden', position: 'relative',
                     border: '1px solid var(--fog-ghost)',
+                    padding: 0, cursor: onPhotoClick ? 'pointer' : 'default',
                   }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -109,7 +113,7 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner }: DetailP
                       </svg>
                     </div>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           </div>

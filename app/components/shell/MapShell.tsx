@@ -26,6 +26,7 @@ import PlannerToolbar from '@/app/(main)/planner/PlannerToolbar';
 import Compass from './Compass';
 import ScaleBar from './ScaleBar';
 import MapLegend from './MapLegend';
+import PhotoLightbox from './PhotoLightbox';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -61,6 +62,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // Lightbox — index of -1 means closed
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const lightboxPhotos = activityDetail?.photos ?? [];
+  const handlePhotoClick = useCallback((index: number) => setLightboxIndex(index), []);
+  const handleLightboxClose = useCallback(() => setLightboxIndex(-1), []);
+  const handlePhotoMarkerClick = useCallback((photoId: string) => {
+    const idx = lightboxPhotos.findIndex(p => p.id === photoId);
+    if (idx >= 0) setLightboxIndex(idx);
+  }, [lightboxPhotos]);
+  const lightboxOpen = lightboxIndex >= 0 && lightboxPhotos.length > 0;
+
+  // Reset lightbox when activity changes
+  useEffect(() => { setLightboxIndex(-1); }, [selectedId]);
 
   // Pagination
   const [allActivities, setAllActivities] = useState(activities);
@@ -295,7 +310,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 {detailLoading ? 'Loading…' : 'No data'}
               </div>
             ) : (
-              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} />
+              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} onPhotoClick={handlePhotoClick} />
             )
           )}
           {mode === 'planner' && (
@@ -308,6 +323,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             activities={allActivities}
             highlightedId={selectedId ?? hoveredId}
             onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
+            onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
             photoMarkers={photoMarkers}
             onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
             baseLayer={layerState.baseLayer}
@@ -351,6 +367,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             />
           )}
         </div>
+        {lightboxOpen && (
+          <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
+        )}
       </div>
     );
   }
@@ -433,7 +452,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   {detailLoading ? 'Loading…' : 'No data'}
                 </div>
               ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} />
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} onPhotoClick={handlePhotoClick} />
               )
             )}
           </MobileBottomSheet>
@@ -461,6 +480,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           isExportingImage={isExportingImage}
           onBack={handleExitPlanner}
         />
+      )}
+
+      {lightboxOpen && (
+        <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
       )}
     </div>
   );

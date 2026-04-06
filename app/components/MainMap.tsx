@@ -40,6 +40,7 @@ interface MainMapProps {
   photoMarkers?: ActivityPhoto[];
   onActivitySelect?: (id: string) => void;
   onActivityHover?: (id: string | null) => void;
+  onPhotoMarkerClick?: (photoId: string) => void;
   baseLayer?: MapLayer;
   plannerProps?: PlannerProps;
   onMapReady?: (map: Map) => void;
@@ -154,6 +155,7 @@ export default function MainMap({
   photoMarkers,
   onActivitySelect,
   onActivityHover,
+  onPhotoMarkerClick,
   baseLayer = 'topo',
   plannerProps,
   onMapReady,
@@ -186,6 +188,8 @@ export default function MainMap({
   const onActivityHoverRef = useRef(onActivityHover);
   useEffect(() => { onActivityHoverRef.current = onActivityHover; }, [onActivityHover]);
   const lastHoveredIdRef = useRef<string | null>(null);
+  const onPhotoMarkerClickRef = useRef(onPhotoMarkerClick);
+  useEffect(() => { onPhotoMarkerClickRef.current = onPhotoMarkerClick; }, [onPhotoMarkerClick]);
 
   // Initialise map once
   useEffect(() => {
@@ -462,7 +466,17 @@ export default function MainMap({
         pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
         return;
       }
-      // Browse mode: select activity
+      // Browse mode: check photo pins first, then activity traces
+      let handled = false;
+      map.forEachFeatureAtPixel(e.pixel, (feature) => {
+        if (handled) return;
+        const photoId = feature.get('photoId');
+        if (photoId) {
+          onPhotoMarkerClickRef.current?.(photoId);
+          handled = true;
+        }
+      }, { layerFilter: (l) => l === photoLayerRef.current, hitTolerance: 8 });
+      if (handled) return;
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
         const actId = feature.get('activityId');
         if (actId && onActivitySelect) onActivitySelect(actId);
