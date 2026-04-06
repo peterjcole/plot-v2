@@ -17,6 +17,7 @@ import { Modify, DragPan } from 'ol/interaction';
 import { get as getProjection, fromLonLat, toLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
+import { getCenter } from 'ol/extent';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
   HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
@@ -90,17 +91,19 @@ function pinIconSvg(hasPhoto: boolean): string {
 
 // ── Planner drawing styles ───────────────────────────────────────────────────
 
+// Cased lines: dark outer border drawn first, orange inner on top.
+// Layer opacity (0.72) makes the whole thing translucent so the map shows through the center.
 const snappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.85)', width: 8 }) }),
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.55)', width: 2.5 }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.95)', width: 10 }) }),
+  new Style({ stroke: new Stroke({ color: '#E07020', width: 6 }) }),
 ];
 const unsnappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.55)', width: 7, lineDash: [10, 10] }) }),
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.45)', width: 2.5, lineDash: [10, 10] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.85)', width: 9, lineDash: [10, 10] }) }),
+  new Style({ stroke: new Stroke({ color: '#E07020', width: 5, lineDash: [10, 10] }) }),
 ];
 const routingPendingStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.35)', width: 6, lineDash: [2, 6] }) }),
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.35)', width: 2, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.6)', width: 7, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.7)', width: 4, lineDash: [2, 6] }) }),
 ];
 
 function waypointPinSvg(index: number): string {
@@ -263,7 +266,7 @@ export default function MainMap({
 
     // Planner layers (always present, toggled visible in planner mode)
     const plannerRouteSource = new VectorSource();
-    const plannerRouteLayer = new VectorLayer({ source: plannerRouteSource, zIndex: 25, visible: false });
+    const plannerRouteLayer = new VectorLayer({ source: plannerRouteSource, zIndex: 25, visible: false, opacity: 0.72 });
     const plannerWpSource = new VectorSource();
     const plannerWpLayer = new VectorLayer({ source: plannerWpSource, zIndex: 30, visible: false });
 
@@ -516,8 +519,14 @@ export default function MainMap({
     if (!fittedRef.current && !inPlanner && withRoutes.length > 0 && map) {
       const extent = source.getExtent();
       if (isFinite(extent[0])) {
-        map.getView().fit(extent, { padding: [40, 40, 40, 360], maxZoom: 9, duration: 400 });
+        map.getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 9, duration: 400 });
         fittedRef.current = true;
+        // Clamp minimum zoom — prevents "whole of europe" view for tightly-bounded extents
+        const fitMap = map;
+        setTimeout(() => {
+          const z = fitMap.getView().getZoom() ?? 6;
+          if (z < 6) fitMap.getView().animate({ center: getCenter(extent), zoom: 6, duration: 200 });
+        }, 450);
       }
     }
   }, [activities, highlightedId, !!plannerProps, osDark, loadedActivityId]); // eslint-disable-line react-hooks/exhaustive-deps
