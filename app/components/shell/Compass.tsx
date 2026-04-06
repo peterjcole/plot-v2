@@ -18,10 +18,14 @@ export default function Compass({ bearing, onResetNorth, style }: CompassProps) 
         width: 36,
         height: 36,
         padding: 0,
-        border: 'none',
-        background: 'transparent',
+        border: '1px solid var(--fog-ghost)',
+        borderRadius: '50%',
+        background: 'var(--glass)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         cursor: 'pointer',
         flexShrink: 0,
+        overflow: 'hidden',
         ...style,
       }}
     >
@@ -29,17 +33,15 @@ export default function Compass({ bearing, onResetNorth, style }: CompassProps) 
         viewBox="0 0 36 36"
         style={{ display: 'block', transform: `rotate(${bearing}deg)`, transition: 'transform 0.2s' }}
       >
-        <circle cx="18" cy="18" r="16" fill="rgba(7,14,20,0.78)" stroke="#1E4858" strokeWidth="1" />
-        <polygon points="18,4 21,18 18,15 15,18" fill="#E07020" />
-        <polygon points="18,32 21,18 18,21 15,18" fill="rgba(240,248,250,0.32)" />
+        {/* North arrow — orange */}
+        <polygon points="18,4 21,18 18,15 15,18" style={{ fill: 'var(--ora)' }} />
+        {/* South arrow — dim */}
+        <polygon points="18,32 21,18 18,21 15,18" style={{ fill: 'var(--fog-ghost)' }} />
         <text
-          x="18" y="10.5"
+          x="18" y="10"
           textAnchor="middle"
           dominantBaseline="central"
-          fill="#E07020"
-          fontSize="5"
-          fontFamily="IBM Plex Mono"
-          fontWeight="700"
+          style={{ fill: 'var(--ora)', fontSize: 5, fontFamily: 'var(--mono)', fontWeight: 700 }}
         >N</text>
       </svg>
     </button>

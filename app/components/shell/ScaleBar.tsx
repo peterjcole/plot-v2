@@ -22,13 +22,23 @@ export default function ScaleBar({ metersPerPixel, style }: ScaleBarProps) {
     <div
       role="img"
       aria-label={`Scale: ${label}`}
-      style={{ display: 'flex', flexDirection: 'column', gap: 3, ...style }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+        background: 'var(--glass)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        borderRadius: 4,
+        padding: '5px 6px',
+        ...style,
+      }}
     >
       <div style={{
         width: barPx,
         height: 3,
         background: 'linear-gradient(to right, var(--fog) 0%, var(--fog) 50%, var(--p4) 50%, var(--p4) 100%)',
-        border: '1px solid var(--p4)',
+        border: '1px solid var(--fog-ghost)',
         borderRadius: 1,
       }} />
       <span style={{
