@@ -29,10 +29,11 @@ import ScaleBar from './ScaleBar';
 import MapLegend from './MapLegend';
 import PhotoLightbox from './PhotoLightbox';
 import WaypointPopover from '@/app/components/map/WaypointPopover';
+import AboutSection from './AboutSection';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
-export type PanelMode = 'browse' | 'detail' | 'planner';
+export type PanelMode = 'browse' | 'detail' | 'planner' | 'about';
 
 
 function computeGridNorthBearing(center: number[]): number {
@@ -250,6 +251,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleExitPlanner = useCallback(() => setMode('browse'), []);
 
+  const handleOpenAbout = useCallback(() => setMode('about'), []);
+  const handleCloseAbout = useCallback(() => setMode('browse'), []);
+
   const handleTabChange = useCallback((tab: 'activities' | 'planner') => {
     if (tab === 'planner') handleOpenPlanner();
     else handleExitPlanner();
@@ -330,6 +334,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onTabChange={handleTabChange}
           theme={theme}
           onThemeChange={handleThemeChange}
+          onAbout={handleOpenAbout}
         >
           {mode === 'browse' && (
             isLoggedIn
@@ -355,6 +360,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               isLoadingElevation={isLoadingElevation}
               dispatch={dispatch}
             />
+          )}
+          {mode === 'about' && (
+            <AboutSection onBack={handleCloseAbout} />
           )}
         </LeftPanel>
 

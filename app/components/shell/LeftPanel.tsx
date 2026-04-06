@@ -12,10 +12,11 @@ interface LeftPanelProps {
   onTabChange?: (tab: Tab) => void;
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
+  onAbout?: () => void;
   children?: React.ReactNode;
 }
 
-export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, theme = 'system', onThemeChange, children }: LeftPanelProps) {
+export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, theme = 'system', onThemeChange, onAbout, children }: LeftPanelProps) {
 
   return (
     <div
@@ -54,7 +55,24 @@ export default function LeftPanel({ avatarInitials, activeTab = 'activities', on
         >
           plot
         </span>
-        <ThemeToggle theme={theme} onChange={onThemeChange ?? (() => {})} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <ThemeToggle theme={theme} onChange={onThemeChange ?? (() => {})} />
+          <button
+            onClick={onAbout}
+            aria-label="About plot"
+            style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'none', border: '1px solid var(--fog-ghost)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'var(--fog-dim)', flexShrink: 0,
+              padding: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Tab bar */}
