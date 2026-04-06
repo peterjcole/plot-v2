@@ -6,7 +6,7 @@ import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
 import { ActivitySummary, ActivityData } from '@/lib/types';
-import { type MapLayer, type PlannerProps } from '@/app/components/MainMap';
+import { type MapLayer, type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, DEFAULT_LAYER_STATE } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
@@ -28,6 +28,7 @@ import Compass from './Compass';
 import ScaleBar from './ScaleBar';
 import MapLegend from './MapLegend';
 import PhotoLightbox from './PhotoLightbox';
+import WaypointPopover from '@/app/components/map/WaypointPopover';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -119,6 +120,21 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const { elevationData, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
+
+  // Waypoint popover
+  const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
+  const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
+  const handleWaypointPopoverClose = useCallback(() => setWaypointPopover(null), []);
+  const handleWaypointDelete = useCallback((index: number) => {
+    dispatch({ type: 'REMOVE_WAYPOINT', index });
+    setWaypointPopover(null);
+  }, [dispatch]);
+  const handleToggleSnapIn = useCallback((index: number) => {
+    if (index > 0) dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: index - 1 });
+  }, [dispatch]);
+  const handleToggleSnapOut = useCallback((index: number) => {
+    if (index < segments.length) dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index });
+  }, [dispatch, segments.length]);
 
   const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return 0;
@@ -348,6 +364,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             highlightedId={selectedId ?? hoveredId}
             onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
             onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
+            onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
             loadedActivityId={loadedActivityId ?? undefined}
             photoMarkers={photoMarkers}
             onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
@@ -392,6 +409,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             />
           )}
         </div>
+        {waypointPopover && mode === 'planner' && (
+          <WaypointPopover
+            waypoint={waypoints[waypointPopover.index]}
+            index={waypointPopover.index}
+            totalWaypoints={waypoints.length}
+            segments={segments}
+            screenX={waypointPopover.screenX}
+            screenY={waypointPopover.screenY}
+            onClose={handleWaypointPopoverClose}
+            onDelete={handleWaypointDelete}
+            onToggleSnapIn={handleToggleSnapIn}
+            onToggleSnapOut={handleToggleSnapOut}
+          />
+        )}
         {lightboxOpen && (
           <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
         )}
@@ -411,6 +442,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           highlightedId={selectedId}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
+          onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
           baseLayer={layerState.baseLayer}
           plannerProps={plannerProps}
           onMapReady={handleMapReady}
@@ -507,6 +539,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         />
       )}
 
+      {waypointPopover && mode === 'planner' && (
+        <WaypointPopover
+          waypoint={waypoints[waypointPopover.index]}
+          index={waypointPopover.index}
+          totalWaypoints={waypoints.length}
+          segments={segments}
+          screenX={waypointPopover.screenX}
+          screenY={waypointPopover.screenY}
+          onClose={handleWaypointPopoverClose}
+          onDelete={handleWaypointDelete}
+          onToggleSnapIn={handleToggleSnapIn}
+          onToggleSnapOut={handleToggleSnapOut}
+        />
+      )}
       {lightboxOpen && (
         <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
       )}

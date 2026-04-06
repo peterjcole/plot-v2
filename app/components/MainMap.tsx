@@ -34,6 +34,12 @@ export interface PlannerProps {
   dispatch: React.Dispatch<RouteAction>;
 }
 
+interface WaypointClickInfo {
+  index: number;
+  screenX: number;
+  screenY: number;
+}
+
 interface MainMapProps {
   activities: ActivitySummary[];
   highlightedId?: string | null;
@@ -41,6 +47,7 @@ interface MainMapProps {
   onActivitySelect?: (id: string) => void;
   onActivityHover?: (id: string | null) => void;
   onPhotoMarkerClick?: (photoId: string) => void;
+  onWaypointClick?: (info: WaypointClickInfo) => void;
   loadedActivityId?: string;
   baseLayer?: MapLayer;
   plannerProps?: PlannerProps;
@@ -50,6 +57,8 @@ interface MainMapProps {
   showPhotos?: boolean;
   dimBaseMap?: boolean;
 }
+
+export type { WaypointClickInfo };
 
 // ── Activity trace styles ────────────────────────────────────────────────────
 
@@ -157,6 +166,7 @@ export default function MainMap({
   onActivitySelect,
   onActivityHover,
   onPhotoMarkerClick,
+  onWaypointClick,
   loadedActivityId,
   baseLayer = 'topo',
   plannerProps,
@@ -192,6 +202,8 @@ export default function MainMap({
   const lastHoveredIdRef = useRef<string | null>(null);
   const onPhotoMarkerClickRef = useRef(onPhotoMarkerClick);
   useEffect(() => { onPhotoMarkerClickRef.current = onPhotoMarkerClick; }, [onPhotoMarkerClick]);
+  const onWaypointClickRef = useRef(onWaypointClick);
+  useEffect(() => { onWaypointClickRef.current = onWaypointClick; }, [onWaypointClick]);
 
   // Initialise map once
   useEffect(() => {
@@ -458,12 +470,19 @@ export default function MainMap({
     const onClick = (e: any) => {
       const pp = plannerPropsRef.current;
       if (pp) {
-        // In planner mode: check for waypoint hit (skip adding) otherwise add
-        const wpHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+        // In planner mode: check for waypoint hit (open popover) otherwise add
+        const wpFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
           layerFilter: (l) => l === plannerWpLayerRef.current,
-          hitTolerance: 10,
+          hitTolerance: 12,
         });
-        if (wpHit) return;
+        if (wpFeature) {
+          onWaypointClickRef.current?.({
+            index: wpFeature.get('waypointIndex'),
+            screenX: e.originalEvent.clientX,
+            screenY: e.originalEvent.clientY,
+          });
+          return;
+        }
         const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
         pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
         return;
