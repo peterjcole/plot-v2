@@ -72,11 +72,12 @@ function hexToComponents(hex: string): [number, number, number] {
 
 function routeStyles(color: string, alpha: number, isDark = true): Style[] {
   const [r, g, b] = hexToComponents(color);
-  const overlay = isDark ? `rgba(7,14,20,${alpha * 0.6})` : 'rgba(255,255,255,0.30)';
-  return [
-    new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 5 }) }),
-    new Style({ stroke: new Stroke({ color: overlay, width: 2 }) }),
-  ];
+  const styles: Style[] = [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 5 }) })];
+  if (alpha >= 0.5) {
+    const overlay = isDark ? 'rgba(7,14,20,0.55)' : 'rgba(255,255,255,0.30)';
+    styles.push(new Style({ stroke: new Stroke({ color: overlay, width: 2 }) }));
+  }
+  return styles;
 }
 
 function pinIconSvg(hasPhoto: boolean): string {
@@ -502,11 +503,11 @@ export default function MainMap({
       );
       const feature = new Feature({ geometry: new LineString(coords), activityId: id });
       const color = getActivityColor(activity.type);
-      const defaultAlpha = osDark ? 0.28 : 0.55;
+      const defaultAlpha = osDark ? 0.38 : 0.55;
       const alpha = inPlanner
         ? (loadedActivityId === id ? 0.55 : 0.08)
         : highlightedId
-          ? highlightedId === id ? 0.9 : 0.1
+          ? highlightedId === id ? 0.9 : 0.12
           : defaultAlpha;
       feature.setStyle(routeStyles(color, alpha, osDark));
       source.addFeature(feature);

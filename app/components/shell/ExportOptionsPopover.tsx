@@ -5,10 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 interface ExportOptionsPopoverProps {
   activityId: string;
   osDark: boolean;
+  anchorRect: { x: number; y: number };
   onClose: () => void;
 }
-
-type PhotoCount = 0 | 1 | 2 | 3;
 
 function Toggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
   return (
@@ -45,11 +44,11 @@ function SegLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ExportOptionsPopover({ activityId, osDark, onClose }: ExportOptionsPopoverProps) {
+export default function ExportOptionsPopover({ activityId, osDark, anchorRect, onClose }: ExportOptionsPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
 
-  const [photoCount, setPhotoCount] = useState<PhotoCount>(0);
+  const [includeImages, setIncludeImages] = useState(true);
   const [baseMap, setBaseMap] = useState<'os' | 'satellite'>('os');
   const [darkMode, setDarkMode] = useState(osDark);
   const [hillshade, setHillshade] = useState(false);
@@ -79,6 +78,7 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
   }, [onClose]);
 
   function buildUrl() {
+    const photoCount = includeImages ? 3 : 0;
     const params = new URLSearchParams({
       activityId,
       format: 'jpeg',
@@ -97,7 +97,9 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
     onClose();
   }
 
-  const photoCounts: PhotoCount[] = [0, 1, 2, 3];
+  // Position: appear just below and to the left of the anchor
+  const left = Math.max(8, anchorRect.x - 200);
+  const top = anchorRect.y + 8;
 
   return (
     <div
@@ -107,24 +109,25 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
       aria-modal="true"
       aria-label="Export options"
       style={{
-        position: 'absolute',
-        bottom: 8,
-        left: 8,
-        width: 220,
+        position: 'fixed',
+        top,
+        left,
+        width: 240,
         background: 'var(--glass-hvy)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         border: '1px solid var(--p3)',
         borderRadius: 8,
         padding: 14,
-        zIndex: 50,
+        zIndex: 9999,
+        boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
         outline: 'none',
       } as React.CSSProperties}
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ice)', fontFamily: 'var(--mono)', letterSpacing: '0.06em' }}>
-          Export image
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ice)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Export options
         </span>
         <button
           onClick={onClose}
@@ -135,27 +138,6 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
-      </div>
-
-      {/* Photos */}
-      <SegLabel>Photos</SegLabel>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {photoCounts.map((n) => (
-          <button
-            key={n}
-            onClick={() => setPhotoCount(n)}
-            style={{
-              flex: 1, padding: '5px 0',
-              background: photoCount === n ? 'var(--ora)' : 'var(--p3)',
-              border: 'none', borderRadius: 4,
-              color: photoCount === n ? 'var(--p0)' : 'var(--fog)',
-              fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {n === 0 ? 'None' : String(n)}
-          </button>
-        ))}
       </div>
 
       {/* Base map */}
@@ -181,15 +163,16 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
 
       {/* OS options */}
       {baseMap === 'os' && (
-        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ marginTop: 10, paddingLeft: 8, borderLeft: '2px solid var(--p3)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Toggle label="Dark mode" checked={darkMode} onToggle={() => setDarkMode(v => !v)} />
           <Toggle label="Hillshading" checked={hillshade} onToggle={() => setHillshade(v => !v)} />
         </div>
       )}
 
-      {/* Other options */}
+      {/* Options */}
       <SegLabel>Options</SegLabel>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Toggle label="Include images" checked={includeImages} onToggle={() => setIncludeImages(v => !v)} />
         <Toggle label="Include description" checked={showDescription} onToggle={() => setShowDescription(v => !v)} />
         <Toggle label="Include logo" checked={includeLogo} onToggle={() => setIncludeLogo(v => !v)} />
       </div>
@@ -206,7 +189,6 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
           color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
           fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          marginBottom: 6,
         }}
       >
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -214,25 +196,6 @@ export default function ExportOptionsPopover({ activityId, osDark, onClose }: Ex
         </svg>
         Download JPEG
       </button>
-
-      {/* GPX button */}
-      <a
-        href={`/api/activity-gpx/${activityId}`}
-        download
-        onClick={onClose}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-          width: '100%', padding: '7px 12px', boxSizing: 'border-box',
-          border: '1px solid var(--p3)', borderRadius: 4,
-          color: 'var(--fog)', fontFamily: 'var(--mono)', fontSize: 10,
-          fontWeight: 500, textDecoration: 'none', letterSpacing: '0.04em',
-        }}
-      >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Export GPX
-      </a>
     </div>
   );
 }

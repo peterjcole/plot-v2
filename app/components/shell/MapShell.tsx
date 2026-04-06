@@ -13,7 +13,7 @@ import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
-import { simplifyWaypoints } from '@/lib/gpx';
+import { selectGpxWaypoints } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
 import { type Theme, loadTheme, saveTheme, applyThemeToDocument } from '@/lib/theme';
 import LeftPanel from './LeftPanel';
@@ -173,6 +173,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     applyThemeToDocument(theme, sysDark);
   }, [theme, sysDark]);
 
+  // Reflect panel mode in URL bar (no navigation, just history state)
+  useEffect(() => {
+    let path = '/';
+    if (mode === 'detail' && selectedId) path = `/activities/${selectedId}`;
+    else if (mode === 'planner') path = '/planner';
+    else if (mode === 'about') path = '/about';
+    window.history.replaceState(null, '', path);
+  }, [mode, selectedId]);
+
   const handleThemeChange = useCallback((t: Theme) => {
     setTheme(t);
     saveTheme(t);
@@ -234,7 +243,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleSelectActivity = useCallback((id: string) => {
     setSelectedId(id);
     setMode('detail');
-  }, []);
+    // Fit map to this activity's route from the already-loaded summary
+    const summary = allActivities.find(a => String(a.id) === id);
+    if (summary?.route?.length && mapInstanceRef.current) {
+      const coords = summary.route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
+      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 14 });
+    }
+  }, [allActivities]);
 
   const handleBack = useCallback(() => {
     setMode('browse');
@@ -269,14 +284,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleOpenInPlanner = useCallback(() => {
     if (!activityDetail?.route?.length) { handleOpenPlanner(); return; }
     const rawWaypoints = activityDetail.route.map(([lat, lng]) => ({ lat, lng }));
-    const simplified = simplifyWaypoints(rawWaypoints, 80);
-    const segs = simplified.slice(0, -1).map(() => ({ snapped: false as const, coordinates: [] }));
-    dispatch({ type: 'LOAD', waypoints: simplified, segments: segs });
+    // Create via-points every 2km with full track coordinates in each segment (same as GPX import)
+    const { waypoints: viaPoints, segments: viaSegments } = selectGpxWaypoints(rawWaypoints, 2);
+    dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
     setLoadedActivityId(String(activityDetail.id));
     setMode('planner');
     setSelectedId(null);
     setActivityDetail(null);
-    handleFitToRoute(simplified);
+    handleFitToRoute(viaPoints);
   }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner]);
 
   const handleGeolocate = useCallback(() => {
@@ -461,7 +476,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         />
       </div>
 
-      <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />
+      {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />}
 
       {/* Activity legend below header */}
       {mode !== 'planner' && (

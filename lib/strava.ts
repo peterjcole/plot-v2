@@ -178,6 +178,8 @@ export async function getActivityDetail(
     lat: p.location?.[0] ?? route[0]?.[0] ?? 0,
     lng: p.location?.[1] ?? route[0]?.[1] ?? 0,
     caption: p.caption || undefined,
+    width: p.width || p.width_px || undefined,
+    height: p.height || p.height_px || undefined,
   }));
 
   return {

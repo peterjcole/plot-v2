@@ -17,13 +17,13 @@ export default async function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#FFF8EC",
+          background: "#070E14",
           borderRadius: "6px",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Contour arcs */}
+        {/* Subtle dark-teal contour arcs */}
         <svg
           width="32"
           height="32"
@@ -33,46 +33,38 @@ export default async function Icon() {
           <path
             d="M -2,8 Q 16,2 34,8"
             fill="none"
-            stroke="#D4872B"
+            stroke="#1E4858"
             strokeWidth="1.5"
+            opacity="0.7"
+          />
+          <path
+            d="M -2,14 Q 16,8 34,14"
+            fill="none"
+            stroke="#1E4858"
+            strokeWidth="1"
             opacity="0.5"
           />
           <path
-            d="M -2,13 Q 16,7 34,13"
+            d="M -2,20 Q 16,14 34,20"
             fill="none"
-            stroke="#D4872B"
-            strokeWidth="1"
-            opacity="0.4"
-          />
-          <path
-            d="M -2,18 Q 16,12 34,18"
-            fill="none"
-            stroke="#D4872B"
+            stroke="#1E4858"
             strokeWidth="1.5"
-            opacity="0.5"
+            opacity="0.7"
           />
           <path
-            d="M -2,23 Q 16,17 34,23"
+            d="M -2,26 Q 16,20 34,26"
             fill="none"
-            stroke="#D4872B"
+            stroke="#1E4858"
             strokeWidth="1"
-            opacity="0.4"
-          />
-          <path
-            d="M -2,28 Q 16,22 34,28"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="1.5"
             opacity="0.5"
           />
         </svg>
-        {/* "p" monogram — absolute positioned to visually center
-             (descender on "p" shifts baseline centering down) */}
+        {/* "p" monogram in orange */}
         <span
           style={{
             fontFamily: "RibeyeMarrow",
             fontSize: "26px",
-            color: "#4A5A2B",
+            color: "#E07020",
             lineHeight: 1,
             position: "absolute",
             top: "50%",

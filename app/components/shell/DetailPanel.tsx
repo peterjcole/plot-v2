@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityData } from '@/lib/types';
 import { getActivityColor, getActivityCategory } from '@/lib/activity-categories';
 import ExportOptionsPopover from './ExportOptionsPopover';
@@ -42,6 +42,16 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
   const [showExportPopover, setShowExportPopover] = useState(false);
+  const [anchorRect, setAnchorRect] = useState({ x: 0, y: 0 });
+  const imageButtonRef = useRef<HTMLButtonElement>(null);
+
+  function handleImageButtonClick() {
+    if (imageButtonRef.current) {
+      const rect = imageButtonRef.current.getBoundingClientRect();
+      setAnchorRect({ x: rect.right, y: rect.bottom });
+    }
+    setShowExportPopover(v => !v);
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -154,7 +164,7 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
         <div style={{ height: 1, background: 'var(--fog-ghost)', marginBottom: 16 }} />
 
         {/* Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {onOpenPlanner && (
             <button
               onClick={onOpenPlanner}
@@ -190,7 +200,8 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
               GPX
             </a>
             <button
-              onClick={() => setShowExportPopover(v => !v)}
+              ref={imageButtonRef}
+              onClick={handleImageButtonClick}
               aria-expanded={showExportPopover}
               aria-label="Export image options"
               style={{
@@ -210,15 +221,18 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
               Image ▾
             </button>
           </div>
-          {showExportPopover && (
-            <ExportOptionsPopover
-              activityId={String(activity.id)}
-              osDark={osDark}
-              onClose={() => setShowExportPopover(false)}
-            />
-          )}
         </div>
       </div>
+
+      {/* Export popover — rendered via fixed positioning, outside panel flow */}
+      {showExportPopover && (
+        <ExportOptionsPopover
+          activityId={String(activity.id)}
+          osDark={osDark}
+          anchorRect={anchorRect}
+          onClose={() => setShowExportPopover(false)}
+        />
+      )}
     </div>
   );
 }

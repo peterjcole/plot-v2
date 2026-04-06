@@ -163,8 +163,8 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity, 
             />
           ))
         )}
-        {/* Load more — only shown when unfiltered and more pages exist */}
-        {hasMore && !search.trim() && filter === 'all' && (
+        {/* Load more — shown when more server pages exist and no active text search */}
+        {hasMore && !search.trim() && (
           <button
             onClick={onLoadMore}
             disabled={isLoadingMore}

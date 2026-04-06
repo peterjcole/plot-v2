@@ -4,6 +4,8 @@ export interface ActivityPhoto {
   lat: number;
   lng: number;
   caption?: string;
+  width?: number;
+  height?: number;
 }
 
 export interface ActivityStats {

@@ -25,6 +25,7 @@ export default function StatusBar({ avatarInitials = '?' }: StatusBarProps) {
         alignItems: 'center',
         padding: '0 10px',
         gap: 6,
+        background: 'var(--p0)',
         borderBottom: '1px solid var(--fog-ghost)',
         flexShrink: 0,
       }}

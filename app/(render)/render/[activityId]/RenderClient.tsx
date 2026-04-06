@@ -134,9 +134,11 @@ export default function RenderClient({
   const photosToShow = activity.photos.slice(0, Math.min(photoCountParam, 3));
   const actualPhotoCount = photosToShow.length;
 
-  // Detect first photo orientation (assume portrait if no size info)
-  // We use aspect ratio heuristic on URL if available, default portrait
-  const firstIsLandscape = false; // Default portrait; no size metadata in ActivityPhoto type
+  // Detect first photo orientation from width/height metadata; default to landscape if unknown
+  const firstPhoto = photosToShow[0];
+  const firstIsLandscape = firstPhoto?.width && firstPhoto?.height
+    ? firstPhoto.width >= firstPhoto.height
+    : true; // default landscape
   const layout = getPhotoLayout(actualPhotoCount, firstIsLandscape);
 
   const mapW = layout ? layout.mapWidth : TOTAL_W;
