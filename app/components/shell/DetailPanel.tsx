@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { ActivityData } from '@/lib/types';
 import { getActivityColor, getActivityCategory } from '@/lib/activity-categories';
+import ExportOptionsPopover from './ExportOptionsPopover';
 
 function fmt(meters: number): string { return (meters / 1000).toFixed(2) + ' km'; }
 function fmtTime(s: number): string {
@@ -33,11 +35,13 @@ interface DetailPanelProps {
   onBack: () => void;
   onOpenPlanner?: () => void;
   onPhotoClick?: (index: number) => void;
+  osDark?: boolean;
 }
 
-export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick }: DetailPanelProps) {
+export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true }: DetailPanelProps) {
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
+  const [showExportPopover, setShowExportPopover] = useState(false);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -150,7 +154,7 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
         <div style={{ height: 1, background: 'var(--fog-ghost)', marginBottom: 16 }} />
 
         {/* Actions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
           {onOpenPlanner && (
             <button
               onClick={onOpenPlanner}
@@ -185,24 +189,34 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
               </svg>
               GPX
             </a>
-            <a
-              href={`/api/activity-printout?activityId=${activity.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setShowExportPopover(v => !v)}
+              aria-expanded={showExportPopover}
+              aria-label="Export image options"
               style={{
-                flex: 1, padding: '8px 12px', textAlign: 'center',
-                border: '1px solid var(--p3)', borderRadius: 4,
-                color: 'var(--fog)', fontFamily: 'var(--mono)', fontSize: 10,
-                fontWeight: 500, textDecoration: 'none', letterSpacing: '0.04em',
+                flex: 1, padding: '8px 12px',
+                border: `1px solid ${showExportPopover ? 'var(--ora)' : 'var(--p3)'}`,
+                borderRadius: 4,
+                color: showExportPopover ? 'var(--ora)' : 'var(--fog)',
+                background: 'none',
+                fontFamily: 'var(--mono)', fontSize: 10,
+                fontWeight: 500, cursor: 'pointer', letterSpacing: '0.04em',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
               </svg>
-              Image
-            </a>
+              Image ▾
+            </button>
           </div>
+          {showExportPopover && (
+            <ExportOptionsPopover
+              activityId={String(activity.id)}
+              osDark={osDark}
+              onClose={() => setShowExportPopover(false)}
+            />
+          )}
         </div>
       </div>
     </div>

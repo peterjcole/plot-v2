@@ -347,7 +347,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 {detailLoading ? 'Loading…' : 'No data'}
               </div>
             ) : (
-              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} />
+              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} />
             )
           )}
           {mode === 'planner' && (
@@ -517,7 +517,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   {detailLoading ? 'Loading…' : 'No data'}
                 </div>
               ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} />
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} />
               )
             )}
           </MobileBottomSheet>
