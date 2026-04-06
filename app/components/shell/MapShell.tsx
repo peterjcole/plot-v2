@@ -13,6 +13,7 @@ import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
+import { simplifyWaypoints } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
 import { type Theme, loadTheme, saveTheme, applyThemeToDocument } from '@/lib/theme';
 import LeftPanel from './LeftPanel';
@@ -62,6 +63,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [loadedActivityId, setLoadedActivityId] = useState<string | null>(null);
 
   // Lightbox — index of -1 means closed
   const [lightboxIndex, setLightboxIndex] = useState(-1);
@@ -227,6 +229,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setMode('planner');
     setSelectedId(null);
     setActivityDetail(null);
+    setLoadedActivityId(null);
   }, []);
 
   const handleExitPlanner = useCallback(() => setMode('browse'), []);
@@ -242,6 +245,19 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
     map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
   }, []);
+
+  const handleOpenInPlanner = useCallback(() => {
+    if (!activityDetail?.route?.length) { handleOpenPlanner(); return; }
+    const rawWaypoints = activityDetail.route.map(([lat, lng]) => ({ lat, lng }));
+    const simplified = simplifyWaypoints(rawWaypoints, 80);
+    const segs = simplified.slice(0, -1).map(() => ({ snapped: false as const, coordinates: [] }));
+    dispatch({ type: 'LOAD', waypoints: simplified, segments: segs });
+    setLoadedActivityId(String(activityDetail.id));
+    setMode('planner');
+    setSelectedId(null);
+    setActivityDetail(null);
+    handleFitToRoute(simplified);
+  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner]);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -310,11 +326,19 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 {detailLoading ? 'Loading…' : 'No data'}
               </div>
             ) : (
-              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} onPhotoClick={handlePhotoClick} />
+              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} />
             )
           )}
           {mode === 'planner' && (
-            <PlannerPanel distance={distance} elevGain={elevGain} />
+            <PlannerPanel
+              distance={distance}
+              elevGain={elevGain}
+              waypoints={waypoints}
+              segments={segments}
+              elevationData={elevationData}
+              isLoadingElevation={isLoadingElevation}
+              dispatch={dispatch}
+            />
           )}
         </LeftPanel>
 
@@ -324,6 +348,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             highlightedId={selectedId ?? hoveredId}
             onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
             onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
+            loadedActivityId={loadedActivityId ?? undefined}
             photoMarkers={photoMarkers}
             onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
             baseLayer={layerState.baseLayer}
@@ -452,7 +477,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   {detailLoading ? 'Loading…' : 'No data'}
                 </div>
               ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenPlanner} onPhotoClick={handlePhotoClick} />
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} />
               )
             )}
           </MobileBottomSheet>

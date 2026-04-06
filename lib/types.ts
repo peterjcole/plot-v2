@@ -68,6 +68,7 @@ export interface Waypoint {
   lat: number;
   lng: number;
   ele?: number;
+  name?: string;
 }
 
 export interface RouteSegment {

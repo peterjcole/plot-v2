@@ -41,6 +41,7 @@ interface MainMapProps {
   onActivitySelect?: (id: string) => void;
   onActivityHover?: (id: string | null) => void;
   onPhotoMarkerClick?: (photoId: string) => void;
+  loadedActivityId?: string;
   baseLayer?: MapLayer;
   plannerProps?: PlannerProps;
   onMapReady?: (map: Map) => void;
@@ -156,6 +157,7 @@ export default function MainMap({
   onActivitySelect,
   onActivityHover,
   onPhotoMarkerClick,
+  loadedActivityId,
   baseLayer = 'topo',
   plannerProps,
   onMapReady,
@@ -402,7 +404,7 @@ export default function MainMap({
       const color = getActivityColor(activity.type);
       const defaultAlpha = osDark ? 0.28 : 0.55;
       const alpha = inPlanner
-        ? 0.08
+        ? (loadedActivityId === id ? 0.55 : 0.08)
         : highlightedId
           ? highlightedId === id ? 0.9 : 0.1
           : defaultAlpha;
@@ -417,7 +419,7 @@ export default function MainMap({
         fittedRef.current = true;
       }
     }
-  }, [activities, highlightedId, !!plannerProps, osDark]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activities, highlightedId, !!plannerProps, osDark, loadedActivityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync photo pin markers
   useEffect(() => {
