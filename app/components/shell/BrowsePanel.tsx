@@ -20,9 +20,12 @@ interface BrowsePanelProps {
   onSelectActivity: (id: string) => void;
   hoveredId?: string | null;
   onHoverActivity?: (id: string | null) => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-export default function BrowsePanel({ activities, selectedId, onSelectActivity, hoveredId, onHoverActivity }: BrowsePanelProps) {
+export default function BrowsePanel({ activities, selectedId, onSelectActivity, hoveredId, onHoverActivity, hasMore, isLoadingMore, onLoadMore }: BrowsePanelProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -124,6 +127,30 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity, 
               onHover={onHoverActivity}
             />
           ))
+        )}
+        {/* Load more — only shown when unfiltered and more pages exist */}
+        {hasMore && !search.trim() && filter === 'all' && (
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            aria-label={isLoadingMore ? 'Loading more activities' : 'Load more activities'}
+            style={{
+              width: '100%',
+              padding: '10px 0',
+              background: 'none',
+              border: 'none',
+              borderTop: '1px solid var(--fog-ghost)',
+              color: isLoadingMore ? 'var(--fog-ghost)' : 'var(--fog-dim)',
+              fontSize: 10,
+              fontFamily: 'var(--mono)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              cursor: isLoadingMore ? 'default' : 'pointer',
+              transition: 'color 0.15s',
+            }}
+          >
+            {isLoadingMore ? 'Loading…' : 'Load more'}
+          </button>
         )}
       </div>
     </div>

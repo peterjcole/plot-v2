@@ -61,6 +61,24 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [mapResolution, setMapResolution] = useState(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+  // Pagination
+  const [allActivities, setAllActivities] = useState(activities);
+  const [page, setPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(activities.length === 50);
+
+  const handleLoadMore = useCallback(async () => {
+    setIsLoadingMore(true);
+    try {
+      const next = await fetch(`/api/activities?page=${page + 1}&perPage=50`).then(r => r.json()) as typeof activities;
+      setAllActivities(prev => [...prev, ...next]);
+      setPage(p => p + 1);
+      setHasMore(next.length === 50);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [page]);
+
   // Theme
   const [theme, setTheme] = useState<Theme>('system');
   const [sysDark, setSysDark] = useState(false);
@@ -267,7 +285,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         >
           {mode === 'browse' && (
             isLoggedIn
-              ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} />
+              ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} />
               : <UnauthPanel />
           )}
           {mode === 'detail' && (
@@ -286,7 +304,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <MainMap
-            activities={activities}
+            activities={allActivities}
             highlightedId={selectedId ?? hoveredId}
             onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
             photoMarkers={photoMarkers}
@@ -338,13 +356,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
   const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : 'Activities';
-  const sheetCount = mode === 'browse' && isLoggedIn ? activities.length : undefined;
+  const sheetCount = mode === 'browse' && isLoggedIn ? allActivities.length : undefined;
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
       <div style={{ position: 'absolute', inset: 0 }}>
         <MainMap
-          activities={activities}
+          activities={allActivities}
           highlightedId={selectedId}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
@@ -405,7 +423,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           >
             {mode === 'browse' && (
               isLoggedIn
-                ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} />
+                ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} />
                 : <UnauthPanel />
             )}
             {mode === 'detail' && (
