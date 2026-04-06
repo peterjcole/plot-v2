@@ -12,8 +12,8 @@ import VectorSource from 'ol/source/Vector';
 import Feature from 'ol/Feature';
 import LineString from 'ol/geom/LineString';
 import Point from 'ol/geom/Point';
-import { Style, Stroke, Icon } from 'ol/style';
-import { Modify } from 'ol/interaction';
+import { Style, Stroke, Icon, Circle as CircleStyle, Fill } from 'ol/style';
+import { Modify, DragPan } from 'ol/interaction';
 import { get as getProjection, fromLonLat, toLonLat } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
@@ -359,6 +359,94 @@ export default function MainMap({
     );
   }, [plannerProps?.waypoints, plannerProps?.segments]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Drag-to-insert on route segments (planner mode only)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !plannerProps) return;
+
+    const dragInsertStyle = new Style({
+      image: new CircleStyle({
+        radius: 8,
+        fill: new Fill({ color: 'rgba(74,90,43,0.5)' }),
+        stroke: new Stroke({ color: '#4A5A2B', width: 2 }),
+      }),
+    });
+
+    let dragInsertSegIdx: number | null = null;
+    let dragInsertSnapped = false;
+    let dragInsertFeature: Feature | null = null;
+    let dragInsertMoved = false;
+
+    const viewport = map.getViewport();
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      const pixel = map.getEventPixel(e);
+      const wpHit = map.forEachFeatureAtPixel(pixel, () => true, {
+        layerFilter: (l) => l === plannerWpLayerRef.current, hitTolerance: 12,
+      });
+      if (wpHit) return;
+      const routeFeature = map.forEachFeatureAtPixel(pixel, (f) => f, {
+        layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
+      });
+      if (!routeFeature) return;
+
+      dragInsertSegIdx = routeFeature.get('segmentIndex') as number;
+      dragInsertSnapped = routeFeature.get('snapped') as boolean;
+      dragInsertMoved = false;
+
+      const coord = map.getCoordinateFromPixel(pixel);
+      dragInsertFeature = new Feature({ geometry: new Point(coord) });
+      dragInsertFeature.setStyle(dragInsertStyle);
+      plannerWpSourceRef.current?.addFeature(dragInsertFeature);
+
+      map.getInteractions().forEach((i) => { if (i instanceof DragPan) i.setActive(false); });
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (dragInsertSegIdx === null || !dragInsertFeature) return;
+      if (!e.buttons) {
+        plannerWpSourceRef.current?.removeFeature(dragInsertFeature);
+        dragInsertFeature = null;
+        dragInsertSegIdx = null;
+        map.getInteractions().forEach((i) => { if (i instanceof DragPan) i.setActive(true); });
+        return;
+      }
+      dragInsertMoved = true;
+      const coord = map.getCoordinateFromPixel(map.getEventPixel(e));
+      (dragInsertFeature.getGeometry() as Point).setCoordinates(coord);
+    };
+
+    const onPointerUp = () => {
+      if (dragInsertSegIdx === null) return;
+      map.getInteractions().forEach((i) => { if (i instanceof DragPan) i.setActive(true); });
+      const coord = dragInsertFeature
+        ? (dragInsertFeature.getGeometry() as Point).getCoordinates()
+        : null;
+      if (dragInsertFeature) {
+        plannerWpSourceRef.current?.removeFeature(dragInsertFeature);
+        dragInsertFeature = null;
+      }
+      const segIdx = dragInsertSegIdx;
+      const isSnapped = dragInsertSnapped;
+      const moved = dragInsertMoved;
+      dragInsertSegIdx = null;
+      if (!moved || !coord) return;
+      const [lng, lat] = toLonLat(coord, OS_PROJECTION.code);
+      plannerPropsRef.current?.dispatch({ type: 'INSERT_WAYPOINT', index: segIdx + 1, waypoint: { lat, lng }, snap: isSnapped });
+    };
+
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', onPointerUp);
+
+    return () => {
+      viewport.removeEventListener('pointerdown', onPointerDown);
+      viewport.removeEventListener('pointermove', onPointerMove);
+      viewport.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [!!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync tile layer visibility when baseLayer prop changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -521,7 +609,11 @@ export default function MainMap({
           layerFilter: (l) => l === plannerWpLayerRef.current,
           hitTolerance: 10,
         });
-        el.style.cursor = wpHit ? 'move' : 'crosshair';
+        const routeHit = !wpHit && map.hasFeatureAtPixel(e.pixel, {
+          layerFilter: (l) => l === plannerRouteLayerRef.current,
+          hitTolerance: 10,
+        });
+        el.style.cursor = wpHit ? 'move' : routeHit ? 'copy' : 'crosshair';
         if (lastHoveredIdRef.current !== null) {
           lastHoveredIdRef.current = null;
           onActivityHoverRef.current?.(null);
