@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { type MapLayer } from '@/app/components/MainMap';
 
 export interface LayerState {
@@ -28,6 +28,7 @@ interface LayersPanelProps {
   onChange: (patch: Partial<LayerState>) => void;
   bottom?: number;
   fixed?: boolean;
+  forceOpen?: boolean;
 }
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -74,8 +75,9 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
 
   return (
     <div style={{

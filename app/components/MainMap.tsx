@@ -72,10 +72,10 @@ function hexToComponents(hex: string): [number, number, number] {
 
 function routeStyles(color: string, alpha: number, isDark = true): Style[] {
   const [r, g, b] = hexToComponents(color);
-  const styles: Style[] = [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 5 }) })];
+  const styles: Style[] = [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 8 }) })];
   if (alpha >= 0.5) {
     const overlay = isDark ? 'rgba(7,14,20,0.55)' : 'rgba(255,255,255,0.30)';
-    styles.push(new Style({ stroke: new Stroke({ color: overlay, width: 2 }) }));
+    styles.push(new Style({ stroke: new Stroke({ color: overlay, width: 3 }) }));
   }
   return styles;
 }
@@ -91,16 +91,16 @@ function pinIconSvg(hasPhoto: boolean): string {
 // ── Planner drawing styles ───────────────────────────────────────────────────
 
 const snappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: '#3A4722', width: 16 }) }),
-  new Style({ stroke: new Stroke({ color: '#A8C476', width: 10 }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.85)', width: 8 }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.55)', width: 2.5 }) }),
 ];
 const unsnappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: '#3A4722', width: 13, lineDash: [12, 14] }) }),
-  new Style({ stroke: new Stroke({ color: '#A8C476', width: 8, lineDash: [12, 14] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.55)', width: 7, lineDash: [10, 10] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.45)', width: 2.5, lineDash: [10, 10] }) }),
 ];
 const routingPendingStyle = [
-  new Style({ stroke: new Stroke({ color: '#3A4722', width: 10, lineDash: [2, 6] }) }),
-  new Style({ stroke: new Stroke({ color: '#A8C476', width: 6, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.35)', width: 6, lineDash: [2, 6] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.35)', width: 2, lineDash: [2, 6] }) }),
 ];
 
 function waypointPinSvg(index: number): string {
@@ -516,7 +516,7 @@ export default function MainMap({
     if (!fittedRef.current && !inPlanner && withRoutes.length > 0 && map) {
       const extent = source.getExtent();
       if (isFinite(extent[0])) {
-        map.getView().fit(extent, { padding: [40, 40, 40, 40], maxZoom: 9, duration: 400 });
+        map.getView().fit(extent, { padding: [40, 40, 40, 360], maxZoom: 9, duration: 400 });
         fittedRef.current = true;
       }
     }

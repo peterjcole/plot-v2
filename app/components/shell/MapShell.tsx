@@ -13,7 +13,7 @@ import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
-import { selectGpxWaypoints } from '@/lib/gpx';
+import { selectGpxWaypoints, downloadGpx } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
 import { type Theme, loadTheme, saveTheme, applyThemeToDocument } from '@/lib/theme';
 import LeftPanel from './LeftPanel';
@@ -122,6 +122,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
 
+  const elevGain = useMemo(() => {
+    if (!elevationData || elevationData.length < 2) return 0;
+    let gain = 0;
+    for (let i = 1; i < elevationData.length; i++) {
+      const delta = elevationData[i].ele - elevationData[i - 1].ele;
+      if (delta > 0) gain += delta;
+    }
+    return Math.round(gain);
+  }, [elevationData]);
+
+  const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
+
+  const handleMobileExportGpx = useCallback(() => {
+    if (waypoints.length === 0) return;
+    downloadGpx(waypoints, segments);
+  }, [waypoints, segments]);
+
   // Waypoint popover
   const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
   const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
@@ -137,15 +154,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     if (index < segments.length) dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index });
   }, [dispatch, segments.length]);
 
-  const elevGain = useMemo(() => {
-    if (!elevationData || elevationData.length < 2) return 0;
-    let gain = 0;
-    for (let i = 1; i < elevationData.length; i++) {
-      const delta = elevationData[i].ele - elevationData[i - 1].ele;
-      if (delta > 0) gain += delta;
-    }
-    return gain;
-  }, [elevationData]);
 
   // Mobile detection
   useEffect(() => {
@@ -432,7 +440,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             />
           )}
         </div>
-        {waypointPopover && mode === 'planner' && (
+        {waypointPopover && mode === 'planner' && waypoints[waypointPopover.index] && (
           <WaypointPopover
             waypoint={waypoints[waypointPopover.index]}
             index={waypointPopover.index}
@@ -540,29 +548,141 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
 
       {mode === 'planner' && (
-        <PlannerToolbar
-          waypoints={waypoints}
-          segments={segments}
-          distance={distance}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          dispatch={dispatch}
-          onGeolocate={handleGeolocate}
-          addPointsEnabled={addPointsEnabled}
-          onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
-          snapEnabled={snapEnabled}
-          onToggleSnap={() => setSnapEnabled((v) => !v)}
-          elevationData={elevationData}
-          isLoadingElevation={isLoadingElevation}
-          onElevationHover={setHoveredElevationPoint}
-          onFitToRoute={handleFitToRoute}
-          onExportImage={handleExportImage}
-          isExportingImage={isExportingImage}
-          onBack={handleExitPlanner}
-        />
+        <>
+          <PlannerToolbar
+            waypoints={waypoints}
+            segments={segments}
+            distance={distance}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            dispatch={dispatch}
+            onGeolocate={handleGeolocate}
+            addPointsEnabled={addPointsEnabled}
+            onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
+            snapEnabled={snapEnabled}
+            onToggleSnap={() => setSnapEnabled((v) => !v)}
+            elevationData={elevationData}
+            isLoadingElevation={isLoadingElevation}
+            onElevationHover={setHoveredElevationPoint}
+            onFitToRoute={handleFitToRoute}
+            onExportImage={handleExportImage}
+            isExportingImage={isExportingImage}
+            isMobile
+            onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
+            onExportGpx={handleMobileExportGpx}
+          />
+
+          {/* Activities / Planner tabs */}
+          <div style={{
+            position: 'fixed', top: 60, left: 0, right: 0, height: 32,
+            background: 'rgba(7,14,20,0.88)', backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex', borderBottom: '1px solid var(--p3)', zIndex: 18,
+          }}>
+            <button
+              onClick={handleExitPlanner}
+              style={{
+                flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+                font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
+                color: 'rgba(240,248,250,0.45)',
+              }}
+            >Activities</button>
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
+              color: 'var(--ora)', borderBottom: '2px solid var(--ora)',
+            }}>Planner</div>
+          </div>
+
+          {/* Layers panel */}
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={200} fixed forceOpen={mobilePlannerLayersOpen} />
+
+          {/* Bottom HUD */}
+          {(() => {
+            const pts = elevationData ?? [];
+            const totalD = pts.length > 1 ? pts[pts.length - 1].distance : 0;
+            const W = 358; const H = 34;
+            let sparklinePts = '';
+            let fillPath = '';
+            if (pts.length >= 2) {
+              const eles = pts.map(p => p.ele);
+              const minE = Math.min(...eles);
+              const maxE = Math.max(...eles);
+              const rangeE = maxE - minE || 1;
+              const toX = (d: number) => totalD ? (d / totalD) * W : 0;
+              const toY = (e: number) => H - 2 - ((e - minE) / rangeE) * (H - 4);
+              sparklinePts = pts.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
+              fillPath = `M0,${H} L${sparklinePts.split(' ').join(' L')} L${W},${H} Z`;
+            }
+            const distKm = (distance / 1000).toFixed(1);
+            return (
+              <div style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                background: 'rgba(14,40,48,0.94)', backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                borderTop: '1px solid var(--p3)', borderRadius: '12px 12px 0 0',
+                paddingBottom: 24, zIndex: 20,
+              }}>
+                <div style={{ width: 36, height: 4, background: 'var(--p4)', borderRadius: 2, margin: '10px auto 12px' }} />
+                <div style={{ display: 'flex', padding: '0 20px 14px' }}>
+                  {[
+                    { val: distKm, lbl: 'km' },
+                    { val: elevGain > 0 ? String(elevGain) : '—', lbl: 'm elev' },
+                    { val: String(waypoints.length), lbl: 'waypts' },
+                  ].map((s, i, arr) => (
+                    <div key={s.lbl} style={{
+                      flex: 1, display: 'flex', flexDirection: 'column', gap: 3,
+                      borderRight: i < arr.length - 1 ? '1px solid var(--fog-ghost)' : 'none',
+                      paddingRight: i < arr.length - 1 ? 16 : 0,
+                      paddingLeft: i > 0 ? 16 : 0,
+                    }}>
+                      <div style={{ font: '700 18px/1 var(--mono)', color: 'var(--ora)' }}>{s.val}</div>
+                      <div style={{ font: '400 8px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(240,248,250,0.45)' }}>{s.lbl}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ position: 'relative', padding: '0 16px 10px' }}>
+                  <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="mhud-elev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#E07020" stopOpacity="0.30" />
+                        <stop offset="100%" stopColor="#E07020" stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    {fillPath && <path d={fillPath} fill="url(#mhud-elev)" />}
+                    {sparklinePts && <polyline points={sparklinePts} fill="none" stroke="#E07020" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
+                  </svg>
+                  <div style={{ position: 'absolute', bottom: 13, left: 18, font: '400 7px/1 var(--mono)', color: 'rgba(240,248,250,0.45)' }}>0</div>
+                  <div style={{ position: 'absolute', bottom: 13, right: 18, font: '400 7px/1 var(--mono)', color: 'rgba(240,248,250,0.45)' }}>{distKm}km</div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
+                  <button
+                    onClick={() => setMobilePlannerLayersOpen(v => !v)}
+                    style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: 'var(--p3)', color: 'var(--fog)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+                    </svg>
+                    Layers
+                  </button>
+                  <button
+                    onClick={handleMobileExportGpx}
+                    disabled={waypoints.length === 0}
+                    style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: waypoints.length === 0 ? 'var(--p3)' : 'var(--ora)', color: waypoints.length === 0 ? 'rgba(240,248,250,0.45)' : 'var(--p0)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Export GPX
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </>
       )}
 
-      {waypointPopover && mode === 'planner' && (
+      {waypointPopover && mode === 'planner' && waypoints[waypointPopover.index] && (
         <WaypointPopover
           waypoint={waypoints[waypointPopover.index]}
           index={waypointPopover.index}

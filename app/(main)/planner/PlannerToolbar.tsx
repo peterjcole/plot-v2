@@ -25,6 +25,9 @@ interface PlannerToolbarProps {
   onExportImage?: () => void;
   isExportingImage?: boolean;
   onBack?: () => void;
+  isMobile?: boolean;
+  onToggleLayers?: () => void;
+  onExportGpx?: () => void;
 }
 
 function fmtDist(m: number): string {
@@ -55,7 +58,7 @@ function TbBtn({ label, disabled, active, onClick, children, title }: TbBtnProps
         background: 'transparent', border: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-        color: active ? 'var(--ora)' : 'var(--fog-dim)',
+        color: active ? 'var(--ora)' : 'rgba(240,248,250,0.45)',
         opacity: disabled ? 0.28 : 1,
         flexShrink: 0,
       }}
@@ -83,6 +86,9 @@ export default function PlannerToolbar({
   onExportImage,
   isExportingImage = false,
   onBack,
+  isMobile = false,
+  onToggleLayers,
+  onExportGpx,
 }: PlannerToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,9 +111,10 @@ export default function PlannerToolbar({
   }, [waypoints.length, dispatch]);
 
   const handleExportGpx = useCallback(() => {
+    if (onExportGpx) { onExportGpx(); return; }
     if (waypoints.length === 0) return;
     downloadGpx(waypoints, segments);
-  }, [waypoints, segments]);
+  }, [onExportGpx, waypoints, segments]);
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,15 +148,23 @@ export default function PlannerToolbar({
     <>
       <input type="file" accept=".gpx" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 44,
+        position: isMobile ? 'fixed' : 'absolute', top: 0, left: 0, right: 0, height: isMobile ? 60 : 44,
         background: 'rgba(7,14,20,0.92)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--p3)',
         display: 'flex', alignItems: 'center',
         padding: '0 12px', gap: 2,
-        zIndex: 5,
+        zIndex: isMobile ? 20 : 5,
       } as React.CSSProperties}>
+
+        {isMobile && (
+          <>
+            <span style={{ fontFamily: 'var(--display)', fontSize: 18, color: 'rgba(240,248,250,0.9)', padding: '0 8px', flexShrink: 0, lineHeight: 1 }}>plot</span>
+            {SEP}
+          </>
+        )}
+
         {/* Undo */}
         <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -165,16 +180,6 @@ export default function PlannerToolbar({
 
         {SEP}
 
-        {/* Clear */}
-        <TbBtn label="Clear" disabled={waypoints.length === 0} onClick={handleClear}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
-        </TbBtn>
-
-        {SEP}
-
         {/* Snap toggle */}
         <TbBtn label="Snap" active={snapEnabled} onClick={onToggleSnap}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -183,50 +188,79 @@ export default function PlannerToolbar({
           </svg>
         </TbBtn>
 
-        {/* Import */}
-        <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
+        {/* Clear */}
+        <TbBtn label="Clear" disabled={waypoints.length === 0} onClick={handleClear}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
           </svg>
         </TbBtn>
 
-        {/* Export GPX */}
-        <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </TbBtn>
+        {!isMobile && (
+          <>
+            {SEP}
 
-        {/* Export Image */}
-        <TbBtn label="Image" disabled={!hasRoute || isExportingImage} onClick={onExportImage}>
-          {isExportingImage ? (
-            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--fog-dim)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          )}
-        </TbBtn>
+            {/* Import */}
+            <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </TbBtn>
+
+            {/* Export GPX */}
+            <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </TbBtn>
+
+            {/* Export Image */}
+            <TbBtn label="Image" disabled={!hasRoute || isExportingImage} onClick={onExportImage}>
+              {isExportingImage ? (
+                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(240,248,250,0.45)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              )}
+            </TbBtn>
+          </>
+        )}
 
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Route info or hint */}
-        {routeInfo ? (
-          <div style={{ font: '600 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
-            {routeInfo}
-          </div>
-        ) : (
-          <div style={{ font: '400 10px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
-            Click the map to place your first point
-          </div>
+        {!isMobile && (
+          <>
+            {/* Route info or hint */}
+            {routeInfo ? (
+              <div style={{ font: '600 10px/1 var(--mono)', color: 'rgba(240,248,250,0.72)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+                {routeInfo}
+              </div>
+            ) : (
+              <div style={{ font: '400 10px/1 var(--mono)', color: 'rgba(240,248,250,0.45)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+                Click the map to place your first point
+              </div>
+            )}
+
+            {SEP}
+          </>
         )}
 
-        {SEP}
+        {/* Layers (mobile only) */}
+        {isMobile && onToggleLayers && (
+          <TbBtn label="Layers" onClick={onToggleLayers}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+          </TbBtn>
+        )}
 
         {/* Locate */}
         <TbBtn label="Locate" onClick={onGeolocate}>
@@ -239,8 +273,8 @@ export default function PlannerToolbar({
           </svg>
         </TbBtn>
 
-        {/* Back (mobile only) */}
-        {onBack && (
+        {/* Back (desktop only, when onBack provided) */}
+        {!isMobile && onBack && (
           <>
             {SEP}
             <TbBtn label="Back" onClick={onBack}>

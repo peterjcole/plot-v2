@@ -45,6 +45,17 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity, 
     });
   }, [activities, search, filter]);
 
+  if (activities.length === 0 && !authError) {
+    return (
+      <div style={{ padding: '8px 0' }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ margin: '4px 12px', height: 60, borderRadius: 4, background: 'var(--fog-ghost)', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.12}s` }} />
+        ))}
+        <style>{`@keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:.7} }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Search */}
