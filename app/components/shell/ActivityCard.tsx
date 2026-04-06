@@ -49,19 +49,25 @@ interface ActivityCardProps {
   activity: ActivitySummary;
   onClick: (id: string) => void;
   isSelected?: boolean;
+  isHovered?: boolean;
+  onHover?: (id: string | null) => void;
 }
 
-export default function ActivityCard({ activity, onClick, isSelected }: ActivityCardProps) {
+export default function ActivityCard({ activity, onClick, isSelected, isHovered, onHover }: ActivityCardProps) {
   const color = getCategoryColor(getActivityCategory(activity.type));
+  const id = String(activity.id);
 
   return (
     <button
-      onClick={() => onClick(String(activity.id))}
+      data-activity-id={id}
+      onClick={() => onClick(id)}
+      onMouseEnter={() => onHover?.(id)}
+      onMouseLeave={() => onHover?.(null)}
       style={{
         display: 'flex',
         alignItems: 'stretch',
         width: '100%',
-        background: isSelected ? 'var(--p2)' : 'none',
+        background: isSelected ? 'var(--p2)' : isHovered ? 'rgba(240,248,250,0.06)' : 'none',
         border: 'none',
         borderBottom: '1px solid var(--fog-ghost)',
         cursor: 'pointer',
@@ -69,8 +75,6 @@ export default function ActivityCard({ activity, onClick, isSelected }: Activity
         textAlign: 'left',
         transition: 'background 0.1s',
       }}
-      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(240,248,250,0.04)'; }}
-      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}
     >
       {/* Coloured left border */}
       <div style={{ width: 3, background: color, flexShrink: 0 }} />

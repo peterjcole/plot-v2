@@ -39,6 +39,7 @@ interface MainMapProps {
   highlightedId?: string | null;
   photoMarkers?: ActivityPhoto[];
   onActivitySelect?: (id: string) => void;
+  onActivityHover?: (id: string | null) => void;
   baseLayer?: MapLayer;
   plannerProps?: PlannerProps;
   onMapReady?: (map: Map) => void;
@@ -152,6 +153,7 @@ export default function MainMap({
   highlightedId,
   photoMarkers,
   onActivitySelect,
+  onActivityHover,
   baseLayer = 'topo',
   plannerProps,
   onMapReady,
@@ -181,6 +183,9 @@ export default function MainMap({
   const plannerModifyRef = useRef<Modify | null>(null);
   const plannerPropsRef = useRef(plannerProps);
   useEffect(() => { plannerPropsRef.current = plannerProps; }, [plannerProps]);
+  const onActivityHoverRef = useRef(onActivityHover);
+  useEffect(() => { onActivityHoverRef.current = onActivityHover; }, [onActivityHover]);
+  const lastHoveredIdRef = useRef<string | null>(null);
 
   // Initialise map once
   useEffect(() => {
@@ -482,12 +487,22 @@ export default function MainMap({
           hitTolerance: 10,
         });
         el.style.cursor = wpHit ? 'move' : 'crosshair';
+        if (lastHoveredIdRef.current !== null) {
+          lastHoveredIdRef.current = null;
+          onActivityHoverRef.current?.(null);
+        }
         return;
       }
-      const hit = map.hasFeatureAtPixel(e.pixel, {
-        layerFilter: (l) => l === routeLayerRef.current,
-      });
-      el.style.cursor = hit ? 'pointer' : '';
+      // Browse mode — detect trace hover
+      let hoveredId: string | null = null;
+      map.forEachFeatureAtPixel(e.pixel, (feature) => {
+        hoveredId = feature.get('activityId') ?? null;
+      }, { layerFilter: (l) => l === routeLayerRef.current });
+      el.style.cursor = hoveredId ? 'pointer' : '';
+      if (hoveredId !== lastHoveredIdRef.current) {
+        lastHoveredIdRef.current = hoveredId;
+        onActivityHoverRef.current?.(hoveredId);
+      }
     };
 
     map.on('pointermove', onMove);

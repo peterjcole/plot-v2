@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ActivitySummary } from '@/lib/types';
 import { getActivityCategory, ActivityCategory } from '@/lib/activity-categories';
 import ActivityCard from './ActivityCard';
@@ -18,11 +18,19 @@ interface BrowsePanelProps {
   activities: ActivitySummary[];
   selectedId: string | null;
   onSelectActivity: (id: string) => void;
+  hoveredId?: string | null;
+  onHoverActivity?: (id: string | null) => void;
 }
 
-export default function BrowsePanel({ activities, selectedId, onSelectActivity }: BrowsePanelProps) {
+export default function BrowsePanel({ activities, selectedId, onSelectActivity, hoveredId, onHoverActivity }: BrowsePanelProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+
+  // Scroll card into view when a trace is hovered on the map
+  useEffect(() => {
+    if (!hoveredId) return;
+    document.querySelector(`[data-activity-id="${hoveredId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [hoveredId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -112,6 +120,8 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity }
               activity={a}
               onClick={onSelectActivity}
               isSelected={selectedId === String(a.id)}
+              isHovered={hoveredId === String(a.id)}
+              onHover={onHoverActivity}
             />
           ))
         )}

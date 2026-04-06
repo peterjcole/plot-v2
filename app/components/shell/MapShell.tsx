@@ -59,6 +59,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [isMobile, setIsMobile] = useState(false);
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Theme
   const [theme, setTheme] = useState<Theme>('system');
@@ -266,7 +267,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         >
           {mode === 'browse' && (
             isLoggedIn
-              ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} />
+              ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} />
               : <UnauthPanel />
           )}
           {mode === 'detail' && (
@@ -286,7 +287,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <MainMap
             activities={activities}
-            highlightedId={selectedId}
+            highlightedId={selectedId ?? hoveredId}
+            onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
             photoMarkers={photoMarkers}
             onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
             baseLayer={layerState.baseLayer}
@@ -403,7 +405,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           >
             {mode === 'browse' && (
               isLoggedIn
-                ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} />
+                ? <BrowsePanel activities={activities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} />
                 : <UnauthPanel />
             )}
             {mode === 'detail' && (
