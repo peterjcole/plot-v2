@@ -3,16 +3,30 @@ import RenderClient from './RenderClient';
 
 interface RenderPageProps {
   params: Promise<{ activityId: string }>;
-  searchParams: Promise<{ width?: string; height?: string; fixed?: string; token?: string; photos?: string; orientation?: string; baseMap?: string; osDark?: string; hidePhotos?: string; includeLogo?: string; hillshadeEnabled?: string; hideDetails?: string; hideDescription?: string }>;
+  searchParams: Promise<{
+    token?: string;
+    photos?: string;
+    orientation?: string;
+    baseMap?: string;
+    osDark?: string;
+    photoCount?: string;
+    includeLogo?: string;
+    hillshadeEnabled?: string;
+    hideDescription?: string;
+    // Legacy params kept for backward compat
+    hidePhotos?: string;
+    hideDetails?: string;
+  }>;
 }
 
 export default async function RenderPage({ params, searchParams }: RenderPageProps) {
   const { activityId } = await params;
-  const { width: widthParam, height: heightParam, fixed, token, photos, orientation, baseMap, osDark: osDarkParam, hidePhotos, includeLogo, hillshadeEnabled: hillshadeEnabledParam, hideDetails, hideDescription } = await searchParams;
-
-  const useFixedSize = fixed === 'true';
-  const fixedWidth = useFixedSize ? parseInt(widthParam || '860', 10) : undefined;
-  const fixedHeight = useFixedSize ? parseInt(heightParam || '540', 10) : undefined;
+  const {
+    token, photos, orientation, baseMap, osDark: osDarkParam,
+    photoCount: photoCountParam,
+    includeLogo, hillshadeEnabled: hillshadeEnabledParam,
+    hideDescription,
+  } = await searchParams;
 
   if (!token && activityId !== 'mock') {
     return <div>Missing access token</div>;
@@ -24,14 +38,19 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
   } : undefined;
 
   const activity = await getActivityDetail(token || '', activityId, mockOptions);
+  const photoCount = photoCountParam ? Math.min(parseInt(photoCountParam, 10), 3) : 0;
 
   return (
-    <div style={{
-      width: fixedWidth ?? '100vw',
-      height: fixedHeight ?? '100vh',
-      overflow: 'hidden',
-    }}>
-      <RenderClient activity={activity} width={fixedWidth} height={fixedHeight} baseMap={baseMap === 'satellite' ? 'satellite' : 'os'} osDark={osDarkParam === 'true'} hidePhotos={hidePhotos === 'true'} includeLogo={includeLogo === 'true'} hillshadeEnabled={hillshadeEnabledParam === 'true'} hideDetails={hideDetails === 'true'} hideDescription={hideDescription === 'true'} />
+    <div style={{ width: 1200, height: 760, overflow: 'hidden' }}>
+      <RenderClient
+        activity={activity}
+        baseMap={baseMap === 'satellite' ? 'satellite' : 'os'}
+        osDark={osDarkParam === 'true'}
+        photoCount={photoCount}
+        includeLogo={includeLogo === 'true'}
+        hillshadeEnabled={hillshadeEnabledParam === 'true'}
+        hideDescription={hideDescription === 'true'}
+      />
     </div>
   );
 }
