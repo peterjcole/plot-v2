@@ -115,8 +115,8 @@ function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string
           '<feComponentTransfer in="SourceAlpha" result="opaque-alpha">',
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
-          '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
-          `<feFlood flood-color="${outlineColor}" flood-opacity="0.9" result="color"/>`,
+          '<feMorphology in="opaque-alpha" operator="dilate" radius="3" result="dilated"/>',
+          `<feFlood flood-color="${outlineColor}" flood-opacity="1.0" result="color"/>`,
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
           '<feMerge>',
@@ -322,8 +322,8 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
 
   const isDark = isSatellite || osDark;
   const routeColor = getActivityColor(activity.type ?? '');
-  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.85)' : 'rgba(255,255,255,0.65)';
-  const routeOpacity = isDark ? 0.60 : 0.35;
+  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.92)' : 'rgba(7,14,20,0.80)';
+  const routeOpacity = 0.68;
 
   return (
     <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
@@ -364,7 +364,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
           positions={route}
           pathOptions={{
             color: routeColor,
-            weight: 5,
+            weight: 9,
             opacity: routeOpacity,
           }}
         />

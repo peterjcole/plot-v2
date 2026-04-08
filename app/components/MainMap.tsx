@@ -102,12 +102,12 @@ function pinIconSvg(hasPhoto: boolean): string {
 // Cased lines: dark outer border drawn first, orange inner on top.
 // Layer opacity (0.52) makes the whole thing translucent so the map shows through the center.
 const snappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.95)', width: 10 }) }),
-  new Style({ stroke: new Stroke({ color: '#E07020', width: 6 }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.95)', width: 16 }) }),
+  new Style({ stroke: new Stroke({ color: '#E07020', width: 11 }) }),
 ];
 const unsnappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.85)', width: 9, lineDash: [10, 10] }) }),
-  new Style({ stroke: new Stroke({ color: '#E07020', width: 5, lineDash: [10, 10] }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.85)', width: 15, lineDash: [12, 10] }) }),
+  new Style({ stroke: new Stroke({ color: '#E07020', width: 10, lineDash: [12, 10] }) }),
 ];
 const routingPendingStyle = [
   new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.6)', width: 7, lineDash: [2, 6] }) }),
@@ -291,7 +291,7 @@ export default function MainMap({
 
     // Planner layers (always present, toggled visible in planner mode)
     const plannerRouteSource = new VectorSource();
-    const plannerRouteLayer = new VectorLayer({ source: plannerRouteSource, zIndex: 25, visible: false, opacity: 0.52 });
+    const plannerRouteLayer = new VectorLayer({ source: plannerRouteSource, zIndex: 25, visible: false, opacity: 0.68 });
     const plannerWpSource = new VectorSource();
     const plannerWpLayer = new VectorLayer({ source: plannerWpSource, zIndex: 30, visible: false });
 
