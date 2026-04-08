@@ -276,19 +276,9 @@ export default function RenderClient({
           <StatCell label="Pace" value={fmtPace(stats.distance, stats.movingTime)} unit="/km" isDark={isDark} />
         </div>
 
-        <StripDivider isDark={isDark} />
-
-        {/* Elevation sparkline */}
-        <div style={{ flexShrink: 0, paddingLeft: 18 }}>
-          <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, fontWeight: 400, color: isDark ? 'rgba(240,248,250,0.34)' : 'rgba(7,54,66,0.38)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 7 }}>
-            Elevation
-          </div>
-          <ElevSparkline data={[]} isDark={isDark} />
-        </div>
-
         {/* Attribution */}
-        <div style={{ marginLeft: 14, fontFamily: 'IBM Plex Mono, monospace', fontSize: 8, lineHeight: 1.5, color: attribColor, flexShrink: 0, textAlign: 'right' }}>
-          © OpenStreetMap<br />contributors
+        <div style={{ marginLeft: 18, fontFamily: 'IBM Plex Mono, monospace', fontSize: 8, lineHeight: 1.5, color: attribColor, flexShrink: 0, textAlign: 'right' }}>
+          © Crown copyright<br />Ordnance Survey
         </div>
       </div>
     </div>

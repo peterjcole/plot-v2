@@ -103,7 +103,7 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
                   onClick={() => onPhotoClick?.(i)}
                   aria-label={`Open photo ${i + 1}${photo.caption ? ': ' + photo.caption : ''}`}
                   style={{
-                    width: 80, height: 60, flexShrink: 0, borderRadius: 4,
+                    width: 160, height: 120, flexShrink: 0, borderRadius: 4,
                     background: 'var(--p2)', overflow: 'hidden', position: 'relative',
                     border: '1px solid var(--fog-ghost)',
                     padding: 0, cursor: onPhotoClick ? 'pointer' : 'default',

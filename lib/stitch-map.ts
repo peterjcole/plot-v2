@@ -178,12 +178,10 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   const isSatellite = baseMap === 'satellite';
   const isTopo = useTopo === true && !isSatellite;
   const isDark = isSatellite || osDark;
-  const routeColor = isDark ? '#E09B45' : '#4A5A2B';
-  const outlineColor = isDark ? '#5A2D00' : '#3A4722';
-  // Export needs higher opacity than browser — the 0.35 ActivityMap value
-  // reads well at screen res but looks too faint on a large print-resolution image.
-  const routeOpacity = isDark ? 0.60 : 0.35;
-  const arrowOpacity = isDark ? routeOpacity : 0.85;
+  const routeColor = '#E07020'; // matches --ora design token used in MainMap planner layers
+  const outlineColor = isDark ? 'rgba(7,14,20,0.95)' : 'rgba(255,255,255,0.7)';
+  const routeOpacity = 0.85;
+  const arrowOpacity = routeOpacity;
 
   const latLngToPixel = (lat: number, lng: number): [number, number] =>
     (isSatellite || isTopo)

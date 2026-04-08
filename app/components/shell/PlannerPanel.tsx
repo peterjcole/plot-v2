@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import { type ElevationPoint } from '@/app/(main)/planner/useElevationProfile';
 import { type RouteAction } from '@/app/(main)/planner/useRouteHistory';
@@ -86,8 +87,32 @@ function ElevationSparkline({ data }: { data: ElevationPoint[] }) {
   );
 }
 
+function SnapToggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={onChange}
+      style={{
+        width: 22, height: 12, borderRadius: 6, border: 'none', padding: 0,
+        background: on ? 'var(--ora)' : 'var(--p3)',
+        cursor: 'pointer', position: 'relative', flexShrink: 0,
+        transition: 'background 0.15s',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 1, left: on ? 11 : 1,
+        width: 10, height: 10, borderRadius: '50%',
+        background: 'var(--ice)', display: 'block',
+        transition: 'left 0.15s',
+      }} />
+    </button>
+  );
+}
+
 export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch }: PlannerPanelProps) {
   const hasRoute = waypoints.length >= 2;
+  const [hoverX, setHoverX] = useState<number | null>(null);
 
   function handleExportGpx() {
     if (waypoints.length < 2) return;
@@ -96,7 +121,7 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px 16px' }}>
+      <div style={{ flexShrink: 0, padding: '12px 14px 0' }}>
 
         {/* Route stats card */}
         {hasRoute ? (
@@ -132,63 +157,90 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
           </p>
         )}
 
-        {/* Waypoints list */}
+        {/* Waypoints header */}
         {waypoints.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-                Waypoints
-              </span>
-              <span style={{ fontSize: 9, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)' }}>
-                {waypoints.length}
-              </span>
-            </div>
-            <div
-              role="list"
-              style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}
-            >
-              {waypoints.map((wp, i) => (
-                <div
-                  key={i}
-                  role="listitem"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '4px 0',
-                  }}
-                >
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: 'var(--p3)', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 8, fontWeight: 700, color: 'var(--fog-dim)', fontFamily: 'var(--mono)',
-                  }}>
-                    {i + 1}
-                  </div>
-                  <span style={{ flex: 1, fontSize: 10, color: 'var(--fog)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {wp.name ?? `Waypoint ${i + 1}`}
-                  </span>
-                  <button
-                    onClick={() => dispatch({ type: 'REMOVE_WAYPOINT', index: i })}
-                    aria-label={`Remove waypoint ${i + 1}`}
-                    style={{
-                      background: 'none', border: 'none', padding: 0,
-                      color: 'var(--fog-ghost)', cursor: 'pointer', lineHeight: 0, flexShrink: 0,
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+              Waypoints
+            </span>
+            <span style={{ fontSize: 9, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)' }}>
+              {waypoints.length}
+            </span>
           </div>
         )}
       </div>
 
+      {/* Waypoints list — fills remaining height */}
+      {waypoints.length > 0 && (
+        <div
+          role="list"
+          style={{ flex: 1, overflowY: 'auto', padding: '0 14px', display: 'flex', flexDirection: 'column', gap: 2 }}
+        >
+          {waypoints.map((wp, i) => {
+            const snapInOn = i > 0 ? (segments[i - 1]?.snapped ?? false) : false;
+            const snapOutOn = i < waypoints.length - 1 ? (segments[i]?.snapped ?? false) : false;
+            return (
+              <div
+                key={i}
+                role="listitem"
+                onMouseEnter={() => setHoverX(i)}
+                onMouseLeave={() => setHoverX(null)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 0',
+                  borderBottom: '1px solid var(--fog-ghost)',
+                }}
+              >
+                <div style={{
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: 'var(--p3)', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 8, fontWeight: 700, color: 'var(--fog-dim)', fontFamily: 'var(--mono)',
+                }}>
+                  {i + 1}
+                </div>
+                <span style={{ flex: 1, fontSize: 10, color: 'var(--fog)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                  {wp.name ?? `Waypoint ${i + 1}`}
+                </span>
+
+                {/* Snap toggles — show on hover or when active */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, opacity: hoverX === i || snapInOn || snapOutOn ? 1 : 0, transition: 'opacity 0.12s' }}>
+                  {i > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <span style={{ fontSize: 6, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', lineHeight: 1 }}>in</span>
+                      <SnapToggle on={snapInOn} onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i - 1 })} />
+                    </div>
+                  )}
+                  {i < waypoints.length - 1 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                      <span style={{ fontSize: 6, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', lineHeight: 1 }}>out</span>
+                      <SnapToggle on={snapOutOn} onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i })} />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => dispatch({ type: 'REMOVE_WAYPOINT', index: i })}
+                  aria-label={`Remove waypoint ${i + 1}`}
+                  style={{
+                    background: 'none', border: 'none', padding: '2px',
+                    color: 'var(--fog-dim)', cursor: 'pointer', lineHeight: 0, flexShrink: 0,
+                    opacity: 0.8,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Footer — Export GPX */}
       {hasRoute && (
-        <div style={{ padding: '0 14px 14px', flexShrink: 0 }}>
+        <div style={{ padding: '10px 14px 14px', flexShrink: 0 }}>
           <button
             onClick={handleExportGpx}
             style={{

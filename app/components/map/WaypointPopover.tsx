@@ -61,12 +61,12 @@ export default function WaypointPopover({
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}>
-          Snap {label}
+          Snap to path {label}
         </span>
         <button
           role="switch"
           aria-checked={checked}
-          aria-label={`Snap ${label}`}
+          aria-label={`Snap to path ${label}`}
           onClick={onToggle}
           style={{
             width: 28, height: 16, borderRadius: 8, border: 'none', padding: 0,

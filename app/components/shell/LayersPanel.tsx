@@ -11,17 +11,40 @@ export interface LayerState {
   showPersonalHeatmap: boolean;
   showPOIs: boolean;
   showGlobalHeatmap: boolean;
+  showExplorer: boolean;
+  showRecentActivities: boolean;
 }
 
 export const DEFAULT_LAYER_STATE: LayerState = {
   baseLayer: 'topo',
-  showHillshade: false,
+  showHillshade: true,
   showPhotos: true,
   dimBaseMap: false,
   showPersonalHeatmap: false,
   showPOIs: false,
   showGlobalHeatmap: false,
+  showExplorer: false,
+  showRecentActivities: true,
 };
+
+const LS_KEY = 'plotv2-layer-state';
+
+export function loadLayerState(): LayerState {
+  if (typeof window === 'undefined') return DEFAULT_LAYER_STATE;
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return DEFAULT_LAYER_STATE;
+    return { ...DEFAULT_LAYER_STATE, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_LAYER_STATE;
+  }
+}
+
+export function saveLayerState(state: LayerState) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  } catch { /* ignore */ }
+}
 
 interface LayersPanelProps {
   state: LayerState;
@@ -29,6 +52,7 @@ interface LayersPanelProps {
   bottom?: number;
   fixed?: boolean;
   forceOpen?: boolean;
+  isOwner?: boolean;
 }
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -60,7 +84,8 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
   );
 }
 
-function Row({ label, on, onChange, disabled }: { label: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Row({ label, on, onChange, disabled, hidden }: { label: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean; hidden?: boolean }) {
+  if (hidden) return null;
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', gap: 8 }}>
       <span style={{ flex: 1, font: '400 10px/1 var(--mono)', color: disabled ? 'var(--fog-dim)' : 'var(--fog)', letterSpacing: '0.03em' }}>
@@ -75,9 +100,14 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
+
+  // Save layer state whenever it changes
+  useEffect(() => {
+    saveLayerState(state);
+  }, [state]);
 
   return (
     <div style={{
@@ -150,19 +180,25 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
 
           <Divider />
 
+          {/* Activities */}
+          <Row label="Recent activities" on={state.showRecentActivities} onChange={(v) => onChange({ showRecentActivities: v })} />
+
+          <Divider />
+
           {/* Personal */}
           <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} />
-          <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} disabled />
-          <Row label="Explorer tiles" on={false} onChange={() => {}} disabled />
+          <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} hidden={!isOwner} />
+          <Row label="Explorer tiles" on={state.showExplorer} onChange={(v) => onChange({ showExplorer: v })} hidden={!isOwner} />
 
-          <Divider />
+          {!isOwner && <Divider />}
+          {isOwner && <Divider />}
 
-          {/* POIs */}
-          <Row label="Points of interest" on={state.showPOIs} onChange={(v) => onChange({ showPOIs: v })} disabled />
+          {/* POIs — owner only */}
+          <Row label="Points of interest" on={state.showPOIs} onChange={(v) => onChange({ showPOIs: v })} hidden={!isOwner} />
 
-          <Divider />
+          {isOwner && <Divider />}
 
-          {/* Global heatmap */}
+          {/* Global heatmap — always shown */}
           <Row label="Global heatmap" on={state.showGlobalHeatmap} onChange={(v) => onChange({ showGlobalHeatmap: v })} disabled />
 
           <Divider />

@@ -97,9 +97,11 @@ export default function ExportOptionsPopover({ activityId, osDark, anchorRect, o
     onClose();
   }
 
-  // Position: appear just below and to the left of the anchor
+  // Position: appear below the anchor, or above if too close to screen bottom
+  const POPOVER_HEIGHT = 380;
   const left = Math.max(8, anchorRect.x - 200);
-  const top = anchorRect.y + 8;
+  const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - anchorRect.y : 400;
+  const top = spaceBelow < POPOVER_HEIGHT + 16 ? anchorRect.y - POPOVER_HEIGHT - 8 : anchorRect.y + 8;
 
   return (
     <div

@@ -5,9 +5,9 @@ import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
-import { ActivitySummary, ActivityData } from '@/lib/types';
+import { ActivitySummary, ActivityData, ActivityPhoto } from '@/lib/types';
 import { type MapLayer, type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
-import LayersPanel, { type LayerState, DEFAULT_LAYER_STATE } from './LayersPanel';
+import LayersPanel, { type LayerState, DEFAULT_LAYER_STATE, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
@@ -50,17 +50,25 @@ interface MapShellProps {
   activities: ActivitySummary[];
   avatarInitials: string;
   isLoggedIn?: boolean;
+  isOwner?: boolean;
   initialMode?: PanelMode;
+  initialSelectedId?: string | null;
   authError?: boolean;
 }
 
-export default function MapShell({ activities, avatarInitials, isLoggedIn = false, initialMode = 'browse', authError = false }: MapShellProps) {
-  const [mode, setMode] = useState<PanelMode>(initialMode);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isOwner = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
+  const [mode, setMode] = useState<PanelMode>(initialSelectedId ? 'detail' : initialMode);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [layerState, setLayerState] = useState<LayerState>(DEFAULT_LAYER_STATE);
-  const patchLayers = useCallback((patch: Partial<LayerState>) => setLayerState(prev => ({ ...prev, ...patch })), []);
+  const patchLayers = useCallback((patch: Partial<LayerState>) => {
+    setLayerState(prev => {
+      const next = { ...prev, ...patch };
+      saveLayerState(next);
+      return next;
+    });
+  }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
@@ -103,6 +111,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [theme, setTheme] = useState<Theme>('system');
   const [sysDark, setSysDark] = useState(false);
   const osDark = theme === 'dark' || (theme === 'system' && sysDark);
+
+  // Owner photos — fetched when showPhotos is toggled on for the owner
+  const [ownerPhotos, setOwnerPhotos] = useState<ActivityPhoto[]>([]);
 
   // Planner state
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
@@ -164,6 +175,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  // Load persisted layer state on mount
+  useEffect(() => {
+    setLayerState(loadLayerState());
+  }, []);
+
+  // Owner photos — fetch when showPhotos is toggled on for the owner
+  useEffect(() => {
+    if (!isOwner || !layerState.showPhotos) { setOwnerPhotos([]); return; }
+    fetch('/api/photos')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: ActivityPhoto[]) => setOwnerPhotos(data))
+      .catch(() => {});
+  }, [isOwner, layerState.showPhotos]);
+
   // Theme initialisation + system preference tracking
   useEffect(() => {
     const stored = loadTheme();
@@ -184,7 +209,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   // Reflect panel mode in URL bar (no navigation, just history state)
   useEffect(() => {
     let path = '/';
-    if (mode === 'detail' && selectedId) path = `/activities/${selectedId}`;
+    if (mode === 'detail' && selectedId) path = `/?activity=${selectedId}`;
     else if (mode === 'planner') path = '/planner';
     else if (mode === 'about') path = '/about';
     window.history.replaceState(null, '', path);
@@ -213,13 +238,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     }
   }, [dispatch]);
 
-  // Auto-save route
+  // Auto-save route — only runs when map is ready to avoid persisting [0,0] center
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const map = mapInstanceRef.current;
-      const center = map ? (map.getView().getCenter() as [number, number]) : [0, 0] as [number, number];
-      const zoom = map?.getView().getZoom() ?? 7;
+      if (!map) return;
+      const center = map.getView().getCenter() as [number, number];
+      const zoom = map.getView().getZoom() ?? 7;
       saveRoute(waypointsRef.current, segmentsRef.current, center, zoom);
     }, 500);
   }, [waypoints, segments]);
@@ -229,12 +255,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setCompassBearing(0);
   }, []);
 
+  // Real GB BNG coordinates are x ∈ [60000, 700000], y ∈ [10000, 1250000].
+  // WGS84 lon/lat values for GB (e.g. [8.7, 50.1] for Frankfurt) are tiny by comparison
+  // and must be rejected to avoid a stale/wrong-format center being applied.
+  function isValidBNG([x, y]: [number, number]) {
+    return x > 60000 && x < 700000 && y > 10000 && y < 1250000;
+  }
+
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
-    const stored = loadRoute();
-    if (stored?.mapCenter[0] !== 0) {
-      map.getView().setCenter(stored!.mapCenter);
-      map.getView().setZoom(stored!.mapZoom);
+    // Only restore stored center when there are no activities — if activities exist,
+    // the auto-fit to their extent gives a better starting view on every refresh.
+    if (allActivities.length === 0) {
+      const stored = loadRoute();
+      if (stored?.mapCenter && isValidBNG(stored.mapCenter as [number, number])) {
+        map.getView().setCenter(stored.mapCenter);
+        map.getView().setZoom(stored.mapZoom);
+      }
     }
     // Set initial resolution
     setMapResolution(map.getView().getResolution() ?? 10);
@@ -246,7 +283,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setCompassBearing(view.getRotation() * 180 / Math.PI);
       setMapResolution(view.getResolution() ?? 10);
     });
-  }, []);
+  }, [allActivities.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectActivity = useCallback((id: string) => {
     setSelectedId(id);
@@ -291,6 +328,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleOpenInPlanner = useCallback(() => {
     if (!activityDetail?.route?.length) { handleOpenPlanner(); return; }
+    if (waypoints.length > 0 && !window.confirm('Load this activity into the planner? This will replace your current route.')) return;
     const rawWaypoints = activityDetail.route.map(([lat, lng]) => ({ lat, lng }));
     // Create via-points every 2km with full track coordinates in each segment (same as GPX import)
     const { waypoints: viaPoints, segments: viaSegments } = selectGpxWaypoints(rawWaypoints, 2);
@@ -300,7 +338,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setSelectedId(null);
     setActivityDetail(null);
     handleFitToRoute(viaPoints);
-  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner]);
+  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner, waypoints.length]);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -327,7 +365,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       const res = await fetch('/api/planner-printout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ route, center, exportMode, baseMap: 'os', osDark: true }),
+        body: JSON.stringify({ route, center, exportMode, baseMap: 'os', osDark }),
       });
       if (!res.ok) return;
       const blob = await res.blob();
@@ -345,7 +383,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     : undefined;
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
-  const photoMarkers = activityDetail?.photos ?? undefined;
+  const photoMarkers = mode === 'detail' ? (activityDetail?.photos ?? undefined) : (ownerPhotos.length > 0 ? ownerPhotos : undefined);
 
   // ── Desktop layout ─────────────────────────────────────────────────────────
   if (!isMobile) {
@@ -392,7 +430,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <MainMap
             activities={allActivities}
-            highlightedId={selectedId ?? hoveredId}
+            highlightedId={hoveredId}
+            selectedId={selectedId}
+            showRecentActivities={layerState.showRecentActivities}
             onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
             onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
             onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
@@ -406,10 +446,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             showHillshade={layerState.showHillshade}
             showPhotos={layerState.showPhotos}
             dimBaseMap={layerState.dimBaseMap}
+            showPersonalHeatmap={layerState.showPersonalHeatmap}
+            showExplorer={layerState.showExplorer}
+            showPOIs={layerState.showPOIs}
           />
           {/* Map chrome — bottom-left cluster */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} />
-          <div style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} />
+          <div style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
             {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
           </div>
@@ -470,7 +513,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       <div style={{ position: 'absolute', inset: 0 }}>
         <MainMap
           activities={allActivities}
-          highlightedId={selectedId}
+          highlightedId={undefined}
+          selectedId={selectedId}
+          showRecentActivities={layerState.showRecentActivities}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
           onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
@@ -481,25 +526,55 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           showHillshade={layerState.showHillshade}
           showPhotos={layerState.showPhotos}
           dimBaseMap={layerState.dimBaseMap}
+          showPersonalHeatmap={layerState.showPersonalHeatmap}
+          showExplorer={layerState.showExplorer}
+          showPOIs={layerState.showPOIs}
         />
       </div>
 
       {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />}
 
-      {/* Activity legend below header */}
+      {/* Tab bar — always shown on mobile */}
+      <div style={{
+        position: 'fixed', top: mode === 'planner' ? 60 : 50, left: 0, right: 0, height: 32,
+        background: 'rgba(7,14,20,0.88)', backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex', borderBottom: '1px solid var(--p3)', zIndex: 18,
+      }}>
+        <button
+          onClick={handleExitPlanner}
+          style={{
+            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
+            color: mode !== 'planner' ? 'var(--ora)' : 'rgba(240,248,250,0.45)',
+            borderBottom: mode !== 'planner' ? '2px solid var(--ora)' : 'none',
+          }}
+        >Activities</button>
+        <button
+          onClick={handleOpenPlanner}
+          style={{
+            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
+            color: mode === 'planner' ? 'var(--ora)' : 'rgba(240,248,250,0.45)',
+            borderBottom: mode === 'planner' ? '2px solid var(--ora)' : 'none',
+          }}
+        >Planner</button>
+      </div>
+
+      {/* Activity legend below tab bar */}
       {mode !== 'planner' && (
-        <MapLegend style={{ position: 'absolute', top: 58, right: 12, zIndex: 10 }} />
+        <MapLegend style={{ position: 'absolute', top: 90, right: 12, zIndex: 10 }} />
       )}
 
       {/* Map chrome — bottom-left cluster (above the buttons) */}
-      <div style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
         {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
       </div>
 
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={142} fixed />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={142} fixed isOwner={isOwner} />
           <button
             onClick={handleOpenPlanner}
             style={{
@@ -572,30 +647,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onExportGpx={handleMobileExportGpx}
           />
 
-          {/* Activities / Planner tabs */}
-          <div style={{
-            position: 'fixed', top: 60, left: 0, right: 0, height: 32,
-            background: 'rgba(7,14,20,0.88)', backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'flex', borderBottom: '1px solid var(--p3)', zIndex: 18,
-          }}>
-            <button
-              onClick={handleExitPlanner}
-              style={{
-                flex: 1, background: 'none', border: 'none', cursor: 'pointer',
-                font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-                color: 'rgba(240,248,250,0.45)',
-              }}
-            >Activities</button>
-            <div style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-              color: 'var(--ora)', borderBottom: '2px solid var(--ora)',
-            }}>Planner</div>
-          </div>
-
           {/* Layers panel */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={200} fixed forceOpen={mobilePlannerLayersOpen} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={200} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />
 
           {/* Bottom HUD */}
           {(() => {
