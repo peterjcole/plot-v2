@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import PlaceSearch from '@/app/(main)/planner/PlaceSearch';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import { defaults as defaultControls } from 'ol/control';
@@ -65,6 +66,9 @@ interface MainMapProps {
   showPersonalHeatmap?: boolean;
   showExplorer?: boolean;
   showPOIs?: boolean;
+  onGeolocate?: () => void;
+  onPlaceSelect?: (coordinates: [number, number]) => void;
+  isMobile?: boolean;
 }
 
 export type { WaypointClickInfo };
@@ -192,6 +196,9 @@ export default function MainMap({
   showPersonalHeatmap = false,
   showExplorer = false,
   showPOIs = false,
+  onGeolocate,
+  onPlaceSelect,
+  isMobile = false,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -811,32 +818,96 @@ export default function MainMap({
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Zoom buttons — top right */}
-      <div style={{
-        position: 'absolute', top: 16, right: 16, zIndex: 12,
-        display: 'flex', flexDirection: 'column', gap: 4,
-      }}>
-        <button
-          onClick={handleZoomIn}
-          disabled={currentZoom >= 12}
-          aria-label="Zoom in"
-          style={zoomBtnStyle(currentZoom >= 12)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-        <button
-          onClick={handleZoomOut}
-          disabled={currentZoom <= OS_ZOOM.min}
-          aria-label="Zoom out"
-          style={zoomBtnStyle(currentZoom <= OS_ZOOM.min)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      </div>
+      {isMobile ? (
+        <>
+          {/* Mobile: geolocate top-left, zoom top-right (below header 60px + tab bar 32px) */}
+          {onGeolocate && (
+            <div style={{ position: 'absolute', top: 100, left: 12, zIndex: 12 }}>
+              <button
+                onClick={onGeolocate}
+                aria-label="Go to my location"
+                title="Go to my location"
+                style={zoomBtnStyle(false)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <line x1="12" y1="2" x2="12" y2="6"/>
+                  <line x1="12" y1="18" x2="12" y2="22"/>
+                  <line x1="2" y1="12" x2="6" y2="12"/>
+                  <line x1="18" y1="12" x2="22" y2="12"/>
+                </svg>
+              </button>
+            </div>
+          )}
+          <div style={{ position: 'absolute', top: 100, right: 16, zIndex: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} />}
+            <button
+              onClick={handleZoomIn}
+              disabled={currentZoom >= 12}
+              aria-label="Zoom in"
+              style={zoomBtnStyle(currentZoom >= 12)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <button
+              onClick={handleZoomOut}
+              disabled={currentZoom <= OS_ZOOM.min}
+              aria-label="Zoom out"
+              style={zoomBtnStyle(currentZoom <= OS_ZOOM.min)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        </>
+      ) : (
+        /* Desktop: bottom-right cluster: search, geolocate, zoom */
+        <div style={{
+          position: 'absolute', bottom: 80, right: 16, zIndex: 12,
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} />}
+          {onGeolocate && (
+            <button
+              onClick={onGeolocate}
+              aria-label="Go to my location"
+              title="Go to my location"
+              style={zoomBtnStyle(false)}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <line x1="12" y1="2" x2="12" y2="6"/>
+                <line x1="12" y1="18" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="6" y2="12"/>
+                <line x1="18" y1="12" x2="22" y2="12"/>
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={handleZoomIn}
+            disabled={currentZoom >= 12}
+            aria-label="Zoom in"
+            style={zoomBtnStyle(currentZoom >= 12)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <button
+            onClick={handleZoomOut}
+            disabled={currentZoom <= OS_ZOOM.min}
+            aria-label="Zoom out"
+            style={zoomBtnStyle(currentZoom <= OS_ZOOM.min)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

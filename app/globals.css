@@ -72,11 +72,27 @@
   --font-logo: var(--font-ribeye-marrow);
 }
 
+html, body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  height: 100%;
+}
+
+/* iOS Safari: overflow:hidden alone doesn't prevent viewport scroll.
+   position:fixed on body locks it completely. */
+body {
+  position: fixed;
+  width: 100%;
+}
+
 body {
   background: var(--p0);
   color: var(--ice);
   font-family: var(--mono);
 }
+
+/* Hide scrollbars while preserving scroll functionality */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
 
 /* Pin map rendering to light mode so dark mode never affects route line, pins, or overlay */
 .leaflet-container {

@@ -199,7 +199,7 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
           {isOwner && <Divider />}
 
           {/* Global heatmap — always shown */}
-          <Row label="Global heatmap" on={state.showGlobalHeatmap} onChange={(v) => onChange({ showGlobalHeatmap: v })} disabled />
+          <Row label="Global heatmap" on={state.showGlobalHeatmap} onChange={(v) => onChange({ showGlobalHeatmap: v })} />
 
           <Divider />
 

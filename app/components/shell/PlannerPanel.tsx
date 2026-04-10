@@ -14,6 +14,9 @@ interface PlannerPanelProps {
   elevationData: ElevationPoint[] | null;
   isLoadingElevation: boolean;
   dispatch: React.Dispatch<RouteAction>;
+  onFitToRoute?: () => void;
+  onExportImage?: () => void;
+  isExportingImage?: boolean;
 }
 
 function fmtDist(m: number): string {
@@ -87,30 +90,90 @@ function ElevationSparkline({ data }: { data: ElevationPoint[] }) {
   );
 }
 
-function SnapToggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+function SnapToggle({ on, onChange, direction }: { on: boolean; onChange: () => void; direction: 'in' | 'out' }) {
+  // Segment chip: dashed line → dot (in) or dot → dashed line (out)
+  // Active: solid orange line + filled waypoint dot
+  // Inactive: ghosted dashed line + hollow dot
   return (
     <button
       role="switch"
       aria-checked={on}
       onClick={onChange}
+      title={direction === 'in' ? 'Snap incoming segment to roads' : 'Snap outgoing segment to roads'}
       style={{
-        width: 22, height: 12, borderRadius: 6, border: 'none', padding: 0,
-        background: on ? 'var(--ora)' : 'var(--p3)',
-        cursor: 'pointer', position: 'relative', flexShrink: 0,
-        transition: 'background 0.15s',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: 20,
+        padding: 0,
+        borderRadius: 3,
+        border: `1px solid ${on ? 'rgba(224,112,32,0.55)' : 'var(--p3)'}`,
+        background: on ? 'rgba(224,112,32,0.1)' : 'transparent',
+        cursor: 'pointer',
+        transition: 'border-color 0.18s, background 0.18s',
       }}
     >
-      <span style={{
-        position: 'absolute', top: 1, left: on ? 11 : 1,
-        width: 10, height: 10, borderRadius: '50%',
-        background: 'var(--ice)', display: 'block',
-        transition: 'left 0.15s',
-      }} />
+      <svg width="62" height="14" viewBox="0 0 62 14" fill="none">
+        {direction === 'in' ? (
+          <>
+            {/* Segment line flowing into waypoint */}
+            <line
+              x1="2" y1="7" x2="42" y2="7"
+              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
+              strokeWidth={on ? 2 : 1.5}
+              strokeDasharray={on ? undefined : '3 2.5'}
+              strokeLinecap="round"
+            />
+            {/* Arrowhead */}
+            <polyline
+              points="36,4 42,7 36,10"
+              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
+              strokeWidth={on ? 1.5 : 1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Waypoint dot */}
+            <circle
+              cx="54" cy="7" r={on ? 4.5 : 3.5}
+              fill={on ? 'var(--ora)' : 'var(--p3)'}
+              stroke={on ? 'rgba(224,112,32,0.35)' : 'var(--p4)'}
+              strokeWidth={on ? 2.5 : 1}
+            />
+          </>
+        ) : (
+          <>
+            {/* Waypoint dot */}
+            <circle
+              cx="8" cy="7" r={on ? 4.5 : 3.5}
+              fill={on ? 'var(--ora)' : 'var(--p3)'}
+              stroke={on ? 'rgba(224,112,32,0.35)' : 'var(--p4)'}
+              strokeWidth={on ? 2.5 : 1}
+            />
+            {/* Segment line flowing out of waypoint */}
+            <line
+              x1="20" y1="7" x2="58" y2="7"
+              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
+              strokeWidth={on ? 2 : 1.5}
+              strokeDasharray={on ? undefined : '3 2.5'}
+              strokeLinecap="round"
+            />
+            {/* Arrowhead */}
+            <polyline
+              points="52,4 58,7 52,10"
+              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
+              strokeWidth={on ? 1.5 : 1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </>
+        )}
+      </svg>
     </button>
   );
 }
 
-export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch }: PlannerPanelProps) {
+export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false }: PlannerPanelProps) {
   const hasRoute = waypoints.length >= 2;
   const [hoverX, setHoverX] = useState<number | null>(null);
 
@@ -120,6 +183,8 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
   }
 
   return (
+    <>
+    <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ flexShrink: 0, padding: '12px 14px 0' }}>
 
@@ -159,13 +224,29 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
 
         {/* Waypoints header */}
         {waypoints.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)', flex: 1 }}>
               Waypoints
             </span>
-            <span style={{ fontSize: 9, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)' }}>
+            <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
               {waypoints.length}
             </span>
+            {waypoints.length >= 2 && onFitToRoute && (
+              <button
+                onClick={onFitToRoute}
+                title="Fit map to route"
+                aria-label="Fit map to route"
+                style={{
+                  background: 'none', border: '1px solid var(--fog-ghost)', borderRadius: 3,
+                  padding: '2px 4px', cursor: 'pointer', color: 'var(--fog-dim)',
+                  display: 'flex', alignItems: 'center', lineHeight: 0,
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6"/>
+                </svg>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -203,19 +284,13 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
                   {wp.name ?? `Waypoint ${i + 1}`}
                 </span>
 
-                {/* Snap toggles — show on hover or when active */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, opacity: hoverX === i || snapInOn || snapOutOn ? 1 : 0, transition: 'opacity 0.12s' }}>
+                {/* Snap toggles — labeled pill toggles, stacked */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0, width: 72, opacity: hoverX === i || snapInOn || snapOutOn ? 1 : 0.3, transition: 'opacity 0.15s ease' }}>
                   {i > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                      <span style={{ fontSize: 6, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', lineHeight: 1 }}>in</span>
-                      <SnapToggle on={snapInOn} onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i - 1 })} />
-                    </div>
+                    <SnapToggle on={snapInOn} direction="in" onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i - 1 })} />
                   )}
                   {i < waypoints.length - 1 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                      <span style={{ fontSize: 6, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', lineHeight: 1 }}>out</span>
-                      <SnapToggle on={snapOutOn} onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i })} />
-                    </div>
+                    <SnapToggle on={snapOutOn} direction="out" onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i })} />
                   )}
                 </div>
 
@@ -229,7 +304,7 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                   </svg>
                 </button>
               </div>
@@ -238,26 +313,52 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
         </div>
       )}
 
-      {/* Footer — Export GPX */}
+      {/* Footer — Export buttons */}
       {hasRoute && (
-        <div style={{ padding: '10px 14px 14px', flexShrink: 0 }}>
+        <div style={{ padding: '10px 14px 14px', flexShrink: 0, display: 'flex', gap: 8 }}>
           <button
             onClick={handleExportGpx}
             style={{
-              width: '100%', padding: '9px 12px',
-              background: 'var(--ora)', border: 'none', borderRadius: 4,
-              color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
+              flex: 1, padding: '9px 10px',
+              background: 'var(--p3)', border: '1px solid var(--fog-ghost)', borderRadius: 4,
+              color: 'var(--fog)', fontFamily: 'var(--mono)', fontSize: 10,
               fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Export GPX
+            GPX
           </button>
+          {onExportImage && (
+            <button
+              onClick={onExportImage}
+              disabled={isExportingImage}
+              style={{
+                flex: 1, padding: '9px 10px',
+                background: 'var(--ora)', border: 'none', borderRadius: 4,
+                color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 10,
+                fontWeight: 600, cursor: isExportingImage ? 'wait' : 'pointer', letterSpacing: '0.04em',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                opacity: isExportingImage ? 0.6 : 1,
+              }}
+            >
+              {isExportingImage ? (
+                <div style={{ width: 11, height: 11, borderRadius: '50%', border: '2px solid rgba(7,14,20,0.4)', borderTopColor: 'var(--p0)', animation: 'spin 0.8s linear infinite' }} />
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              )}
+              Image
+            </button>
+          )}
         </div>
       )}
     </div>
+    </>
   );
 }

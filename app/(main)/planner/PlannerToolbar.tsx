@@ -13,7 +13,7 @@ interface PlannerToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   dispatch: React.Dispatch<RouteAction>;
-  onGeolocate: () => void;
+  onGeolocate?: () => void;
   addPointsEnabled: boolean;
   onToggleAddPoints: () => void;
   snapEnabled: boolean;
@@ -160,7 +160,7 @@ export default function PlannerToolbar({
 
         {isMobile && (
           <>
-            <span style={{ fontFamily: 'var(--display)', fontSize: 18, color: 'rgba(240,248,250,0.9)', padding: '0 8px', flexShrink: 0, lineHeight: 1 }}>plot</span>
+            <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', padding: '0 4px 0 4px', flexShrink: 0, lineHeight: 1 }}>plot</span>
             {SEP}
           </>
         )}
@@ -215,21 +215,21 @@ export default function PlannerToolbar({
                 <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
             </TbBtn>
-
-            {/* Export Image */}
-            <TbBtn label="Image" disabled={!hasRoute || isExportingImage} onClick={onExportImage}>
-              {isExportingImage ? (
-                <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(240,248,250,0.45)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-              )}
-            </TbBtn>
           </>
         )}
+
+        {/* Export Image — available on both desktop and mobile */}
+        <TbBtn label="Image" disabled={isExportingImage} onClick={onExportImage}>
+          {isExportingImage ? (
+            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--fog-ghost)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          )}
+        </TbBtn>
 
         {/* Spacer */}
         <div style={{ flex: 1 }} />
@@ -238,11 +238,11 @@ export default function PlannerToolbar({
           <>
             {/* Route info or hint */}
             {routeInfo ? (
-              <div style={{ font: '600 10px/1 var(--mono)', color: 'rgba(240,248,250,0.72)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              <div style={{ font: '600 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
                 {routeInfo}
               </div>
             ) : (
-              <div style={{ font: '400 10px/1 var(--mono)', color: 'rgba(240,248,250,0.45)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              <div style={{ font: '400 10px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
                 Click the map to place your first point
               </div>
             )}
@@ -261,17 +261,6 @@ export default function PlannerToolbar({
             </svg>
           </TbBtn>
         )}
-
-        {/* Locate */}
-        <TbBtn label="Locate" onClick={onGeolocate}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <line x1="12" y1="2" x2="12" y2="6"/>
-            <line x1="12" y1="18" x2="12" y2="22"/>
-            <line x1="2" y1="12" x2="6" y2="12"/>
-            <line x1="18" y1="12" x2="22" y2="12"/>
-          </svg>
-        </TbBtn>
 
         {/* Back (desktop only, when onBack provided) */}
         {!isMobile && onBack && (

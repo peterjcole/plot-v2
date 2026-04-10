@@ -30,6 +30,7 @@ import MapLegend from './MapLegend';
 import PhotoLightbox from './PhotoLightbox';
 import WaypointPopover from '@/app/components/map/WaypointPopover';
 import AboutSection from './AboutSection';
+import SplashOverlay from './SplashOverlay';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -70,6 +71,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     });
   }, []);
   const [isMobile, setIsMobile] = useState(false);
+  const [splashDismissed, setSplashDismissed] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem('plot-splash-dismissed') === '1') setSplashDismissed(true);
+  }, []);
+  const handleSplashDismiss = useCallback(() => {
+    localStorage.setItem('plot-splash-dismissed', '1');
+    setSplashDismissed(true);
+  }, []);
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -144,6 +153,33 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [elevationData]);
 
   const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
+
+  // Mobile planner HUD — draggable bottom panel
+  // COLLAPSED = thin grab strip, map almost fully visible; EXPANDED = natural content height
+  const PLANNER_HUD_COLLAPSED = 38;
+  const PLANNER_HUD_EXPANDED = 158;
+  const [plannerHudHeight, setPlannerHudHeight] = useState(PLANNER_HUD_EXPANDED);
+  const [plannerHudDragging, setPlannerHudDragging] = useState(false);
+  const plannerHudDragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const handlePlannerHudTouchStart = useCallback((e: React.TouchEvent) => {
+    plannerHudDragRef.current = { startY: e.touches[0].clientY, startH: plannerHudHeight };
+    setPlannerHudDragging(true);
+  }, [plannerHudHeight]);
+  const handlePlannerHudTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!plannerHudDragRef.current) return;
+    const delta = plannerHudDragRef.current.startY - e.touches[0].clientY;
+    // Allow drag from collapsed up to expanded; clamp between collapsed and expanded
+    const next = Math.max(PLANNER_HUD_COLLAPSED, Math.min(PLANNER_HUD_EXPANDED, plannerHudDragRef.current.startH + delta));
+    setPlannerHudHeight(next);
+  }, []);
+  const handlePlannerHudTouchEnd = useCallback(() => {
+    if (!plannerHudDragRef.current) return;
+    setPlannerHudDragging(false);
+    // Snap: if dragged past halfway, collapse; otherwise expand
+    const mid = (PLANNER_HUD_COLLAPSED + PLANNER_HUD_EXPANDED) / 2;
+    setPlannerHudHeight(h => h >= mid ? PLANNER_HUD_EXPANDED : PLANNER_HUD_COLLAPSED);
+    plannerHudDragRef.current = null;
+  }, []);
 
   const handleMobileExportGpx = useCallback(() => {
     if (waypoints.length === 0) return;
@@ -302,12 +338,21 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setActivityDetail(null);
   }, []);
 
+  const handleFitToRoute = useCallback((wps: typeof waypoints) => {
+    const map = mapInstanceRef.current;
+    if (!map || wps.length < 2) return;
+    const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
+    map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
+  }, []);
+
   const handleOpenPlanner = useCallback(() => {
     setMode('planner');
     setSelectedId(null);
     setActivityDetail(null);
     setLoadedActivityId(null);
-  }, []);
+    // Defer until after mode change re-renders
+    setTimeout(() => handleFitToRoute(waypoints), 50);
+  }, [waypoints, handleFitToRoute]);
 
   const handleExitPlanner = useCallback(() => setMode('browse'), []);
 
@@ -318,13 +363,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     if (tab === 'planner') handleOpenPlanner();
     else handleExitPlanner();
   }, [handleOpenPlanner, handleExitPlanner]);
-
-  const handleFitToRoute = useCallback((wps: typeof waypoints) => {
-    const map = mapInstanceRef.current;
-    if (!map || wps.length < 2) return;
-    const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
-    map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
-  }, []);
 
   const handleOpenInPlanner = useCallback(() => {
     if (!activityDetail?.route?.length) { handleOpenPlanner(); return; }
@@ -349,6 +387,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       const rotation = computeGridNorthBearing(coord) * Math.PI / 180;
       map.getView().animate({ center: coord, zoom: 8, rotation, duration: 500 });
     });
+  }, []);
+
+  const handlePlaceSelect = useCallback((coordinates: [number, number]) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const center = fromLonLat(coordinates, OS_PROJECTION.code);
+    const rotation = computeGridNorthBearing(center) * Math.PI / 180;
+    map.getView().animate({ center, zoom: 8, rotation, duration: 500 });
   }, []);
 
   const handleExportImage = useCallback(async () => {
@@ -391,6 +437,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
         <LeftPanel
           avatarInitials={avatarInitials}
+          isLoggedIn={isLoggedIn}
           activeTab={activeTab}
           onTabChange={handleTabChange}
           theme={theme}
@@ -420,6 +467,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               elevationData={elevationData}
               isLoadingElevation={isLoadingElevation}
               dispatch={dispatch}
+              onFitToRoute={() => handleFitToRoute(waypoints)}
+              onExportImage={handleExportImage}
+              isExportingImage={isExportingImage}
             />
           )}
           {mode === 'about' && (
@@ -449,6 +499,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             showPersonalHeatmap={layerState.showPersonalHeatmap}
             showExplorer={layerState.showExplorer}
             showPOIs={layerState.showPOIs}
+            onGeolocate={handleGeolocate}
+            onPlaceSelect={handlePlaceSelect}
           />
           {/* Map chrome — bottom-left cluster */}
           <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} />
@@ -500,12 +552,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         {lightboxOpen && (
           <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
         )}
+        {!isLoggedIn && !splashDismissed && (
+          <SplashOverlay onDismiss={handleSplashDismiss} onPlanRoute={() => { handleSplashDismiss(); handleOpenPlanner(); }} />
+        )}
       </div>
     );
   }
 
   // ── Mobile layout ──────────────────────────────────────────────────────────
-  const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : 'Activities';
+  const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : mode === 'about' ? 'About' : 'Activities';
   const sheetCount = mode === 'browse' && isLoggedIn ? allActivities.length : undefined;
 
   return (
@@ -529,58 +584,60 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           showPersonalHeatmap={layerState.showPersonalHeatmap}
           showExplorer={layerState.showExplorer}
           showPOIs={layerState.showPOIs}
+          onGeolocate={handleGeolocate}
+          onPlaceSelect={handlePlaceSelect}
+          isMobile
         />
       </div>
 
-      {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} theme={theme} onThemeChange={handleThemeChange} />}
+      {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} isLoggedIn={isLoggedIn} theme={theme} onThemeChange={handleThemeChange} onAbout={handleOpenAbout} />}
 
       {/* Tab bar — always shown on mobile */}
       <div style={{
-        position: 'fixed', top: mode === 'planner' ? 60 : 50, left: 0, right: 0, height: 32,
-        background: 'rgba(7,14,20,0.88)', backdropFilter: 'blur(8px)',
+        position: 'fixed', top: 60, left: 0, right: 0, height: 32,
+        background: 'var(--glass-hvy)', backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         display: 'flex', borderBottom: '1px solid var(--p3)', zIndex: 18,
+        touchAction: 'none',
       }}>
         <button
           onClick={handleExitPlanner}
           style={{
             flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-            color: mode !== 'planner' ? 'var(--ora)' : 'rgba(240,248,250,0.45)',
-            borderBottom: mode !== 'planner' ? '2px solid var(--ora)' : 'none',
+            color: mode !== 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
+            borderBottom: mode !== 'planner' ? '2px solid var(--ora)' : '2px solid transparent',
           }}
         >Activities</button>
         <button
           onClick={handleOpenPlanner}
           style={{
             flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-            color: mode === 'planner' ? 'var(--ora)' : 'rgba(240,248,250,0.45)',
-            borderBottom: mode === 'planner' ? '2px solid var(--ora)' : 'none',
+            color: mode === 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
+            borderBottom: mode === 'planner' ? '2px solid var(--ora)' : '2px solid transparent',
           }}
         >Planner</button>
       </div>
 
-      {/* Activity legend below tab bar */}
-      {mode !== 'planner' && (
-        <MapLegend style={{ position: 'absolute', top: 90, right: 12, zIndex: 10 }} />
-      )}
 
       {/* Map chrome — bottom-left cluster (above the buttons) */}
-      <div style={{ position: 'fixed', bottom: 194, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'fixed', bottom: 220, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
         {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
       </div>
 
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={142} fixed isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed isOwner={isOwner} />
           <button
             onClick={handleOpenPlanner}
             style={{
               position: 'fixed',
               right: 16,
-              bottom: 142,
+              bottom: 168,
               width: 48,
               height: 48,
               borderRadius: 6,
@@ -602,7 +659,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           <MobileBottomSheet
             title={sheetTitle}
             count={sheetCount}
-            forceExpanded={mode === 'detail'}
+            forceExpanded={mode === 'detail' || mode === 'about'}
           >
             {mode === 'browse' && (
               isLoggedIn
@@ -617,6 +674,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               ) : (
                 <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} />
               )
+            )}
+            {mode === 'about' && (
+              <AboutSection onBack={handleCloseAbout} />
             )}
           </MobileBottomSheet>
         </>
@@ -646,11 +706,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
           />
+          {/* Note: onGeolocate kept for prop compat but Locate button moved to map chrome */}
 
           {/* Layers panel */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={200} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />
 
-          {/* Bottom HUD */}
+          {/* Bottom HUD — draggable */}
           {(() => {
             const pts = elevationData ?? [];
             const totalD = pts.length > 1 ? pts[pts.length - 1].distance : 0;
@@ -671,29 +732,46 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             return (
               <div style={{
                 position: 'fixed', bottom: 0, left: 0, right: 0,
-                background: 'rgba(14,40,48,0.94)', backdropFilter: 'blur(12px)',
+                height: plannerHudHeight,
+                background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 borderTop: '1px solid var(--p3)', borderRadius: '12px 12px 0 0',
-                paddingBottom: 24, zIndex: 20,
+                zIndex: 20,
+                display: 'flex', flexDirection: 'column',
+                transition: plannerHudDragging ? 'none' : 'height 0.3s ease',
+                touchAction: 'none',
+                overflow: 'hidden',
               }}>
-                <div style={{ width: 36, height: 4, background: 'var(--p4)', borderRadius: 2, margin: '10px auto 12px' }} />
-                <div style={{ display: 'flex', padding: '0 20px 14px' }}>
-                  {[
-                    { val: distKm, lbl: 'km' },
-                    { val: elevGain > 0 ? String(elevGain) : '—', lbl: 'm elev' },
-                    { val: String(waypoints.length), lbl: 'waypts' },
-                  ].map((s, i, arr) => (
-                    <div key={s.lbl} style={{
-                      flex: 1, display: 'flex', flexDirection: 'column', gap: 3,
-                      borderRight: i < arr.length - 1 ? '1px solid var(--fog-ghost)' : 'none',
-                      paddingRight: i < arr.length - 1 ? 16 : 0,
-                      paddingLeft: i > 0 ? 16 : 0,
-                    }}>
-                      <div style={{ font: '700 18px/1 var(--mono)', color: 'var(--ora)' }}>{s.val}</div>
-                      <div style={{ font: '400 8px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(240,248,250,0.45)' }}>{s.lbl}</div>
-                    </div>
-                  ))}
-                </div>
+                {/* Drag zone — handle bar + stats row, large touch target */}
+                <div
+                  onTouchStart={handlePlannerHudTouchStart}
+                  onTouchMove={handlePlannerHudTouchMove}
+                  onTouchEnd={handlePlannerHudTouchEnd}
+                  onClick={() => setPlannerHudHeight(h => h > PLANNER_HUD_COLLAPSED + 5 ? PLANNER_HUD_COLLAPSED : PLANNER_HUD_EXPANDED)}
+                  style={{ flexShrink: 0, userSelect: 'none', cursor: 'grab' }}
+                >
+                  <div style={{ padding: '10px 0 6px' }}>
+                    <div style={{ width: 36, height: 4, background: 'var(--p4)', borderRadius: 2, margin: '0 auto' }} />
+                  </div>
+                  {/* Stats inside drag zone so swiping on them also works */}
+                  <div style={{ display: 'flex', padding: '0 20px 14px' }}>
+                    {[
+                      { val: distKm, lbl: 'km' },
+                      { val: elevGain > 0 ? String(elevGain) : '—', lbl: 'm elev' },
+                      { val: String(waypoints.length), lbl: 'waypts' },
+                    ].map((s, i, arr) => (
+                      <div key={s.lbl} style={{
+                        flex: 1, display: 'flex', flexDirection: 'column', gap: 3,
+                        borderRight: i < arr.length - 1 ? '1px solid var(--fog-ghost)' : 'none',
+                        paddingRight: i < arr.length - 1 ? 16 : 0,
+                        paddingLeft: i > 0 ? 16 : 0,
+                      }}>
+                        <div style={{ font: '700 18px/1 var(--mono)', color: 'var(--ora)' }}>{s.val}</div>
+                        <div style={{ font: '400 8px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fog-dim)' }}>{s.lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>{/* end drag zone */}
                 <div style={{ position: 'relative', padding: '0 16px 10px' }}>
                   <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
                     <defs>
@@ -705,10 +783,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                     {fillPath && <path d={fillPath} fill="url(#mhud-elev)" />}
                     {sparklinePts && <polyline points={sparklinePts} fill="none" stroke="#E07020" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
                   </svg>
-                  <div style={{ position: 'absolute', bottom: 13, left: 18, font: '400 7px/1 var(--mono)', color: 'rgba(240,248,250,0.45)' }}>0</div>
-                  <div style={{ position: 'absolute', bottom: 13, right: 18, font: '400 7px/1 var(--mono)', color: 'rgba(240,248,250,0.45)' }}>{distKm}km</div>
+                  <div style={{ position: 'absolute', bottom: 13, left: 18, font: '400 7px/1 var(--mono)', color: 'var(--fog-dim)' }}>0</div>
+                  <div style={{ position: 'absolute', bottom: 13, right: 18, font: '400 7px/1 var(--mono)', color: 'var(--fog-dim)' }}>{distKm}km</div>
                 </div>
-                <div style={{ display: 'flex', gap: 10, padding: '0 16px' }}>
+                <div style={{ display: 'flex', gap: 10, padding: '0 16px 14px' }}>
                   <button
                     onClick={() => setMobilePlannerLayersOpen(v => !v)}
                     style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: 'var(--p3)', color: 'var(--fog)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
@@ -721,7 +799,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   <button
                     onClick={handleMobileExportGpx}
                     disabled={waypoints.length === 0}
-                    style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: waypoints.length === 0 ? 'var(--p3)' : 'var(--ora)', color: waypoints.length === 0 ? 'rgba(240,248,250,0.45)' : 'var(--p0)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: waypoints.length === 0 ? 'var(--p3)' : 'var(--ora)', color: waypoints.length === 0 ? 'var(--fog-dim)' : 'var(--p0)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
@@ -751,6 +829,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
       {lightboxOpen && (
         <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
+      )}
+      {!isLoggedIn && !splashDismissed && (
+        <SplashOverlay onDismiss={handleSplashDismiss} onPlanRoute={() => { handleSplashDismiss(); handleOpenPlanner(); }} />
       )}
     </div>
   );

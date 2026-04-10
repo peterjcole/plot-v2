@@ -132,9 +132,11 @@ export default function MobileBottomSheet({
       </div>
 
       {/* Scrollable content */}
-      <div style={{
+      <div className="hide-scrollbar" style={{
         flex: 1,
         overflowY: isExpanded ? 'auto' : 'hidden',
+        overscrollBehavior: 'contain',
+        scrollbarWidth: 'none',
       }}>
         {children}
       </div>
