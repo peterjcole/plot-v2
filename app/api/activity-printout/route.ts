@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   const photoCount = Math.min(parseInt(searchParams.get('photoCount') || '0', 10), 3);
   const includeLogo = searchParams.get('includeLogo') === 'true';
   const hillshadeEnabled = searchParams.get('hillshadeEnabled') === 'true';
-  const hideDescription = searchParams.get('hideDescription') === 'true';
+  const showDescription = searchParams.get('showDescription') === 'true';
 
   try {
     const browser = await getBrowser();
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const token = encodeURIComponent(session.accessToken);
-    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}&photoCount=${photoCount}${includeLogo ? '&includeLogo=true' : ''}${hillshadeEnabled ? '&hillshadeEnabled=true' : ''}${hideDescription ? '&hideDescription=true' : ''}${bypassParam}`;
+    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}&photoCount=${photoCount}${includeLogo ? '&includeLogo=true' : ''}${hillshadeEnabled ? '&hillshadeEnabled=true' : ''}${showDescription ? '&showDescription=true' : ''}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',

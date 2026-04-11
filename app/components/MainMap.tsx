@@ -64,6 +64,9 @@ interface MainMapProps {
   showPhotos?: boolean;
   dimBaseMap?: boolean;
   showPersonalHeatmap?: boolean;
+  showGlobalHeatmap?: boolean;
+  heatmapSport?: string;
+  heatmapColor?: string;
   showExplorer?: boolean;
   showPOIs?: boolean;
   onGeolocate?: () => void;
@@ -194,6 +197,9 @@ export default function MainMap({
   showPhotos = true,
   dimBaseMap = false,
   showPersonalHeatmap = false,
+  showGlobalHeatmap = false,
+  heatmapSport = 'all',
+  heatmapColor = 'hot',
   showExplorer = false,
   showPOIs = false,
   onGeolocate,
@@ -214,6 +220,7 @@ export default function MainMap({
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
+  const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const fittedRef = useRef(false);
 
   // Zoom state for zoom buttons
@@ -569,6 +576,38 @@ export default function MainMap({
     };
   }, [showPersonalHeatmap]);
 
+  // Global heatmap tile layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (globalHeatmapLayerRef.current) {
+      map.removeLayer(globalHeatmapLayerRef.current);
+      globalHeatmapLayerRef.current = null;
+    }
+
+    if (!showGlobalHeatmap) return;
+
+    const layer = new TileLayer({
+      source: new XYZ({
+        url: `/api/heatmap?sport=${heatmapSport}&color=${heatmapColor}&z={z}&x={x}&y={y}`,
+        projection: 'EPSG:3857',
+      }),
+      opacity: 0.6,
+      zIndex: 4,
+    });
+
+    map.addLayer(layer);
+    globalHeatmapLayerRef.current = layer;
+
+    return () => {
+      if (globalHeatmapLayerRef.current) {
+        map.removeLayer(globalHeatmapLayerRef.current);
+        globalHeatmapLayerRef.current = null;
+      }
+    };
+  }, [showGlobalHeatmap, heatmapSport, heatmapColor]);
+
   // Sync activity route features (dim in planner mode)
   useEffect(() => {
     const source = routeSourceRef.current;
@@ -866,7 +905,7 @@ export default function MainMap({
       ) : (
         /* Desktop: bottom-right cluster: search, geolocate, zoom */
         <div style={{
-          position: 'absolute', bottom: 80, right: 16, zIndex: 12,
+          position: 'absolute', bottom: 16, right: 16, zIndex: 12,
           display: 'flex', flexDirection: 'column', gap: 4,
         }}>
           {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} />}

@@ -87,7 +87,7 @@ export default function ExportOptionsPopover({ activityId, osDark, anchorRect, o
     });
     if (darkMode) params.set('osDark', 'true');
     if (hillshade) params.set('hillshadeEnabled', 'true');
-    if (showDescription) params.set('hideDescription', 'false');
+    if (showDescription) params.set('showDescription', 'true');
     if (includeLogo) params.set('includeLogo', 'true');
     return `/api/activity-printout?${params.toString()}`;
   }

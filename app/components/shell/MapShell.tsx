@@ -494,9 +494,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onMapReady={handleMapReady}
             osDark={osDark}
             showHillshade={layerState.showHillshade}
-            showPhotos={layerState.showPhotos}
+            showPhotos={mode === 'detail' ? true : layerState.showPhotos}
             dimBaseMap={layerState.dimBaseMap}
             showPersonalHeatmap={layerState.showPersonalHeatmap}
+            showGlobalHeatmap={layerState.showGlobalHeatmap}
+            heatmapSport={layerState.heatmapSport}
+            heatmapColor={layerState.heatmapColor}
             showExplorer={layerState.showExplorer}
             showPOIs={layerState.showPOIs}
             onGeolocate={handleGeolocate}
@@ -579,9 +582,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onMapReady={handleMapReady}
           osDark={osDark}
           showHillshade={layerState.showHillshade}
-          showPhotos={layerState.showPhotos}
+          showPhotos={mode === 'detail' ? true : layerState.showPhotos}
           dimBaseMap={layerState.dimBaseMap}
           showPersonalHeatmap={layerState.showPersonalHeatmap}
+          showGlobalHeatmap={layerState.showGlobalHeatmap}
+          heatmapSport={layerState.heatmapSport}
+          heatmapColor={layerState.heatmapColor}
           showExplorer={layerState.showExplorer}
           showPOIs={layerState.showPOIs}
           onGeolocate={handleGeolocate}

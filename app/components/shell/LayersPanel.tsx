@@ -11,6 +11,8 @@ export interface LayerState {
   showPersonalHeatmap: boolean;
   showPOIs: boolean;
   showGlobalHeatmap: boolean;
+  heatmapSport: string;
+  heatmapColor: string;
   showExplorer: boolean;
   showRecentActivities: boolean;
 }
@@ -23,9 +25,27 @@ export const DEFAULT_LAYER_STATE: LayerState = {
   showPersonalHeatmap: false,
   showPOIs: false,
   showGlobalHeatmap: false,
+  heatmapSport: 'all',
+  heatmapColor: 'hot',
   showExplorer: false,
   showRecentActivities: true,
 };
+
+const HEATMAP_SPORTS = [
+  { value: 'all', label: 'All' },
+  { value: 'ride', label: 'Ride' },
+  { value: 'run', label: 'Run' },
+  { value: 'water', label: 'Water' },
+  { value: 'winter', label: 'Winter' },
+];
+
+const HEATMAP_COLORS = [
+  { value: 'hot', label: 'Hot' },
+  { value: 'blue', label: 'Blue' },
+  { value: 'purple', label: 'Purple' },
+  { value: 'gray', label: 'Gray' },
+  { value: 'bluered', label: 'Blue-Red' },
+];
 
 const LS_KEY = 'plotv2-layer-state';
 
@@ -186,7 +206,7 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
           <Divider />
 
           {/* Personal */}
-          <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} />
+          <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} hidden={!isOwner} />
           <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} hidden={!isOwner} />
           <Row label="Explorer tiles" on={state.showExplorer} onChange={(v) => onChange({ showExplorer: v })} hidden={!isOwner} />
 
@@ -201,6 +221,39 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
           {/* Global heatmap — always shown */}
           <Row label="Global heatmap" on={state.showGlobalHeatmap} onChange={(v) => onChange({ showGlobalHeatmap: v })} />
 
+          {state.showGlobalHeatmap && (
+            <div style={{ paddingLeft: 8, borderLeft: '2px solid var(--p3)', marginBottom: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1, font: '400 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '0.03em' }}>Sport</span>
+                <select
+                  value={state.heatmapSport}
+                  onChange={(e) => onChange({ heatmapSport: e.target.value })}
+                  style={{
+                    background: 'var(--p2)', border: '1px solid var(--p3)', borderRadius: 3,
+                    color: 'var(--fog)', font: '400 10px/1 var(--mono)', padding: '3px 4px',
+                    cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  {HEATMAP_SPORTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1, font: '400 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '0.03em' }}>Color</span>
+                <select
+                  value={state.heatmapColor}
+                  onChange={(e) => onChange({ heatmapColor: e.target.value })}
+                  style={{
+                    background: 'var(--p2)', border: '1px solid var(--p3)', borderRadius: 3,
+                    color: 'var(--fog)', font: '400 10px/1 var(--mono)', padding: '3px 4px',
+                    cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  {HEATMAP_COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
           <Divider />
 
           {/* Dim base map */}
@@ -214,7 +267,7 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
         aria-label="Toggle layers panel"
         aria-expanded={open}
         style={{
-          width: 44, height: 44, borderRadius: 8,
+          width: 36, height: 36, borderRadius: 8,
           background: 'var(--glass)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',

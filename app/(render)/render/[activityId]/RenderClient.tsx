@@ -111,7 +111,7 @@ interface RenderClientProps {
   includeLogo?: boolean;
   hillshadeEnabled?: boolean;
   hideDetails?: boolean;
-  hideDescription?: boolean;
+  showDescription?: boolean;
 }
 
 export default function RenderClient({
@@ -121,7 +121,7 @@ export default function RenderClient({
   photoCount: photoCountParam = 0,
   includeLogo,
   hillshadeEnabled,
-  hideDescription,
+  showDescription = false,
 }: RenderClientProps) {
   const TOTAL_W = 1200;
   const TOTAL_H = 760;
@@ -172,7 +172,6 @@ export default function RenderClient({
           osDark={osDark}
           hillshadeEnabled={hillshadeEnabled}
           hideDetails={true}
-          hideDescription={hideDescription}
         />
       </div>
 
@@ -241,25 +240,34 @@ export default function RenderClient({
           <span style={{ fontFamily: 'var(--display)', fontSize: 30, color: '#E07020', letterSpacing: '0.05em', lineHeight: 1 }}>
             plot
           </span>
-          <div>
-            <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 17, fontWeight: 700, color: nameColor, letterSpacing: '0.02em', lineHeight: 1.2 }}>
+          <div style={{ maxWidth: 440, overflow: 'hidden' }}>
+            <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 19, fontWeight: 700, color: nameColor, letterSpacing: '0.02em', lineHeight: 1.2 }}>
               {activity.name}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
               {activity.type && (
-                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, fontWeight: 700, color: '#E07020', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, fontWeight: 700, color: '#E07020', letterSpacing: '0.16em', textTransform: 'uppercase', lineHeight: 1 }}>
                   {activity.type}
                 </span>
               )}
               {activity.type && stats.startDate && (
-                <span style={{ fontSize: 10, color: dotColor }}>·</span>
+                <span style={{ fontSize: 12, color: dotColor, lineHeight: 1 }}>·</span>
               )}
               {stats.startDate && (
-                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, fontWeight: 400, color: dimColor, letterSpacing: '0.04em' }}>
+                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, fontWeight: 400, color: dimColor, letterSpacing: '0.04em', lineHeight: 1 }}>
                   {fmtDate(stats.startDate)}
                 </span>
               )}
             </div>
+            {showDescription && activity.description && (
+              <div style={{
+                fontFamily: 'IBM Plex Mono, monospace', fontSize: 10, fontStyle: 'italic',
+                fontWeight: 400, color: dimColor, letterSpacing: '0.02em', lineHeight: 1.4,
+                marginTop: 6, overflow: 'hidden', maxHeight: '2.8em',
+              }}>
+                {activity.description}
+              </div>
+            )}
           </div>
         </div>
 
