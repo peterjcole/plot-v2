@@ -73,7 +73,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       return next;
     });
   }, []);
-  const [isMobile, setIsMobile] = useState(false);
   const [splashDismissed, setSplashDismissed] = useState(false);
   useEffect(() => {
     if (localStorage.getItem('plot-splash-dismissed') === '1') setSplashDismissed(true);
@@ -243,15 +242,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [dispatch, segments.length]);
 
 
-  // Mobile detection
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
   // Trigger photo catch-up import the first time "My photos" is enabled
   useEffect(() => {
     if (!isOwner || !layerState.showPhotos || photosImportTriggeredRef.current) return;
@@ -419,14 +409,22 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
   }, []);
 
+  // When the user navigates browse → planner at runtime, fit the map to the route once
+  // mapReady and waypoints are available — mirrors the initial-load pattern above.
+  const runtimePlannerFitRef = useRef(false);
+  useEffect(() => {
+    if (!runtimePlannerFitRef.current || mode !== 'planner' || !mapReady || waypoints.length < 2) return;
+    runtimePlannerFitRef.current = false;
+    handleFitToRoute(waypoints);
+  }, [mode, mapReady, waypoints, handleFitToRoute]);
+
   const handleOpenPlanner = useCallback(() => {
     setMode('planner');
     setSelectedId(null);
     setActivityDetail(null);
     setLoadedActivityId(null);
-    // Defer until after mode change re-renders
-    setTimeout(() => handleFitToRoute(waypoints), 50);
-  }, [waypoints, handleFitToRoute]);
+    runtimePlannerFitRef.current = true;
+  }, []);
 
   const handleExitPlanner = useCallback(() => setMode('browse'), []);
 
@@ -456,6 +454,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, []);
 
   const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
+    if (popupLoading) return;
     // Same point → toggle close
     if (activityPopup && Math.abs(activityPopup.lat - lat) < 0.0001 && Math.abs(activityPopup.lng - lng) < 0.0001) {
       setActivityPopup(null);
@@ -478,7 +477,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     } finally {
       setPopupLoading(false);
     }
-  }, [activityPopup]);
+  }, [activityPopup, popupLoading]);
 
   const handleTabChange = useCallback((tab: 'activities' | 'planner') => {
     if (tab === 'planner') handleOpenPlanner();
@@ -539,7 +538,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = 'route.jpg'; a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     } finally {
       setIsExportingImage(false);
     }
@@ -552,10 +551,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
   const photoMarkers = mode === 'detail' ? (activityDetail?.photos ?? undefined) : undefined;
 
-  // ── Desktop layout ─────────────────────────────────────────────────────────
-  if (!isMobile) {
-    return (
-      <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
+  // ── Unified layout ────────────────────────────────────────────────────────
+  const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : mode === 'about' ? 'About' : 'Activities';
+  const sheetCount = mode === 'browse' && isLoggedIn ? allActivities.length : undefined;
+
+  return (
+    <div className="relative h-screen w-screen overflow-hidden sm:flex" style={{ background: 'var(--p0)' }}>
+
+      {/* ── Desktop sidebar (hidden on mobile) ────────────────────────── */}
+      <div className="hidden sm:flex sm:flex-col sm:shrink-0">
         <LeftPanel
           avatarInitials={avatarInitials}
           isLoggedIn={isLoggedIn}
@@ -598,139 +602,21 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             <AboutSection onBack={handleCloseAbout} />
           )}
         </LeftPanel>
-
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <MainMap
-            activities={allActivities}
-            highlightedId={hoveredId}
-            selectedId={selectedId}
-            showRecentActivities={layerState.showRecentActivities}
-            onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
-            onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
-            onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
-            loadedActivityId={loadedActivityId ?? undefined}
-            photoMarkers={photoMarkers}
-            onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
-            baseLayer={layerState.baseLayer}
-            plannerProps={plannerProps}
-            onMapReady={handleMapReady}
-            osDark={osDark}
-            showHillshade={layerState.showHillshade}
-            dimBaseMap={layerState.dimBaseMap}
-            showPersonalHeatmap={layerState.showPersonalHeatmap}
-            showGlobalHeatmap={layerState.showGlobalHeatmap}
-            heatmapSport={layerState.heatmapSport}
-            heatmapColor={layerState.heatmapColor}
-            showExplorer={layerState.showExplorer}
-            showOwnerPhotos={isOwner && layerState.showPhotos}
-            onPhotoClick={handleOwnerPhotoClick}
-            onClusterPhotosClick={handleOwnerClusterPhotosClick}
-            onHeatmapClick={isOwner ? handleHeatmapClick : undefined}
-            hoveredActivityRoute={hoveredActivityRoute}
-            hoveredActivityColor={hoveredActivityColor}
-            onGeolocate={handleGeolocate}
-            onPlaceSelect={handlePlaceSelect}
-          />
-          {/* Map chrome — bottom-left cluster */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} />
-          <div style={{ position: 'absolute', bottom: 68, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
-            {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
-          </div>
-          {/* Activity legend — top-right */}
-          {mode !== 'planner' && (
-            <MapLegend style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }} />
-          )}
-          {mode === 'planner' && (
-            <PlannerToolbar
-              waypoints={waypoints}
-              segments={segments}
-              distance={distance}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              dispatch={dispatch}
-              addPointsEnabled={addPointsEnabled}
-              onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
-              snapEnabled={snapEnabled}
-              onToggleSnap={() => setSnapEnabled((v) => !v)}
-              elevationData={elevationData}
-              isLoadingElevation={isLoadingElevation}
-              onFitToRoute={handleFitToRoute}
-              onExportImage={handleExportImage}
-              isExportingImage={isExportingImage}
-              onBack={handleExitPlanner}
-            />
-          )}
-        </div>
-        {waypointPopover && mode === 'planner' && waypoints[waypointPopover.index] && (
-          <WaypointPopover
-            waypoint={waypoints[waypointPopover.index]}
-            index={waypointPopover.index}
-            totalWaypoints={waypoints.length}
-            segments={segments}
-            screenX={waypointPopover.screenX}
-            screenY={waypointPopover.screenY}
-            onClose={handleWaypointPopoverClose}
-            onDelete={handleWaypointDelete}
-            onToggleSnapIn={handleToggleSnapIn}
-            onToggleSnapOut={handleToggleSnapOut}
-          />
-        )}
-        {lightboxOpen && (
-          <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
-        )}
-        {photoPopup && (
-          <PhotoPopup
-            photo={photoPopup.photo}
-            screenX={photoPopup.screenX}
-            screenY={photoPopup.screenY}
-            onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
-          />
-        )}
-        {clusterPhotosPopup && (
-          <ClusterPhotosPopup
-            photos={clusterPhotosPopup.photos}
-            screenX={clusterPhotosPopup.screenX}
-            screenY={clusterPhotosPopup.screenY}
-            onClose={() => { setClusterPhotosPopup(null); setHoveredActivityRoute(null); }}
-            onPhotoSelect={(photo, sx, sy) => {
-              setClusterPhotosPopup(null);
-              handleOwnerPhotoClick(photo, sx, sy);
-            }}
-          />
-        )}
-        {activityPopup && (
-          <HeatmapActivityPopup
-            activities={activityPopup.activities}
-            screenX={activityPopup.screenX}
-            screenY={activityPopup.screenY}
-            isLoading={popupLoading}
-            onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
-            onHoverActivity={(route, color) => { setHoveredActivityRoute(route ?? null); setHoveredActivityColor(color ?? null); }}
-          />
-        )}
-        {!isLoggedIn && !splashDismissed && (
-          <SplashOverlay onDismiss={handleSplashDismiss} onPlanRoute={() => { handleSplashDismiss(); handleOpenPlanner(); }} />
-        )}
       </div>
-    );
-  }
 
-  // ── Mobile layout ──────────────────────────────────────────────────────────
-  const sheetTitle = mode === 'detail' && activityDetail ? activityDetail.name : mode === 'about' ? 'About' : 'Activities';
-  const sheetCount = mode === 'browse' && isLoggedIn ? allActivities.length : undefined;
-
-  return (
-    <div style={{ position: 'relative', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--p0)' }}>
-      <div style={{ position: 'absolute', inset: 0 }}>
+      {/* ── Map area ────────────────────────────────────────────────────── */}
+      <div className="absolute inset-0 overflow-hidden sm:relative sm:inset-auto sm:flex-1">
         <MainMap
           activities={allActivities}
-          highlightedId={undefined}
+          highlightedId={hoveredId}
           selectedId={selectedId}
           showRecentActivities={layerState.showRecentActivities}
+          onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
+          onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
+          onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
+          loadedActivityId={loadedActivityId ?? undefined}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
-          onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
           baseLayer={layerState.baseLayer}
           plannerProps={plannerProps}
           onMapReady={handleMapReady}
@@ -750,11 +636,49 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           hoveredActivityColor={hoveredActivityColor}
           onGeolocate={handleGeolocate}
           onPlaceSelect={handlePlaceSelect}
-          isMobile
         />
+
+        {/* Desktop chrome — layers, compass, scale, legend (hidden on mobile) */}
+        <div className="hidden sm:block">
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} />
+        </div>
+        <div className="hidden sm:flex absolute bottom-[68px] left-3 z-[14] items-center gap-2">
+          <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
+          {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
+        </div>
+        {mode !== 'planner' && (
+          <div className="hidden sm:block">
+            <MapLegend style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }} />
+          </div>
+        )}
+
+        {mode === 'planner' && (
+          <PlannerToolbar
+            waypoints={waypoints}
+            segments={segments}
+            distance={distance}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            dispatch={dispatch}
+            addPointsEnabled={addPointsEnabled}
+            onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
+            snapEnabled={snapEnabled}
+            onToggleSnap={() => setSnapEnabled((v) => !v)}
+            elevationData={elevationData}
+            isLoadingElevation={isLoadingElevation}
+            onFitToRoute={handleFitToRoute}
+            onExportImage={handleExportImage}
+            isExportingImage={isExportingImage}
+            onBack={handleExitPlanner}
+            onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
+            onExportGpx={handleMobileExportGpx}
+          />
+        )}
       </div>
 
-      {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} isLoggedIn={isLoggedIn} theme={theme} onThemeChange={handleThemeChange} onAbout={handleOpenAbout} />}
+      {/* ── Mobile-only chrome (hidden on desktop) ───────────────────────── */}
+      <div className="sm:hidden">
+        {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} isLoggedIn={isLoggedIn} theme={theme} onThemeChange={handleThemeChange} onAbout={handleOpenAbout} />}
 
       {/* Tab bar — always shown on mobile */}
       <div style={{
@@ -848,27 +772,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
       {mode === 'planner' && (
         <>
-          <PlannerToolbar
-            waypoints={waypoints}
-            segments={segments}
-            distance={distance}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            dispatch={dispatch}
-            addPointsEnabled={addPointsEnabled}
-            onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
-            snapEnabled={snapEnabled}
-            onToggleSnap={() => setSnapEnabled((v) => !v)}
-            elevationData={elevationData}
-            isLoadingElevation={isLoadingElevation}
-            onFitToRoute={handleFitToRoute}
-            onExportImage={handleExportImage}
-            isExportingImage={isExportingImage}
-            isMobile
-            onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
-            onExportGpx={handleMobileExportGpx}
-          />
-
           {/* Layers panel */}
           <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />
 
@@ -973,7 +876,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           })()}
         </>
       )}
+      </div>{/* end sm:hidden mobile chrome */}
 
+      {/* ── Shared overlays ──────────────────────────────────────────────── */}
       {waypointPopover && mode === 'planner' && waypoints[waypointPopover.index] && (
         <WaypointPopover
           waypoint={waypoints[waypointPopover.index]}

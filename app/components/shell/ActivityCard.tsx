@@ -1,3 +1,4 @@
+import { ArrowUp } from 'lucide-react';
 import { ActivitySummary } from '@/lib/types';
 import { getActivityCategory, getCategoryColor } from '@/lib/activity-categories';
 
@@ -6,7 +7,7 @@ function formatDistance(meters: number): string {
 }
 
 function formatElevation(meters: number): string {
-  return Math.round(meters) + ' m↑';
+  return Math.round(meters) + ' m';
 }
 
 function formatDate(iso: string): string {
@@ -107,7 +108,7 @@ export default function ActivityCard({ activity, onClick, isSelected, isHovered,
           letterSpacing: '0.02em',
         }}>
           <span>{formatDistance(activity.distance)}</span>
-          <span>{formatElevation(activity.elevationGain)}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>{formatElevation(activity.elevationGain)}<ArrowUp size={9} /></span>
           <span style={{ marginLeft: 'auto' }}>{formatDate(activity.startDate)}</span>
         </div>
       </div>

@@ -22,10 +22,12 @@ export default function MobileBottomSheet({
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
-  // Compute expanded snap point after mount (depends on window height)
+  // Compute expanded snap point after mount; update on resize/orientation change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- window is only available after mount
-    setSnapExpanded(Math.round(window.innerHeight * 0.72));
+    const update = () => setSnapExpanded(Math.round(window.innerHeight * 0.72));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   // Auto-snap to expanded when parent forces it

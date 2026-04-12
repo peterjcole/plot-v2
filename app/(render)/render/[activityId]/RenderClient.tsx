@@ -1,6 +1,8 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import { ArrowUp } from 'lucide-react';
 import { ActivityData } from '@/lib/types';
 import { type BaseMap } from '@/lib/map-config';
 
@@ -27,7 +29,7 @@ function fmtElev(m: number): string { return String(Math.round(m)); }
 function fmtTime(s: number): string {
   const h = Math.floor(s / 3600);
   const min = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
+  const sec = Math.floor(s % 60);
   if (h > 0) return `${h}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   return `${min}:${String(sec).padStart(2, '0')}`;
 }
@@ -42,7 +44,7 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-interface StatCellProps { label: string; value: string; unit?: string; isDark: boolean }
+interface StatCellProps { label: string; value: string; unit?: ReactNode; isDark: boolean }
 function StatCell({ label, value, unit, isDark }: StatCellProps) {
   const dimColor = isDark ? 'rgba(240,248,250,0.34)' : 'rgba(7,54,66,0.38)';
   const valColor = isDark ? '#F0F8FA' : '#073642';
@@ -250,7 +252,7 @@ export default function RenderClient({
         <div style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 8px' }}>
           <StatCell label="Distance" value={fmtKm(stats.distance)} unit="km" isDark={isDark} />
           <StripDivider isDark={isDark} />
-          <StatCell label="Elevation" value={fmtElev(stats.elevationGain)} unit="m↑" isDark={isDark} />
+          <StatCell label="Elevation" value={fmtElev(stats.elevationGain)} unit={<>m<ArrowUp size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /></>} isDark={isDark} />
           <StripDivider isDark={isDark} />
           <StatCell label="Time" value={fmtTime(stats.movingTime)} isDark={isDark} />
           <StripDivider isDark={isDark} />

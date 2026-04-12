@@ -43,13 +43,18 @@ export default function HeatmapActivityPopup({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Focus close button on mount
+  useEffect(() => { closeButtonRef.current?.focus(); }, []);
+
+  // Highlight the first activity once activities are populated
+  // (popup opens with activities:[] while the fetch is in flight)
+  const didHighlightRef = useRef(false);
   useEffect(() => {
-    closeButtonRef.current?.focus();
-    if (activities.length > 0) {
+    if (!didHighlightRef.current && activities.length > 0) {
+      didHighlightRef.current = true;
       onHoverActivity(activities[0].route, getSportColor(activities[0].sportType));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only on mount — activities and callbacks don't change after popup opens
+  }, [activities, onHoverActivity]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
@@ -171,7 +176,7 @@ export default function HeatmapActivityPopup({
                 </p>
               </label>
               <a
-                href={`/activity/${activity.id}`}
+                href={`/?activity=${activity.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors mt-0.5"

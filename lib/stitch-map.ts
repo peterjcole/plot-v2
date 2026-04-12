@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import proj4 from 'proj4';
 import { OS_PROJECTION, type BaseMap } from '@/lib/map-config';
 import { type ExportMode } from '@/lib/render-dimensions';
+import { getActivityColor } from '@/lib/activity-categories';
 
 // Register projections once at module load
 proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
@@ -15,6 +16,7 @@ export interface StitchOptions {
   osDark: boolean;
   hillshadeEnabled?: boolean;
   useTopo?: boolean;
+  activityType?: string;
   width: number;
   height: number;
   renderZoom: number;
@@ -166,7 +168,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   const isSatellite = baseMap === 'satellite';
   const isTopo = useTopo === true && !isSatellite;
   const isDark = isSatellite || osDark;
-  const routeColor = '#E07020'; // matches --ora design token used in MainMap planner layers
+  const routeColor = opts.activityType ? getActivityColor(opts.activityType) : '#E07020';
   const outlineColor = isDark ? 'rgba(7,14,20,0.95)' : 'rgba(255,255,255,0.7)';
   const routeOpacity = 0.85;
   const arrowOpacity = routeOpacity;

@@ -150,7 +150,7 @@ export default function BrowsePanel({ activities, selectedId, onSelectActivity, 
               href="/api/auth/strava"
               style={{ fontSize: 10, color: 'var(--ora)', fontFamily: 'var(--mono)', textDecoration: 'none', letterSpacing: '0.04em' }}
             >
-              Reconnect Strava →
+              Reconnect Strava <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle' }}><path d="m9 18 6-6-6-6"/></svg>
             </a>
           </div>
         </div>

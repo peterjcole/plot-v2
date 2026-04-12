@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useRef } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef } from 'react';
+import { ArrowUp } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -24,7 +25,6 @@ interface PlannerToolbarProps {
   onExportImage?: () => void;
   isExportingImage?: boolean;
   onBack?: () => void;
-  isMobile?: boolean;
   onToggleLayers?: () => void;
   onExportGpx?: () => void;
 }
@@ -84,7 +84,6 @@ export default function PlannerToolbar({
   onExportImage,
   isExportingImage = false,
   onBack,
-  isMobile = false,
   onToggleLayers,
   onExportGpx,
 }: PlannerToolbarProps) {
@@ -138,30 +137,27 @@ export default function PlannerToolbar({
 
   const hasRoute = waypoints.length >= 2;
 
-  const routeInfo = hasRoute
-    ? `${fmtDist(distance)}${elevGain != null ? ` · ${elevGain} m ↑` : ''}`
+  const routeInfo: ReactNode = hasRoute
+    ? <>{fmtDist(distance)}{elevGain != null ? <> · {elevGain} m <ArrowUp size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></> : null}</>
     : null;
 
   return (
     <>
       <input type="file" accept=".gpx" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
-      <div style={{
-        position: isMobile ? 'fixed' : 'absolute', top: 0, left: 0, right: 0, height: isMobile ? 60 : 48,
-        background: 'var(--glass-hvy)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--p3)',
-        display: 'flex', alignItems: 'center',
-        padding: '0 12px', gap: 2,
-        zIndex: isMobile ? 20 : 5,
-      } as React.CSSProperties}>
-
-        {isMobile && (
-          <>
-            <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', padding: '0 4px 0 4px', flexShrink: 0, lineHeight: 1 }}>plot</span>
-            {SEP}
-          </>
-        )}
+      <div
+        className="fixed sm:absolute top-0 left-0 right-0 h-[60px] sm:h-12 z-20 sm:z-[5] flex items-center px-3 gap-0.5"
+        style={{
+          background: 'var(--glass-hvy)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--p3)',
+        }}
+      >
+        {/* Mobile-only: "plot" logo */}
+        <div className="flex items-center sm:hidden">
+          <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', padding: '0 4px 0 4px', flexShrink: 0, lineHeight: 1 }}>plot</span>
+          {SEP}
+        </div>
 
         {/* Undo */}
         <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
@@ -194,27 +190,26 @@ export default function PlannerToolbar({
           </svg>
         </TbBtn>
 
-        {!isMobile && (
-          <>
-            {SEP}
+        {/* Desktop-only: Import + Export GPX */}
+        <div className="hidden sm:flex items-center">
+          {SEP}
 
-            {/* Import */}
-            <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-            </TbBtn>
+          {/* Import */}
+          <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </TbBtn>
 
-            {/* Export GPX */}
-            <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-            </TbBtn>
-          </>
-        )}
+          {/* Export GPX */}
+          <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </TbBtn>
+        </div>
 
         {/* Export Image — available on both desktop and mobile */}
         <TbBtn label="Image" disabled={isExportingImage} onClick={onExportImage}>
@@ -232,44 +227,43 @@ export default function PlannerToolbar({
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {!isMobile && (
-          <>
-            {/* Route info or hint */}
-            {routeInfo ? (
-              <div style={{ font: '600 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
-                {routeInfo}
-              </div>
-            ) : (
-              <div style={{ font: '400 10px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
-                Click the map to place your first point
-              </div>
-            )}
-
-            {SEP}
-          </>
-        )}
+        {/* Desktop-only: route info / hint */}
+        <div className="hidden sm:flex items-center">
+          {routeInfo ? (
+            <div style={{ font: '600 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              {routeInfo}
+            </div>
+          ) : (
+            <div style={{ font: '400 10px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              Click the map to place your first point
+            </div>
+          )}
+          {SEP}
+        </div>
 
         {/* Layers (mobile only) */}
-        {isMobile && onToggleLayers && (
-          <TbBtn label="Layers" onClick={onToggleLayers}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-              <polyline points="2 17 12 22 22 17"/>
-              <polyline points="2 12 12 17 22 12"/>
-            </svg>
-          </TbBtn>
+        {onToggleLayers && (
+          <div className="sm:hidden">
+            <TbBtn label="Layers" onClick={onToggleLayers}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+            </TbBtn>
+          </div>
         )}
 
         {/* Back (desktop only, when onBack provided) */}
-        {!isMobile && onBack && (
-          <>
+        {onBack && (
+          <div className="hidden sm:flex items-center">
             {SEP}
             <TbBtn label="Back" onClick={onBack}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m15 18-6-6 6-6"/>
               </svg>
             </TbBtn>
-          </>
+          </div>
         )}
       </div>
 
