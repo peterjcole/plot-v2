@@ -12,7 +12,6 @@ import type { ElevationHoverPoint } from './ElevationChart';
 import { calculateDistance } from './route-utils';
 import { Plus, Minus, CircleArrowUp } from 'lucide-react';
 import PlannerToolbar from './PlannerToolbar';
-import PlaceSearch from './PlaceSearch';
 import LayersPanel from './LayersPanel';
 import HeatmapActivityPopup from './HeatmapActivityPopup';
 import PhotoPopup from './PhotoPopup';
@@ -528,7 +527,6 @@ export default function PlannerClient({ onBack, onStatsChange }: PlannerClientPr
         photosEnabled={photosEnabled}
         onPhotosEnabledChange={setPhotosEnabled}
       />
-      <PlaceSearch onSelect={handlePlaceSelect} />
       <PlannerToolbar
         waypoints={waypoints}
         segments={segments}

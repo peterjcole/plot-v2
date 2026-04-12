@@ -6,7 +6,7 @@ import { ActivitySummary } from '@/lib/types';
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ mode?: string; activity?: string }> }) {
   const { mode, activity } = await searchParams;
-  const initialMode: PanelMode = mode === 'planner' ? 'planner' : 'browse';
+  const initialMode: PanelMode = mode === 'planner' ? 'planner' : mode === 'about' ? 'about' : 'browse';
   const initialSelectedId = activity ?? null;
   const session = await getSession();
   const isLoggedIn = !!session.accessToken;

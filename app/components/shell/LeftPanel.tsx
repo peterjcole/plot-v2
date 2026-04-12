@@ -8,6 +8,7 @@ type Tab = 'activities' | 'planner';
 
 interface LeftPanelProps {
   avatarInitials?: string;
+  isLoggedIn?: boolean;
   activeTab?: Tab;
   onTabChange?: (tab: Tab) => void;
   theme?: Theme;
@@ -16,7 +17,7 @@ interface LeftPanelProps {
   children?: React.ReactNode;
 }
 
-export default function LeftPanel({ avatarInitials, activeTab = 'activities', onTabChange, theme = 'system', onThemeChange, onAbout, children }: LeftPanelProps) {
+export default function LeftPanel({ avatarInitials, isLoggedIn = false, activeTab = 'activities', onTabChange, theme = 'system', onThemeChange, onAbout, children }: LeftPanelProps) {
 
   return (
     <div
@@ -31,7 +32,7 @@ export default function LeftPanel({ avatarInitials, activeTab = 'activities', on
         overflow: 'hidden',
       }}
     >
-      <StatusBar avatarInitials={avatarInitials} />
+      <StatusBar avatarInitials={avatarInitials} isLoggedIn={isLoggedIn} />
 
       {/* Wordmark */}
       <div

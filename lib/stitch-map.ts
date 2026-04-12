@@ -119,25 +119,12 @@ function buildSvg(
   // Markers scaled up to be visible at full export resolution (~3× screen)
   const r = 16;
 
-  // All defs at the top so clip-path/filter references are never forward references.
-  // The route-outline filter mirrors ActivityMap's feMorphology approach: dilate the
-  // alpha channel to produce a border-only outline, then merge it behind the source
-  // graphic so the route fill stays at its target opacity (map shows through).
+  // Defs: only clip-path for end marker. Route outline is achieved by a double-stroke
+  // technique (wide outline stroke below, narrow colour stroke on top) which renders
+  // at full resolution without needing feMorphology (which is O(pixels) and too slow
+  // at export sizes).
   const defs =
     `<defs>` +
-    `<filter id="route-outline" x="-5%" y="-5%" width="110%" height="110%">` +
-    `<feComponentTransfer in="SourceAlpha" result="opaque-alpha">` +
-    `<feFuncA type="linear" slope="100" intercept="0"/>` +
-    `</feComponentTransfer>` +
-    `<feMorphology in="opaque-alpha" operator="dilate" radius="5" result="dilated"/>` +
-    `<feFlood flood-color="${outlineColor}" flood-opacity="0.9" result="color"/>` +
-    `<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>` +
-    `<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>` +
-    `<feMerge>` +
-    `<feMergeNode in="border-only"/>` +
-    `<feMergeNode in="SourceGraphic"/>` +
-    `</feMerge>` +
-    `</filter>` +
     `<clipPath id="end-clip">` +
     `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}"/>` +
     `</clipPath>` +
@@ -162,9 +149,10 @@ function buildSvg(
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
     defs,
-    // Single polyline with outline filter — matches ActivityMap's feMorphology approach.
-    // The filter adds a border-only outline so the fill stays at routeOpacity (map shows through).
-    `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="14" stroke-opacity="${routeOpacity}" stroke-linecap="round" stroke-linejoin="round" filter="url(#route-outline)"/>`,
+    // Double-stroke casing: wide outline stroke first (behind), then narrow colour stroke on top.
+    // This avoids feMorphology (which is O(pixels) and requires ¼-scale rendering at export sizes).
+    `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="24" stroke-opacity="0.88" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="14" stroke-opacity="${routeOpacity}" stroke-linecap="round" stroke-linejoin="round"/>`,
     ...arrows,
     startMarker,
     endMarker,
@@ -351,22 +339,8 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     height,
   );
 
-  // Render SVG at ¼ resolution to keep feMorphology fast at large export sizes.
-  // feMorphology is O(pixels): at 25MP it takes ~55s; at ¼ scale (~1.6MP) it takes ~3s.
-  //
-  // IMPORTANT: on SVG input, sharp passes .resize() dimensions directly to librsvg as the
-  // render target — it does NOT rasterise first then scale. So we must call .toBuffer()
-  // first (which rasterises at the SVG's declared width/height), then resize the bitmap.
-  const svgSmallW = Math.round(width / 4);
-  const svgSmallH = Math.round(height / 4);
-  const svgSmall = svgStr.replace(
-    `width="${width}" height="${height}">`,
-    `width="${svgSmallW}" height="${svgSmallH}" viewBox="0 0 ${width} ${height}">`,
-  );
-  const svgRasterized = await sharp(Buffer.from(svgSmall)).toBuffer();
-  const svgOverlay = await sharp(svgRasterized)
-    .resize(width, height, { fit: 'fill', kernel: 'lanczos3' })
-    .toBuffer();
+  // Render SVG at full resolution. Double-stroke casing (no feMorphology) keeps this fast.
+  const svgOverlay = await sharp(Buffer.from(svgStr)).toBuffer();
 
   return sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
     .composite([{ input: svgOverlay }])
