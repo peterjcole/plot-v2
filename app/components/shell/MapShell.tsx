@@ -40,6 +40,13 @@ const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false }
 export type PanelMode = 'browse' | 'detail' | 'planner' | 'about';
 
 
+// Real GB BNG coordinates are x ∈ [60000, 700000], y ∈ [10000, 1250000].
+// WGS84 lon/lat values for GB (e.g. [8.7, 50.1] for Frankfurt) are tiny by comparison
+// and must be rejected to avoid a stale/wrong-format center being applied.
+function isValidBNG([x, y]: [number, number]) {
+  return x > 60000 && x < 700000 && y > 10000 && y < 1250000;
+}
+
 function computeGridNorthBearing(center: number[]): number {
   const c = transform(center, OS_PROJECTION.code, 'EPSG:4326') as [number, number];
   const n = transform([center[0], center[1] + 1000], OS_PROJECTION.code, 'EPSG:4326') as [number, number];
@@ -110,7 +117,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleLoadMore = useCallback(async () => {
     setIsLoadingMore(true);
     try {
-      const next = await fetch(`/api/activities?page=${page + 1}&perPage=50`).then(r => r.json()) as typeof activities;
+      const res = await fetch(`/api/activities?page=${page + 1}&perPage=50`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const next = await res.json() as typeof activities;
       setAllActivities(prev => [...prev, ...next]);
       setPage(p => p + 1);
       setHasMore(next.length === 50);
@@ -327,13 +336,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setCompassBearing(0);
   }, []);
 
-  // Real GB BNG coordinates are x ∈ [60000, 700000], y ∈ [10000, 1250000].
-  // WGS84 lon/lat values for GB (e.g. [8.7, 50.1] for Frankfurt) are tiny by comparison
-  // and must be rejected to avoid a stale/wrong-format center being applied.
-  function isValidBNG([x, y]: [number, number]) {
-    return x > 60000 && x < 700000 && y > 10000 && y < 1250000;
-  }
-
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
     setMapReady(true);
@@ -383,6 +385,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     initialFitDoneRef.current = true;
     const coords = route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
     mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 14 });
+  // initialSelectedId is intentionally omitted from deps — it's a stable SSR prop that never
+  // changes after mount. Adding it would cause a spurious re-run on every render.
   }, [mapReady, activityDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectActivity = useCallback((id: string) => {

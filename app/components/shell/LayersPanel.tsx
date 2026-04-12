@@ -125,11 +125,6 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
 
-  // Save layer state whenever it changes
-  useEffect(() => {
-    saveLayerState(state);
-  }, [state]);
-
   return (
     <div style={{
       position: fixed ? 'fixed' : 'absolute',
