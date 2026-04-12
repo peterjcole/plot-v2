@@ -348,9 +348,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
     setMapReady(true);
-    // Only restore stored center when there are no activities — if activities exist,
-    // the auto-fit to their extent gives a better starting view on every refresh.
-    if (allActivities.length === 0) {
+    // In planner mode always restore stored position (the planner fit effect will override
+    // this with the route bounds if there are waypoints). In browse mode only restore when
+    // there are no activities so the activity list auto-fit can take over.
+    if (initialMode === 'planner' || allActivities.length === 0) {
       const stored = loadRoute();
       if (stored?.mapCenter && isValidBNG(stored.mapCenter as [number, number])) {
         map.getView().setCenter(stored.mapCenter);
@@ -367,7 +368,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setCompassBearing(view.getRotation() * 180 / Math.PI);
       setMapResolution(view.getResolution() ?? 10);
     });
-  }, [allActivities.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allActivities.length, initialMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On initial /planner load, fit the map to the saved route once both the map and
+  // waypoints are ready. Runs once — no animation so it snaps cleanly on load.
+  const initialPlannerFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (initialPlannerFitDoneRef.current) return;
+    if (initialMode !== 'planner' || !mapReady || waypoints.length < 2) return;
+    initialPlannerFitDoneRef.current = true;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const coords = waypoints.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
+    map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 9 });
+  }, [mapReady, waypoints, initialMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When navigating directly to an activity via URL, fit the map to it once both the map
   // and the full activity detail (which always has a route) are loaded.
