@@ -86,9 +86,9 @@ export function useElevationProfile(
     null
   );
   const [isFetching, setIsFetching] = useState(false);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const settledKeyRef = useRef<string | null>(null);
 
   // Check if any segments are still pending routing (snapped but no coordinates)
   const hasPendingSegments = segments.some(
@@ -113,9 +113,10 @@ export function useElevationProfile(
       // Only clear data if the route is actually gone (< 2 waypoints).
       // If segments are still routing, keep showing previous elevation data.
       if (waypoints.length < 2) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale data when route is removed
         setElevationData(null);
         setIsFetching(false);
-        settledKeyRef.current = null;
+        setSettledKey(null);
       }
       return;
     }
@@ -178,7 +179,7 @@ export function useElevationProfile(
             }
 
             setElevationData(downsampled);
-            settledKeyRef.current = polylineKey;
+            setSettledKey(polylineKey);
           }
         )
         .catch((err) => {
@@ -203,10 +204,10 @@ export function useElevationProfile(
     };
   }, []);
 
-  // Derive loading state synchronously: true if the route has changed
-  // since the last settled elevation data, or if a fetch is in flight.
+  // Derive loading state: true if the route has changed since the last settled
+  // elevation data, or if a fetch is in flight.
   const needsElevation = waypoints.length >= 2;
-  const isStale = needsElevation && (polylineKey !== settledKeyRef.current || hasPendingSegments);
+  const isStale = needsElevation && (polylineKey !== settledKey || hasPendingSegments);
   const isLoading = isStale || isFetching;
 
   return { elevationData, isLoading };

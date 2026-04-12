@@ -1,15 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { Undo2, Redo2, Trash2, Download, Upload, Mountain, LocateFixed, MapPinPlus, Magnet, Home, Share2, Printer } from 'lucide-react';
+import { type ReactNode, useCallback, useMemo, useRef } from 'react';
+import { ArrowUp } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
-import { downloadGpx, parseGpx, simplifyWaypoints, selectGpxWaypoints } from '@/lib/gpx';
+import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
-import ElevationChart, { type ElevationHoverPoint } from './ElevationChart';
-import Switch from '@/app/components/ui/Switch';
-import IconToggle from '@/app/components/ui/IconToggle';
 
 interface PlannerToolbarProps {
   waypoints: Waypoint[];
@@ -18,27 +14,61 @@ interface PlannerToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   dispatch: React.Dispatch<RouteAction>;
-  onGeolocate: () => void;
   addPointsEnabled: boolean;
   onToggleAddPoints: () => void;
   snapEnabled: boolean;
   onToggleSnap: () => void;
   elevationData: ElevationPoint[] | null;
   isLoadingElevation: boolean;
-  onElevationHover?: (point: ElevationHoverPoint | null) => void;
+  onElevationHover?: (point: { lat: number; lng: number; ele: number; distance: number } | null) => void;
   onFitToRoute?: (waypoints: Waypoint[]) => void;
   onExportImage?: () => void;
   isExportingImage?: boolean;
+  onBack?: () => void;
+  onToggleLayers?: () => void;
+  onExportGpx?: () => void;
 }
 
-function formatDistance(meters: number): string {
-  if (meters < 1000) return `${Math.round(meters)} m`;
-  return `${(meters / 1000).toFixed(2)} km`;
+function fmtDist(m: number): string {
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${(m / 1000).toFixed(1)} km`;
 }
 
-const btnClass =
-  'flex items-center justify-center w-9 h-9 sm:w-11 sm:h-11 rounded-lg text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors';
+const SEP = (
+  <div style={{ width: 1, height: 24, background: 'var(--p3)', margin: '0 4px', flexShrink: 0 }} />
+);
 
+interface TbBtnProps {
+  label: string;
+  disabled?: boolean;
+  active?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+  title?: string;
+}
+function TbBtn({ label, disabled, active, onClick, children, title }: TbBtnProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      style={{
+        width: 40, height: 36, borderRadius: 3,
+        background: 'transparent', border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+        color: active ? 'var(--ora)' : 'var(--fog)',
+        opacity: disabled ? 0.28 : 1,
+        flexShrink: 0,
+      }}
+    >
+      {children}
+      <span style={{ font: '600 9px/1 var(--mono)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'inherit' }}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
 export default function PlannerToolbar({
   waypoints,
@@ -47,21 +77,19 @@ export default function PlannerToolbar({
   canUndo,
   canRedo,
   dispatch,
-  onGeolocate,
-  addPointsEnabled,
-  onToggleAddPoints,
   snapEnabled,
   onToggleSnap,
   elevationData,
-  isLoadingElevation,
-  onElevationHover,
   onFitToRoute,
   onExportImage,
   isExportingImage = false,
+  onBack,
+  onToggleLayers,
+  onExportGpx,
 }: PlannerToolbarProps) {
-  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
-  const exportDropdownRef = useRef<HTMLDivElement>(null);
-  const elevationGain = useMemo(() => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
     let gain = 0;
     for (let i = 1; i < elevationData.length; i++) {
@@ -76,33 +104,14 @@ export default function PlannerToolbar({
 
   const handleClear = useCallback(() => {
     if (waypoints.length === 0) return;
-    if (window.confirm('Clear the entire route?')) {
-      dispatch({ type: 'CLEAR' });
-    }
+    if (window.confirm('Clear the entire route?')) dispatch({ type: 'CLEAR' });
   }, [waypoints.length, dispatch]);
 
-  const handleExport = useCallback(() => {
+  const handleExportGpx = useCallback(() => {
+    if (onExportGpx) { onExportGpx(); return; }
     if (waypoints.length === 0) return;
     downloadGpx(waypoints, segments);
-  }, [waypoints, segments]);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleExportDropdownToggle = useCallback(() => {
-    setExportDropdownOpen((v) => !v);
-  }, []);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!exportDropdownOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
-        setExportDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [exportDropdownOpen]);
+  }, [onExportGpx, waypoints, segments]);
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,161 +124,152 @@ export default function PlannerToolbar({
     reader.onload = (ev) => {
       const content = ev.target?.result;
       if (typeof content !== 'string') return;
-      const parsed = simplifyWaypoints(parseGpx(content), 500);
-      if (parsed.length >= 1) {
-        const { waypoints: gpxWaypoints, segments: gpxSegments } = selectGpxWaypoints(parsed);
-        dispatch({ type: 'LOAD', waypoints: gpxWaypoints, segments: gpxSegments });
-        onFitToRoute?.(parsed);
+      const trackPoints = parseGpx(content);
+      const { waypoints: viaPoints, segments: viaSegments } = selectGpxWaypoints(trackPoints, 2);
+      if (viaPoints.length >= 1) {
+        dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
+        onFitToRoute?.(viaPoints);
       }
     };
     reader.readAsText(file);
     e.target.value = '';
   }, [waypoints.length, dispatch, onFitToRoute]);
 
+  const hasRoute = waypoints.length >= 2;
+
+  const routeInfo: ReactNode = hasRoute
+    ? <>{fmtDist(distance)}{elevGain != null ? <> · {elevGain} m <ArrowUp size={10} style={{ display: 'inline', verticalAlign: 'middle' }} /></> : null}</>
+    : null;
+
   return (
     <>
-      <input type="file" accept=".gpx" className="hidden" ref={fileInputRef} onChange={handleImport} />
-      {/* Toolbar + elevation column */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex flex-col max-w-[calc(100vw-1.5rem)]">
-        {/* Main toolbar */}
-        <div className={`relative z-[1] flex items-center justify-evenly gap-1 bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border px-2 py-1.5 sm:justify-start sm:gap-2 sm:px-3 sm:py-2 ${waypoints.length >= 2 ? 'rounded-t-xl' : 'rounded-xl'}`}>
-          {/* Add Points toggle — icon on small, switch on large */}
-          <div className="sm:hidden">
-            <IconToggle pressed={addPointsEnabled} onPressedChange={() => onToggleAddPoints()} title="Add Points">
-              <MapPinPlus size={18} />
-            </IconToggle>
-          </div>
-          <div className="hidden sm:block">
-            <Switch
-              checked={addPointsEnabled}
-              onCheckedChange={() => onToggleAddPoints()}
-              label="Add Points"
-            />
-          </div>
-
-          {/* Snap to Path — always visible as icon on small, slides in as switch on large */}
-          <div className="sm:hidden">
-            <IconToggle pressed={snapEnabled} onPressedChange={() => onToggleSnap()} title="Snap to Path" disabled={!addPointsEnabled}>
-              <Magnet size={18} />
-            </IconToggle>
-          </div>
-          <div
-            className={`hidden sm:block overflow-hidden transition-all duration-200 ${
-              addPointsEnabled
-                ? 'max-w-48 opacity-100'
-                : 'max-w-0 opacity-0'
-            }`}
-          >
-            <Switch
-              checked={snapEnabled}
-              onCheckedChange={() => onToggleSnap()}
-              label="Snap to Path"
-            />
-          </div>
-
-          <div className="w-px h-6 bg-border shrink-0" />
-
-          <button onClick={handleUndo} disabled={!canUndo} title="Undo" className={btnClass}>
-            <Undo2 size={18} />
-          </button>
-
-          <button onClick={handleRedo} disabled={!canRedo} title="Redo" className={btnClass}>
-            <Redo2 size={18} />
-          </button>
-
-          <div className="w-px h-6 bg-border shrink-0" />
-
-          <button onClick={handleClear} disabled={waypoints.length === 0} title="Clear route" className={btnClass}>
-            <Trash2 size={18} />
-          </button>
-
-          {/* Export dropdown */}
-          <div className="relative" ref={exportDropdownRef}>
-            <button
-              onClick={handleExportDropdownToggle}
-              disabled={isExportingImage}
-              title="Export"
-              className={btnClass}
-            >
-              {isExportingImage ? (
-                <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Share2 size={18} />
-              )}
-            </button>
-            {exportDropdownOpen && (
-              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-20 flex flex-col bg-surface-raised shadow-lg border border-border rounded-lg overflow-hidden min-w-[140px]">
-                <button
-                  onClick={() => { handleExport(); setExportDropdownOpen(false); }}
-                  disabled={waypoints.length === 0}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Download size={15} />
-                  Export GPX
-                </button>
-                <button
-                  onClick={() => { onExportImage?.(); setExportDropdownOpen(false); }}
-                  disabled={isExportingImage}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Printer size={15} />
-                  Export Image
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button onClick={() => fileInputRef.current?.click()} title="Import GPX" className={btnClass}>
-            <Upload size={18} />
-          </button>
-
-          {/* Home — mobile only, far right */}
-          <div className="sm:hidden w-px h-6 bg-border shrink-0" />
-          <Link href="/" title="Home" className={`${btnClass} sm:hidden`}>
-            <Home size={18} />
-          </Link>
+      <input type="file" accept=".gpx" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
+      <div
+        className="fixed sm:absolute top-0 left-0 right-0 h-[60px] sm:h-12 z-20 sm:z-[5] flex items-center px-3 gap-0.5"
+        style={{
+          background: 'var(--glass-hvy)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--p3)',
+        }}
+      >
+        {/* Mobile-only: "plot" logo */}
+        <div className="flex items-center sm:hidden">
+          <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', padding: '0 4px 0 4px', flexShrink: 0, lineHeight: 1 }}>plot</span>
+          {SEP}
         </div>
 
-        {/* Elevation tray — slides down from under the toolbar */}
-        <div
-          className={`w-full overflow-hidden transition-all duration-300 ease-out ${
-            waypoints.length >= 2
-              ? 'max-h-[80px] opacity-100'
-              : 'max-h-0 opacity-0 pointer-events-none'
-          }`}
-        >
-          <div className="relative -mt-2 pt-4 flex items-center gap-3 bg-surface-raised/50 backdrop-blur-md rounded-b-xl shadow-md border border-border border-t-0 px-4 py-1.5">
-            <span className="text-sm font-semibold text-text-primary tabular-nums shrink-0">
-              {formatDistance(distance)}
-            </span>
-            <div className="relative flex items-center gap-2 flex-1 min-w-0 h-[28px]">
-              {elevationGain != null && (
-                <span className="inline-flex items-center gap-0.5 text-sm text-text-secondary tabular-nums shrink-0">
-                  <Mountain size={10} strokeWidth={2.5} className="shrink-0" />
-                  {elevationGain}m
-                </span>
-              )}
-              {elevationData ? (
-                <ElevationChart data={elevationData} onHover={onElevationHover} />
-              ) : null}
-              {isLoadingElevation && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center">
-                  <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+        {/* Undo */}
+        <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+          </svg>
+        </TbBtn>
+        {/* Redo */}
+        <TbBtn label="Redo" disabled={!canRedo} onClick={handleRedo}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
+          </svg>
+        </TbBtn>
+
+        {SEP}
+
+        {/* Snap toggle */}
+        <TbBtn label="Snap" active={snapEnabled} onClick={onToggleSnap}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+        </TbBtn>
+
+        {/* Clear */}
+        <TbBtn label="Clear" disabled={waypoints.length === 0} onClick={handleClear}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+        </TbBtn>
+
+        {/* Desktop-only: Import + Export GPX */}
+        <div className="hidden sm:flex items-center">
+          {SEP}
+
+          {/* Import */}
+          <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </TbBtn>
+
+          {/* Export GPX */}
+          <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </TbBtn>
+        </div>
+
+        {/* Export Image — available on both desktop and mobile */}
+        <TbBtn label="Image" disabled={isExportingImage} onClick={onExportImage}>
+          {isExportingImage ? (
+            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--fog-ghost)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+          )}
+        </TbBtn>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* Desktop-only: route info / hint */}
+        <div className="hidden sm:flex items-center">
+          {routeInfo ? (
+            <div style={{ font: '600 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '.06em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              {routeInfo}
             </div>
-          </div>
+          ) : (
+            <div style={{ font: '400 10px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '.04em', padding: '0 12px', whiteSpace: 'nowrap' }}>
+              Click the map to place your first point
+            </div>
+          )}
+          {SEP}
         </div>
+
+        {/* Layers (mobile only) */}
+        {onToggleLayers && (
+          <div className="sm:hidden">
+            <TbBtn label="Layers" onClick={onToggleLayers}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                <polyline points="2 17 12 22 22 17"/>
+                <polyline points="2 12 12 17 22 12"/>
+              </svg>
+            </TbBtn>
+          </div>
+        )}
+
+        {/* Back (desktop only, when onBack provided) */}
+        {onBack && (
+          <div className="hidden sm:flex items-center">
+            {SEP}
+            <TbBtn label="Back" onClick={onBack}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 18-6-6 6-6"/>
+              </svg>
+            </TbBtn>
+          </div>
+        )}
       </div>
 
-      {/* Geolocation button — standalone, bottom-right */}
-      <button
-        onClick={onGeolocate}
-        title="My location"
-        className="absolute bottom-4 right-3 z-10 flex items-center justify-center w-11 h-11 rounded-lg bg-surface-raised/70 backdrop-blur-md shadow-lg border border-border text-text-primary hover:bg-surface-muted transition-colors"
-      >
-        <LocateFixed size={18} />
-      </button>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </>
   );
 }

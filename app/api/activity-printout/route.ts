@@ -28,23 +28,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const width = Math.min(
-    Math.max(parseInt(searchParams.get('width') || '860', 10), 100),
-    4096
-  );
-  const height = Math.min(
-    Math.max(parseInt(searchParams.get('height') || '540', 10), 100),
-    4096
-  );
+  const width = 1200;
+  const height = 760;
   const format = searchParams.get('format') === 'jpeg' ? 'jpeg' : 'png';
   const debug = searchParams.get('debug') === 'true';
   const baseMap = searchParams.get('baseMap') === 'satellite' ? 'satellite' : 'os';
   const osDark = searchParams.get('osDark') === 'true';
-  const hidePhotos = searchParams.get('hidePhotos') === 'true';
+  const photoCount = Math.min(parseInt(searchParams.get('photoCount') || '0', 10), 3);
   const includeLogo = searchParams.get('includeLogo') === 'true';
   const hillshadeEnabled = searchParams.get('hillshadeEnabled') === 'true';
-  const hideDetails = searchParams.get('hideDetails') === 'true';
-  const hideDescription = searchParams.get('hideDescription') === 'true';
+  const showDescription = searchParams.get('showDescription') === 'true';
 
   try {
     const browser = await getBrowser();
@@ -62,7 +55,7 @@ export async function GET(request: NextRequest) {
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     const bypassParam = bypassSecret ? `&x-vercel-protection-bypass=${bypassSecret}&x-vercel-set-bypass-cookie=samesitenone` : '';
     const token = encodeURIComponent(session.accessToken);
-    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}${hidePhotos ? '&hidePhotos=true' : ''}${includeLogo ? '&includeLogo=true' : ''}${hillshadeEnabled ? '&hillshadeEnabled=true' : ''}${hideDetails ? '&hideDetails=true' : ''}${hideDescription ? '&hideDescription=true' : ''}${bypassParam}`;
+    const renderUrl = `${origin}/render/${activityId}?token=${token}&baseMap=${baseMap}${osDark ? '&osDark=true' : ''}&photoCount=${photoCount}${includeLogo ? '&includeLogo=true' : ''}${hillshadeEnabled ? '&hillshadeEnabled=true' : ''}${showDescription ? '&showDescription=true' : ''}${bypassParam}`;
 
     await page.goto(renderUrl, {
       waitUntil: 'networkidle0',

@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
 import { OS_PROJECTION, OS_DEFAULT_CENTER, OS_TILE_URL, OS_DARK_TILE_URL, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
+import { getActivityColor } from '@/lib/activity-categories';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -114,8 +115,8 @@ function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string
           '<feComponentTransfer in="SourceAlpha" result="opaque-alpha">',
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
-          '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
-          `<feFlood flood-color="${outlineColor}" flood-opacity="0.9" result="color"/>`,
+          '<feMorphology in="opaque-alpha" operator="dilate" radius="3" result="dilated"/>',
+          `<feFlood flood-color="${outlineColor}" flood-opacity="1.0" result="color"/>`,
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
           '<feMerge>',
@@ -137,7 +138,7 @@ function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string
       clearTimeout(timer);
       map.off('moveend', apply);
     };
-  }, [map]);
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps -- filter created once per map; colors are static for a given render
 
   return null;
 }
@@ -319,12 +320,10 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
   const minZoom = (isSatellite || !isInGB) ? 2 : 0;
   const maxZoom = (isSatellite || !isInGB) ? 18 : 9;
 
-  // Satellite or dark mode: bright accent orange with dark brown outline
-  // Light mode: primary green with dark green outline
   const isDark = isSatellite || osDark;
-  const routeColor = isDark ? '#E09B45' : '#4A5A2B';
-  const routeOutlineColor = isDark ? '#5A2D00' : '#3A4722';
-  const routeOpacity = isDark ? 0.60 : 0.35;
+  const routeColor = getActivityColor(activity.type ?? '');
+  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.92)' : 'rgba(7,14,20,0.80)';
+  const routeOpacity = 0.68;
 
   return (
     <div style={{ width, height, position: 'relative', colorScheme: 'only light' }}>
@@ -365,7 +364,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
           positions={route}
           pathOptions={{
             color: routeColor,
-            weight: 5,
+            weight: 9,
             opacity: routeOpacity,
           }}
         />

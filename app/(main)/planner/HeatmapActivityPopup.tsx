@@ -37,20 +37,24 @@ export default function HeatmapActivityPopup({
   onClose,
   onHoverActivity,
 }: HeatmapActivityPopupProps) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() =>
+    activities.length > 0 ? activities[0].id : null
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-  }, []);
+  // Focus close button on mount
+  useEffect(() => { closeButtonRef.current?.focus(); }, []);
 
+  // Highlight the first activity once activities are populated
+  // (popup opens with activities:[] while the fetch is in flight)
+  const didHighlightRef = useRef(false);
   useEffect(() => {
-    if (activities.length > 0 && selectedId === null) {
-      setSelectedId(activities[0].id);
+    if (!didHighlightRef.current && activities.length > 0) {
+      didHighlightRef.current = true;
       onHoverActivity(activities[0].route, getSportColor(activities[0].sportType));
     }
-  }, [activities]);
+  }, [activities, onHoverActivity]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {
@@ -172,7 +176,7 @@ export default function HeatmapActivityPopup({
                 </p>
               </label>
               <a
-                href={`/activity/${activity.id}`}
+                href={`/?activity=${activity.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 text-text-tertiary hover:text-text-primary transition-colors mt-0.5"

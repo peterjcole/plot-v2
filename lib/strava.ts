@@ -70,6 +70,7 @@ export async function getAthleteActivities(
     movingTime: a.moving_time,
     elevationGain: a.total_elevation_gain,
     photoCount: a.total_photo_count ?? 0,
+    route: a.map?.summary_polyline ? decodePolyline(a.map.summary_polyline) : undefined,
   }));
 }
 
@@ -177,11 +178,14 @@ export async function getActivityDetail(
     lat: p.location?.[0] ?? route[0]?.[0] ?? 0,
     lng: p.location?.[1] ?? route[0]?.[1] ?? 0,
     caption: p.caption || undefined,
+    width: p.width || p.width_px || undefined,
+    height: p.height || p.height_px || undefined,
   }));
 
   return {
     id: String(activity.id),
     name: activity.name,
+    type: activity.type || activity.sport_type || undefined,
     description: activity.description || undefined,
     route,
     photos,
@@ -192,7 +196,11 @@ export async function getActivityDetail(
       averageSpeed: activity.average_speed,
       maxSpeed: activity.max_speed,
       startDate: activity.start_date,
+      avgHeartrate: activity.average_heartrate || undefined,
+      elevHigh: activity.elev_high || undefined,
+      calories: activity.calories || undefined,
     },
+    gear: activity.gear?.name || undefined,
   };
 }
 
