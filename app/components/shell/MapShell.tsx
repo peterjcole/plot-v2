@@ -5,9 +5,9 @@ import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
-import { ActivitySummary, ActivityData, ActivityPhoto } from '@/lib/types';
+import { ActivitySummary, ActivityData, ActivityPhoto, PhotoItem, HeatmapActivity } from '@/lib/types';
 import { type MapLayer, type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
-import LayersPanel, { type LayerState, DEFAULT_LAYER_STATE, loadLayerState, saveLayerState } from './LayersPanel';
+import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
@@ -31,6 +31,9 @@ import PhotoLightbox from './PhotoLightbox';
 import WaypointPopover from '@/app/components/map/WaypointPopover';
 import AboutSection from './AboutSection';
 import SplashOverlay from './SplashOverlay';
+import PhotoPopup from '@/app/(main)/planner/PhotoPopup';
+import ClusterPhotosPopup from '@/app/(main)/planner/ClusterPhotosPopup';
+import HeatmapActivityPopup from '@/app/(main)/planner/HeatmapActivityPopup';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -62,7 +65,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [layerState, setLayerState] = useState<LayerState>(DEFAULT_LAYER_STATE);
+  const [layerState, setLayerState] = useState<LayerState>(() => loadLayerState());
   const patchLayers = useCallback((patch: Partial<LayerState>) => {
     setLayerState(prev => {
       const next = { ...prev, ...patch };
@@ -79,6 +82,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     localStorage.setItem('plot-splash-dismissed', '1');
     setSplashDismissed(true);
   }, []);
+  const [mapReady, setMapReady] = useState(false);
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -121,8 +125,22 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [sysDark, setSysDark] = useState(false);
   const osDark = theme === 'dark' || (theme === 'system' && sysDark);
 
-  // Owner photos — fetched when showPhotos is toggled on for the owner
-  const [ownerPhotos, setOwnerPhotos] = useState<ActivityPhoto[]>([]);
+  // Owner photo popups
+  const [photoPopup, setPhotoPopup] = useState<{ photo: PhotoItem; screenX: number; screenY: number } | null>(null);
+  const [clusterPhotosPopup, setClusterPhotosPopup] = useState<{ photos: PhotoItem[]; screenX: number; screenY: number } | null>(null);
+  const photosImportTriggeredRef = useRef(false);
+
+  // Heatmap activity popup + route highlight
+  const [activityPopup, setActivityPopup] = useState<{
+    activities: HeatmapActivity[];
+    screenX: number;
+    screenY: number;
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [popupLoading, setPopupLoading] = useState(false);
+  const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
+  const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
 
   // Planner state
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
@@ -190,6 +208,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
   const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
   const handleWaypointPopoverClose = useCallback(() => setWaypointPopover(null), []);
+  const handleEditWaypoint = useCallback((index: number) => {
+    const wp = waypointsRef.current[index];
+    if (!wp || !mapInstanceRef.current) return;
+    const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
+    const pixel = mapInstanceRef.current.getPixelFromCoordinate(coord);
+    if (!pixel) return;
+    const rect = mapInstanceRef.current.getTargetElement().getBoundingClientRect();
+    setWaypointPopover({ index, screenX: rect.left + pixel[0], screenY: rect.top + pixel[1] });
+  }, []);
   const handleWaypointDelete = useCallback((index: number) => {
     dispatch({ type: 'REMOVE_WAYPOINT', index });
     setWaypointPopover(null);
@@ -211,18 +238,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // Load persisted layer state on mount
+  // Trigger photo catch-up import the first time "My photos" is enabled
   useEffect(() => {
-    setLayerState(loadLayerState());
-  }, []);
-
-  // Owner photos — fetch when showPhotos is toggled on for the owner
-  useEffect(() => {
-    if (!isOwner || !layerState.showPhotos) { setOwnerPhotos([]); return; }
-    fetch('/api/photos')
-      .then(r => r.ok ? r.json() : [])
-      .then((data: ActivityPhoto[]) => setOwnerPhotos(data))
-      .catch(() => {});
+    if (!isOwner || !layerState.showPhotos || photosImportTriggeredRef.current) return;
+    try {
+      if (localStorage.getItem('plotv2-photos-import-triggered')) {
+        photosImportTriggeredRef.current = true;
+        return;
+      }
+    } catch { /* ignore */ }
+    photosImportTriggeredRef.current = true;
+    fetch('/api/photos/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then((res) => {
+        if (res.ok) {
+          try { localStorage.setItem('plotv2-photos-import-triggered', '1'); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => { /* silently ignore */ });
   }, [isOwner, layerState.showPhotos]);
 
   // Theme initialisation + system preference tracking
@@ -300,6 +332,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleMapReady = useCallback((map: Map) => {
     mapInstanceRef.current = map;
+    setMapReady(true);
     // Only restore stored center when there are no activities — if activities exist,
     // the auto-fit to their extent gives a better starting view on every refresh.
     if (allActivities.length === 0) {
@@ -320,6 +353,19 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setMapResolution(view.getResolution() ?? 10);
     });
   }, [allActivities.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When navigating directly to an activity via URL, fit the map to it once both the map
+  // and the full activity detail (which always has a route) are loaded.
+  const initialFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (initialFitDoneRef.current || !initialSelectedId || !mapReady || !mapInstanceRef.current) return;
+    if (!activityDetail || String(activityDetail.id) !== initialSelectedId) return;
+    const route = activityDetail.route;
+    if (!route?.length) return;
+    initialFitDoneRef.current = true;
+    const coords = route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
+    mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 14 });
+  }, [mapReady, activityDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectActivity = useCallback((id: string) => {
     setSelectedId(id);
@@ -358,6 +404,53 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleOpenAbout = useCallback(() => setMode('about'), []);
   const handleCloseAbout = useCallback(() => setMode('browse'), []);
+
+  const handleOwnerPhotoClick = useCallback(async (photo: PhotoItem, screenX: number, screenY: number) => {
+    setActivityPopup(null);
+    setClusterPhotosPopup(null);
+    setHoveredActivityRoute(null);
+    setPhotoPopup({ photo, screenX, screenY });
+    try {
+      const res = await fetch(`/api/tiles/activities?lat=${photo.lat}&lng=${photo.lng}`);
+      if (res.ok) {
+        const data = await res.json() as { id: number; route: [number, number][] }[];
+        const match = data.find(a => a.id === photo.activityId) ?? data[0];
+        if (match) { setHoveredActivityRoute(match.route); setHoveredActivityColor(null); }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleOwnerClusterPhotosClick = useCallback((photos: PhotoItem[], screenX: number, screenY: number) => {
+    setActivityPopup(null);
+    setPhotoPopup(null);
+    setHoveredActivityRoute(null);
+    setClusterPhotosPopup({ photos, screenX, screenY });
+  }, []);
+
+  const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
+    // Same point → toggle close
+    if (activityPopup && Math.abs(activityPopup.lat - lat) < 0.0001 && Math.abs(activityPopup.lng - lng) < 0.0001) {
+      setActivityPopup(null);
+      setHoveredActivityRoute(null);
+      return;
+    }
+    setActivityPopup({ activities: [], screenX, screenY, lat, lng });
+    setPopupLoading(true);
+    setHoveredActivityRoute(null);
+    try {
+      const res = await fetch(`/api/tiles/activities?lat=${lat}&lng=${lng}`);
+      if (res.ok) {
+        const data = await res.json();
+        setActivityPopup(prev => prev ? { ...prev, activities: data } : null);
+      } else {
+        setActivityPopup(null);
+      }
+    } catch {
+      setActivityPopup(null);
+    } finally {
+      setPopupLoading(false);
+    }
+  }, [activityPopup]);
 
   const handleTabChange = useCallback((tab: 'activities' | 'planner') => {
     if (tab === 'planner') handleOpenPlanner();
@@ -429,7 +522,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     : undefined;
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
-  const photoMarkers = mode === 'detail' ? (activityDetail?.photos ?? undefined) : (ownerPhotos.length > 0 ? ownerPhotos : undefined);
+  const photoMarkers = mode === 'detail' ? (activityDetail?.photos ?? undefined) : undefined;
 
   // ── Desktop layout ─────────────────────────────────────────────────────────
   if (!isMobile) {
@@ -470,6 +563,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               onFitToRoute={() => handleFitToRoute(waypoints)}
               onExportImage={handleExportImage}
               isExportingImage={isExportingImage}
+              onEditWaypoint={handleEditWaypoint}
             />
           )}
           {mode === 'about' && (
@@ -502,6 +596,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             heatmapColor={layerState.heatmapColor}
             showExplorer={layerState.showExplorer}
             showPOIs={layerState.showPOIs}
+            showOwnerPhotos={isOwner && layerState.showPhotos}
+            onPhotoClick={handleOwnerPhotoClick}
+            onClusterPhotosClick={handleOwnerClusterPhotosClick}
+            onHeatmapClick={isOwner ? handleHeatmapClick : undefined}
+            hoveredActivityRoute={hoveredActivityRoute}
+            hoveredActivityColor={hoveredActivityColor}
             onGeolocate={handleGeolocate}
             onPlaceSelect={handlePlaceSelect}
           />
@@ -555,6 +655,36 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         {lightboxOpen && (
           <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
         )}
+        {photoPopup && (
+          <PhotoPopup
+            photo={photoPopup.photo}
+            screenX={photoPopup.screenX}
+            screenY={photoPopup.screenY}
+            onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
+          />
+        )}
+        {clusterPhotosPopup && (
+          <ClusterPhotosPopup
+            photos={clusterPhotosPopup.photos}
+            screenX={clusterPhotosPopup.screenX}
+            screenY={clusterPhotosPopup.screenY}
+            onClose={() => { setClusterPhotosPopup(null); setHoveredActivityRoute(null); }}
+            onPhotoSelect={(photo, sx, sy) => {
+              setClusterPhotosPopup(null);
+              handleOwnerPhotoClick(photo, sx, sy);
+            }}
+          />
+        )}
+        {activityPopup && (
+          <HeatmapActivityPopup
+            activities={activityPopup.activities}
+            screenX={activityPopup.screenX}
+            screenY={activityPopup.screenY}
+            isLoading={popupLoading}
+            onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
+            onHoverActivity={(route, color) => { setHoveredActivityRoute(route ?? null); setHoveredActivityColor(color ?? null); }}
+          />
+        )}
         {!isLoggedIn && !splashDismissed && (
           <SplashOverlay onDismiss={handleSplashDismiss} onPlanRoute={() => { handleSplashDismiss(); handleOpenPlanner(); }} />
         )}
@@ -590,6 +720,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           heatmapColor={layerState.heatmapColor}
           showExplorer={layerState.showExplorer}
           showPOIs={layerState.showPOIs}
+          showOwnerPhotos={isOwner && layerState.showPhotos}
+          onPhotoClick={handleOwnerPhotoClick}
+          onClusterPhotosClick={handleOwnerClusterPhotosClick}
+          onHeatmapClick={isOwner ? handleHeatmapClick : undefined}
+          hoveredActivityRoute={hoveredActivityRoute}
+          hoveredActivityColor={hoveredActivityColor}
           onGeolocate={handleGeolocate}
           onPlaceSelect={handlePlaceSelect}
           isMobile
@@ -835,6 +971,36 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
       {lightboxOpen && (
         <PhotoLightbox photos={lightboxPhotos} initialIndex={lightboxIndex} onClose={handleLightboxClose} />
+      )}
+      {photoPopup && (
+        <PhotoPopup
+          photo={photoPopup.photo}
+          screenX={photoPopup.screenX}
+          screenY={photoPopup.screenY}
+          onClose={() => { setPhotoPopup(null); setHoveredActivityRoute(null); }}
+        />
+      )}
+      {clusterPhotosPopup && (
+        <ClusterPhotosPopup
+          photos={clusterPhotosPopup.photos}
+          screenX={clusterPhotosPopup.screenX}
+          screenY={clusterPhotosPopup.screenY}
+          onClose={() => { setClusterPhotosPopup(null); setHoveredActivityRoute(null); }}
+          onPhotoSelect={(photo, sx, sy) => {
+            setClusterPhotosPopup(null);
+            handleOwnerPhotoClick(photo, sx, sy);
+          }}
+        />
+      )}
+      {activityPopup && (
+        <HeatmapActivityPopup
+          activities={activityPopup.activities}
+          screenX={activityPopup.screenX}
+          screenY={activityPopup.screenY}
+          isLoading={popupLoading}
+          onClose={() => { setActivityPopup(null); setHoveredActivityRoute(null); setHoveredActivityColor(null); }}
+          onHoverActivity={(route, color) => { setHoveredActivityRoute(route ?? null); setHoveredActivityColor(color ?? null); }}
+        />
       )}
       {!isLoggedIn && !splashDismissed && (
         <SplashOverlay onDismiss={handleSplashDismiss} onPlanRoute={() => { handleSplashDismiss(); handleOpenPlanner(); }} />

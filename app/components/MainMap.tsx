@@ -15,18 +15,21 @@ import OlVectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
 import Feature from 'ol/Feature';
 import LineString from 'ol/geom/LineString';
+import Polygon from 'ol/geom/Polygon';
 import Point from 'ol/geom/Point';
 import { Style, Stroke, Icon, Circle as CircleStyle, Fill } from 'ol/style';
 import { Modify, DragPan } from 'ol/interaction';
-import { get as getProjection, fromLonLat, toLonLat } from 'ol/proj';
+import { get as getProjection, fromLonLat, toLonLat, transformExtent } from 'ol/proj';
 import { register } from 'ol/proj/proj4';
+import { unByKey } from 'ol/Observable';
 import proj4 from 'proj4';
 import { getCenter, boundingExtent } from 'ol/extent';
+import Supercluster from 'supercluster';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
   HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
-import { ActivitySummary, ActivityPhoto, Waypoint, RouteSegment } from '@/lib/types';
+import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
 import { getActivityColor } from '@/lib/activity-categories';
 import type { RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import 'ol/ol.css';
@@ -69,6 +72,12 @@ interface MainMapProps {
   heatmapColor?: string;
   showExplorer?: boolean;
   showPOIs?: boolean;
+  showOwnerPhotos?: boolean;
+  onPhotoClick?: (photo: PhotoItem, screenX: number, screenY: number) => void;
+  onClusterPhotosClick?: (photos: PhotoItem[], screenX: number, screenY: number) => void;
+  onHeatmapClick?: (lat: number, lng: number, screenX: number, screenY: number) => void;
+  hoveredActivityRoute?: [number, number][] | null;
+  hoveredActivityColor?: string | null;
   onGeolocate?: () => void;
   onPlaceSelect?: (coordinates: [number, number]) => void;
   isMobile?: boolean;
@@ -202,6 +211,12 @@ export default function MainMap({
   heatmapColor = 'hot',
   showExplorer = false,
   showPOIs = false,
+  showOwnerPhotos = false,
+  onPhotoClick,
+  onClusterPhotosClick,
+  onHeatmapClick,
+  hoveredActivityRoute,
+  hoveredActivityColor,
   onGeolocate,
   onPlaceSelect,
   isMobile = false,
@@ -221,6 +236,9 @@ export default function MainMap({
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const explorerTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerSquareLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerGridLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const fittedRef = useRef(false);
 
   // Zoom state for zoom buttons
@@ -241,6 +259,19 @@ export default function MainMap({
   useEffect(() => { onPhotoMarkerClickRef.current = onPhotoMarkerClick; }, [onPhotoMarkerClick]);
   const onWaypointClickRef = useRef(onWaypointClick);
   useEffect(() => { onWaypointClickRef.current = onWaypointClick; }, [onWaypointClick]);
+  const ownerPhotosLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const ownerPhotosSourceRef = useRef<VectorSource | null>(null);
+  const ownerSuperclusterRef = useRef<Supercluster | null>(null);
+  const onPhotoClickRef = useRef(onPhotoClick);
+  useEffect(() => { onPhotoClickRef.current = onPhotoClick; }, [onPhotoClick]);
+  const onClusterPhotosClickRef = useRef(onClusterPhotosClick);
+  useEffect(() => { onClusterPhotosClickRef.current = onClusterPhotosClick; }, [onClusterPhotosClick]);
+  const activityHighlightSourceRef = useRef<VectorSource | null>(null);
+  const activityHighlightLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const onHeatmapClickRef = useRef(onHeatmapClick);
+  useEffect(() => { onHeatmapClickRef.current = onHeatmapClick; }, [onHeatmapClick]);
+  const showPersonalHeatmapRef = useRef(showPersonalHeatmap);
+  useEffect(() => { showPersonalHeatmapRef.current = showPersonalHeatmap; }, [showPersonalHeatmap]);
 
   // Initialise map once
   useEffect(() => {
@@ -340,13 +371,18 @@ export default function MainMap({
     plannerRouteLayerRef.current = plannerRouteLayer;
     plannerModifyRef.current = plannerModify;
 
+    const highlightSource = new VectorSource();
+    const highlightLayer = new VectorLayer({ source: highlightSource, zIndex: 11 });
+    activityHighlightSourceRef.current = highlightSource;
+    activityHighlightLayerRef.current = highlightLayer;
+
     const center = fromLonLat([OS_DEFAULT_CENTER.lng, OS_DEFAULT_CENTER.lat], OS_PROJECTION.code);
     const viewResolutions = [...OS_PROJECTION.resolutions, 0.875, 0.4375, 0.21875];
 
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, hillshadeLayer, routeLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
       view: new View({
         projection,
         center,
@@ -385,6 +421,8 @@ export default function MainMap({
       plannerRouteLayerRef.current = null;
       plannerModifyRef.current = null;
       personalHeatmapLayerRef.current = null;
+      activityHighlightSourceRef.current = null;
+      activityHighlightLayerRef.current = null;
       fittedRef.current = false;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -525,10 +563,187 @@ export default function MainMap({
     hillshadeLayerRef.current?.setVisible(showHillshade);
   }, [showHillshade]);
 
-  // Photo markers visibility
+  // Owner photos — SuperCluster-based circular thumbnail layer
   useEffect(() => {
-    photoLayerRef.current?.setVisible(showPhotos);
-  }, [showPhotos]);
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const m = map;
+    if (ownerPhotosLayerRef.current) {
+      m.removeLayer(ownerPhotosLayerRef.current);
+      ownerPhotosLayerRef.current = null;
+      ownerPhotosSourceRef.current = null;
+    }
+    ownerSuperclusterRef.current = null;
+    if (!showOwnerPhotos) return;
+
+    const source = new VectorSource();
+    const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
+
+    function loadThumbnail(proxyUrl: string) {
+      thumbnailCache[proxyUrl] = null;
+      const img = new window.Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = 40; c.height = 40;
+        const ctx = c.getContext('2d')!;
+        ctx.beginPath();
+        ctx.arc(20, 20, 19, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(img, 0, 0, 40, 40);
+        ctx.beginPath();
+        ctx.arc(20, 20, 19, 0, Math.PI * 2);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        thumbnailCache[proxyUrl] = c;
+        source.changed();
+      };
+      img.onerror = () => { thumbnailCache[proxyUrl] = null; };
+      img.src = proxyUrl;
+    }
+
+    function makeClusterCanvas(count: number, topPhotoCanvas: HTMLCanvasElement): HTMLCanvasElement {
+      const SIZE = 52;
+      const PHOTO_R = 19;
+      const cx = 22, cy = 22;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext('2d')!;
+      for (let i = 2; i >= 1; i--) {
+        ctx.beginPath();
+        ctx.arc(cx + i * 3, cy + i * 3, PHOTO_R, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${0.18 * i})`;
+        ctx.fill();
+      }
+      ctx.drawImage(topPhotoCanvas, cx - PHOTO_R, cy - PHOTO_R, PHOTO_R * 2, PHOTO_R * 2);
+      const label = String(count);
+      const fontSize = 11;
+      const tmp = document.createElement('canvas').getContext('2d')!;
+      tmp.font = `700 ${fontSize}px sans-serif`;
+      const textW = tmp.measureText(label).width;
+      const bw = Math.max(18, Math.ceil(textW) + 10);
+      const bh = 16;
+      const bx = cx + PHOTO_R - bw / 2 + 4;
+      const by = cy + PHOTO_R - bh / 2 + 4;
+      const br = bh / 2;
+      ctx.beginPath();
+      ctx.moveTo(bx + br, by);
+      ctx.arcTo(bx + bw, by, bx + bw, by + bh, br);
+      ctx.arcTo(bx + bw, by + bh, bx, by + bh, br);
+      ctx.arcTo(bx, by + bh, bx, by, br);
+      ctx.arcTo(bx, by, bx + bw, by, br);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(15,15,15,0.92)';
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = `700 ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, bx + bw / 2, by + bh / 2);
+      return canvas;
+    }
+
+    const layer = new VectorLayer({
+      source,
+      style: (feature) => {
+        const url = feature.get('url') as string;
+        const proxyUrl = `/api/photos/proxy?url=${encodeURIComponent(url)}`;
+        if (feature.get('isCluster')) {
+          const count = feature.get('pointCount') as number;
+          const cached = thumbnailCache[proxyUrl];
+          if (cached) {
+            const clusterCanvas = makeClusterCanvas(count, cached);
+            return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
+          }
+          if (cached === undefined) loadThumbnail(proxyUrl);
+          return new Style({ image: new CircleStyle({ radius: 19, fill: new Fill({ color: 'rgba(20,20,20,0.85)' }), stroke: new Stroke({ color: 'white', width: 2 }) }) });
+        }
+        const cached = thumbnailCache[proxyUrl];
+        if (cached) return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
+        if (cached === undefined) loadThumbnail(proxyUrl);
+        return new Style({ image: new CircleStyle({ radius: 14, fill: new Fill({ color: 'rgba(74,90,43,0.82)' }), stroke: new Stroke({ color: 'rgba(58,71,34,0.9)', width: 2 }) }) });
+      },
+      zIndex: 4.8,
+    });
+
+    m.addLayer(layer);
+    ownerPhotosLayerRef.current = layer;
+    ownerPhotosSourceRef.current = source;
+
+    function getSupercluserZoom(): number {
+      const view = m.getView();
+      const resolution = view.getResolution() ?? 1;
+      const center = view.getCenter() ?? [0, 0];
+      const [, centerLat] = toLonLat(center, OS_PROJECTION.code);
+      const centerLatRad = centerLat * Math.PI / 180;
+      const wmZoom = Math.log2(156543.03 * Math.cos(centerLatRad) / resolution);
+      return Math.max(0, Math.min(14, Math.floor(wmZoom)));
+    }
+
+    function updateClusters() {
+      if (!ownerSuperclusterRef.current) return;
+      const view = m.getView();
+      const size = m.getSize();
+      if (!size) return;
+      const extent = view.calculateExtent(size);
+      const [minLng, minLat, maxLng, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
+      const scZoom = getSupercluserZoom();
+      const clusters = ownerSuperclusterRef.current.getClusters([minLng, minLat, maxLng, maxLat], scZoom);
+      const features = clusters.map((c) => {
+        const [lng, lat] = c.geometry.coordinates as [number, number];
+        const f = new Feature({ geometry: new Point(fromLonLat([lng, lat], OS_PROJECTION.code)) });
+        if (c.properties.cluster) {
+          const leaf = ownerSuperclusterRef.current!.getLeaves(c.properties.cluster_id, 1)[0];
+          f.set('isCluster', true);
+          f.set('clusterId', c.properties.cluster_id);
+          f.set('pointCount', c.properties.point_count);
+          f.set('url', (leaf?.properties as PhotoItem | undefined)?.url ?? '');
+        } else {
+          const p = c.properties as PhotoItem;
+          f.set('isCluster', false);
+          f.set('url', p.url);
+          f.set('photoId', p.photoId);
+          f.set('lat', p.lat);
+          f.set('lng', p.lng);
+          f.set('activityId', p.activityId);
+          f.set('activityName', p.activityName);
+          f.set('activityDate', p.activityDate);
+          f.set('activityDistance', p.activityDistance);
+          f.set('sportType', p.sportType);
+        }
+        return f;
+      });
+      source.clear();
+      source.addFeatures(features);
+    }
+
+    let isCancelled = false;
+    fetch('/api/photos')
+      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
+      .then((data: { photos: PhotoItem[] }) => {
+        if (isCancelled) return;
+        const index = new Supercluster({ radius: 60, maxZoom: 14 });
+        index.load(data.photos.map((p) => ({
+          type: 'Feature' as const,
+          geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+          properties: p,
+        })));
+        ownerSuperclusterRef.current = index;
+        updateClusters();
+      })
+      .catch(() => { /* photos unavailable — layer stays empty */ });
+
+    const moveKey = m.on('moveend', updateClusters);
+
+    return () => {
+      isCancelled = true;
+      unByKey(moveKey);
+      m.removeLayer(layer);
+      ownerPhotosLayerRef.current = null;
+      ownerPhotosSourceRef.current = null;
+      ownerSuperclusterRef.current = null;
+    };
+  }, [showOwnerPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dim base map — reduce opacity of topo/OS layers
   useEffect(() => {
@@ -607,6 +822,208 @@ export default function MainMap({
       }
     };
   }, [showGlobalHeatmap, heatmapSport, heatmapColor]);
+
+  // Explorer: tile coordinate helpers
+  const tileToPolygonCoords = useCallback((x: number, y: number, zoom: number): number[][] => {
+    const n = 1 << zoom;
+    const lonLeft = (x / n) * 360 - 180;
+    const lonRight = ((x + 1) / n) * 360 - 180;
+    const latTopRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n)));
+    const latBottomRad = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 1)) / n)));
+    const latTop = (latTopRad * 180) / Math.PI;
+    const latBottom = (latBottomRad * 180) / Math.PI;
+    return [
+      fromLonLat([lonLeft, latTop], OS_PROJECTION.code),
+      fromLonLat([lonRight, latTop], OS_PROJECTION.code),
+      fromLonLat([lonRight, latBottom], OS_PROJECTION.code),
+      fromLonLat([lonLeft, latBottom], OS_PROJECTION.code),
+      fromLonLat([lonLeft, latTop], OS_PROJECTION.code),
+    ];
+  }, []);
+
+  const latLngToTile = useCallback((lat: number, lng: number, zoom: number) => {
+    const n = 1 << zoom;
+    const x = Math.floor(((lng + 180) / 360) * n);
+    const latRad = (lat * Math.PI) / 180;
+    const y = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+    return { x, y };
+  }, []);
+
+  // Explorer: visited tiles + max square layers
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (explorerTilesLayerRef.current) {
+      map.removeLayer(explorerTilesLayerRef.current);
+      explorerTilesLayerRef.current = null;
+    }
+    if (explorerSquareLayerRef.current) {
+      map.removeLayer(explorerSquareLayerRef.current);
+      explorerSquareLayerRef.current = null;
+    }
+
+    if (!showExplorer) return;
+
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchExplorerData = (retriesLeft: number) => {
+      fetch('/api/explorer?filter=all')
+        .then((res) => res.ok ? res.json() : null)
+        .then((data: { status?: string; tiles?: [number, number][]; maxSquare?: { x: number; y: number; size: number } | null } | null) => {
+          if (cancelled || !data) return;
+
+          if (data.status === 'computing') {
+            if (retriesLeft > 0) {
+              pollTimer = setTimeout(() => fetchExplorerData(retriesLeft - 1), 2000);
+            }
+            return;
+          }
+
+          if (!data.tiles) return;
+
+          const tilesSource = new VectorSource();
+          for (const [x, y] of data.tiles) {
+            const coords = tileToPolygonCoords(x, y, 14);
+            const feature = new Feature({ geometry: new Polygon([coords]) });
+            tilesSource.addFeature(feature);
+          }
+
+          const tilesLayer = new VectorLayer({
+            source: tilesSource,
+            style: new Style({
+              fill: new Fill({ color: 'rgba(46, 204, 113, 0.25)' }),
+              stroke: new Stroke({ color: 'rgba(46, 204, 113, 0.5)', width: 0.5 }),
+            }),
+            zIndex: 3.5,
+          });
+
+          map.addLayer(tilesLayer);
+          explorerTilesLayerRef.current = tilesLayer;
+
+          if (data.maxSquare) {
+            const { x, y, size } = data.maxSquare;
+            const squareCoords = [
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([((x + size) / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([((x + size) / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + size)) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + size)) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+              fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
+            ];
+
+            const squareSource = new VectorSource();
+            squareSource.addFeature(new Feature({ geometry: new Polygon([squareCoords]) }));
+
+            const squareLayer = new VectorLayer({
+              source: squareSource,
+              style: new Style({
+                fill: new Fill({ color: 'rgba(231, 76, 60, 0.08)' }),
+                stroke: new Stroke({ color: 'rgba(231, 76, 60, 0.9)', width: 3 }),
+              }),
+              zIndex: 3.6,
+            });
+
+            map.addLayer(squareLayer);
+            explorerSquareLayerRef.current = squareLayer;
+          }
+        })
+        .catch(() => { /* silently fail */ });
+    };
+
+    fetchExplorerData(15);
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+      if (explorerTilesLayerRef.current) {
+        map.removeLayer(explorerTilesLayerRef.current);
+        explorerTilesLayerRef.current = null;
+      }
+      if (explorerSquareLayerRef.current) {
+        map.removeLayer(explorerSquareLayerRef.current);
+        explorerSquareLayerRef.current = null;
+      }
+    };
+  }, [showExplorer, tileToPolygonCoords]);
+
+  // Explorer: z14 grid overlay (unclaimed tile outlines)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (explorerGridLayerRef.current) {
+      map.removeLayer(explorerGridLayerRef.current);
+      explorerGridLayerRef.current = null;
+    }
+
+    if (!showExplorer) return;
+
+    const gridSource = new VectorSource();
+    const gridLayer = new VectorLayer({
+      source: gridSource,
+      style: new Style({
+        stroke: new Stroke({ color: 'rgba(80, 80, 80, 0.5)', width: 1 }),
+      }),
+      zIndex: 3.4,
+    });
+    map.addLayer(gridLayer);
+    explorerGridLayerRef.current = gridLayer;
+
+    const updateGrid = () => {
+      gridSource.clear();
+      const extent = map.getView().calculateExtent(map.getSize());
+      const [minLon, minLat, maxLon, maxLat] = transformExtent(extent, OS_PROJECTION.code, 'EPSG:4326');
+
+      const topLeft = latLngToTile(maxLat, minLon, 14);
+      const bottomRight = latLngToTile(minLat, maxLon, 14);
+
+      const tilesX = bottomRight.x - topLeft.x + 1;
+      const tilesY = bottomRight.y - topLeft.y + 1;
+
+      if (tilesX * tilesY > 5000) return;
+
+      for (let x = topLeft.x; x <= bottomRight.x; x++) {
+        for (let y = topLeft.y; y <= bottomRight.y; y++) {
+          const coords = tileToPolygonCoords(x, y, 14);
+          gridSource.addFeature(new Feature({ geometry: new Polygon([coords]) }));
+        }
+      }
+    };
+
+    updateGrid();
+    map.on('moveend', updateGrid);
+
+    return () => {
+      map.un('moveend', updateGrid);
+      if (explorerGridLayerRef.current) {
+        map.removeLayer(explorerGridLayerRef.current);
+        explorerGridLayerRef.current = null;
+      }
+    };
+  }, [showExplorer, tileToPolygonCoords, latLngToTile]);
+
+  // Activity highlight layer — hovered route from heatmap popup or photo click
+  useEffect(() => {
+    const source = activityHighlightSourceRef.current;
+    if (!source) return;
+    source.clear();
+    if (!hoveredActivityRoute?.length) return;
+    // hoveredActivityColor null → warm neutral brown (matches DEFAULT_SPORT_COLOR)
+    const color = hoveredActivityColor ?? '#6B6050';
+    const [r, g, b] = hexToComponents(color);
+    // Route is [lng, lat][] GeoJSON order
+    const coords = hoveredActivityRoute.map(([lng, lat]) => fromLonLat([lng, lat], OS_PROJECTION.code));
+    const feature = new Feature({ geometry: new LineString(coords) });
+    // Dark mode: white halo casing so the line pops against dark tiles
+    // Light mode: dark shadow casing for contrast against light tiles
+    const casingColor = osDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)';
+    feature.setStyle([
+      new Style({ stroke: new Stroke({ color: casingColor, width: 10 }) }),
+      new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${osDark ? 0.95 : 0.85})`, width: 5 }) }),
+    ]);
+    source.addFeature(feature);
+  }, [hoveredActivityRoute, hoveredActivityColor, osDark]);
 
   // Sync activity route features (dim in planner mode)
   useEffect(() => {
@@ -763,8 +1180,34 @@ export default function MainMap({
         pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
         return;
       }
-      // Browse mode: check photo pins first, then activity traces
+      // Browse mode: check owner photo clusters first, then activity photo pins, then traces
       let handled = false;
+      if (ownerPhotosLayerRef.current) {
+        map.forEachFeatureAtPixel(e.pixel, (feature) => {
+          if (handled) return;
+          if (feature.get('isCluster')) {
+            const leaves = ownerSuperclusterRef.current?.getLeaves(feature.get('clusterId'), Infinity) ?? [];
+            const photos = leaves.map((l) => l.properties as PhotoItem);
+            onClusterPhotosClickRef.current?.(photos, e.originalEvent.clientX, e.originalEvent.clientY);
+            handled = true;
+          } else if (feature.get('photoId')) {
+            const photo: PhotoItem = {
+              photoId: feature.get('photoId'),
+              url: feature.get('url'),
+              lat: feature.get('lat'),
+              lng: feature.get('lng'),
+              activityId: feature.get('activityId'),
+              activityName: feature.get('activityName'),
+              activityDate: feature.get('activityDate'),
+              activityDistance: feature.get('activityDistance'),
+              sportType: feature.get('sportType'),
+            };
+            onPhotoClickRef.current?.(photo, e.originalEvent.clientX, e.originalEvent.clientY);
+            handled = true;
+          }
+        }, { layerFilter: (l) => l === ownerPhotosLayerRef.current, hitTolerance: 12 });
+      }
+      if (handled) return;
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
         if (handled) return;
         const photoId = feature.get('photoId');
@@ -775,9 +1218,15 @@ export default function MainMap({
       }, { layerFilter: (l) => l === photoLayerRef.current, hitTolerance: 8 });
       if (handled) return;
       map.forEachFeatureAtPixel(e.pixel, (feature) => {
+        if (handled) return;
         const actId = feature.get('activityId');
-        if (actId && onActivitySelect) onActivitySelect(actId);
+        if (actId && onActivitySelect) { onActivitySelect(actId); handled = true; }
       });
+      // Personal heatmap fallback — fires when no photo or trace was hit
+      if (!handled && showPersonalHeatmapRef.current) {
+        const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+        onHeatmapClickRef.current?.(lat, lng, e.originalEvent.clientX, e.originalEvent.clientY);
+      }
     };
 
     map.on('click', onClick);

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import { type ElevationPoint } from '@/app/(main)/planner/useElevationProfile';
 import { type RouteAction } from '@/app/(main)/planner/useRouteHistory';
@@ -17,6 +16,7 @@ interface PlannerPanelProps {
   onFitToRoute?: () => void;
   onExportImage?: () => void;
   isExportingImage?: boolean;
+  onEditWaypoint?: (index: number) => void;
 }
 
 function fmtDist(m: number): string {
@@ -90,92 +90,8 @@ function ElevationSparkline({ data }: { data: ElevationPoint[] }) {
   );
 }
 
-function SnapToggle({ on, onChange, direction }: { on: boolean; onChange: () => void; direction: 'in' | 'out' }) {
-  // Segment chip: dashed line → dot (in) or dot → dashed line (out)
-  // Active: solid orange line + filled waypoint dot
-  // Inactive: ghosted dashed line + hollow dot
-  return (
-    <button
-      role="switch"
-      aria-checked={on}
-      onClick={onChange}
-      title={direction === 'in' ? 'Snap incoming segment to roads' : 'Snap outgoing segment to roads'}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: 20,
-        padding: 0,
-        borderRadius: 3,
-        border: `1px solid ${on ? 'rgba(224,112,32,0.55)' : 'var(--p3)'}`,
-        background: on ? 'rgba(224,112,32,0.1)' : 'transparent',
-        cursor: 'pointer',
-        transition: 'border-color 0.18s, background 0.18s',
-      }}
-    >
-      <svg width="62" height="14" viewBox="0 0 62 14" fill="none">
-        {direction === 'in' ? (
-          <>
-            {/* Segment line flowing into waypoint */}
-            <line
-              x1="2" y1="7" x2="42" y2="7"
-              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
-              strokeWidth={on ? 2 : 1.5}
-              strokeDasharray={on ? undefined : '3 2.5'}
-              strokeLinecap="round"
-            />
-            {/* Arrowhead */}
-            <polyline
-              points="36,4 42,7 36,10"
-              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
-              strokeWidth={on ? 1.5 : 1}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {/* Waypoint dot */}
-            <circle
-              cx="54" cy="7" r={on ? 4.5 : 3.5}
-              fill={on ? 'var(--ora)' : 'var(--p3)'}
-              stroke={on ? 'rgba(224,112,32,0.35)' : 'var(--p4)'}
-              strokeWidth={on ? 2.5 : 1}
-            />
-          </>
-        ) : (
-          <>
-            {/* Waypoint dot */}
-            <circle
-              cx="8" cy="7" r={on ? 4.5 : 3.5}
-              fill={on ? 'var(--ora)' : 'var(--p3)'}
-              stroke={on ? 'rgba(224,112,32,0.35)' : 'var(--p4)'}
-              strokeWidth={on ? 2.5 : 1}
-            />
-            {/* Segment line flowing out of waypoint */}
-            <line
-              x1="20" y1="7" x2="58" y2="7"
-              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
-              strokeWidth={on ? 2 : 1.5}
-              strokeDasharray={on ? undefined : '3 2.5'}
-              strokeLinecap="round"
-            />
-            {/* Arrowhead */}
-            <polyline
-              points="52,4 58,7 52,10"
-              stroke={on ? 'var(--ora)' : 'var(--fog-ghost)'}
-              strokeWidth={on ? 1.5 : 1}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </>
-        )}
-      </svg>
-    </button>
-  );
-}
-
-export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false }: PlannerPanelProps) {
+export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false, onEditWaypoint }: PlannerPanelProps) {
   const hasRoute = waypoints.length >= 2;
-  const [hoverX, setHoverX] = useState<number | null>(null);
 
   function handleExportGpx() {
     if (waypoints.length < 2) return;
@@ -258,14 +174,10 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
           style={{ flex: 1, overflowY: 'auto', padding: '0 14px', display: 'flex', flexDirection: 'column', gap: 2 }}
         >
           {waypoints.map((wp, i) => {
-            const snapInOn = i > 0 ? (segments[i - 1]?.snapped ?? false) : false;
-            const snapOutOn = i < waypoints.length - 1 ? (segments[i]?.snapped ?? false) : false;
             return (
               <div
                 key={i}
                 role="listitem"
-                onMouseEnter={() => setHoverX(i)}
-                onMouseLeave={() => setHoverX(null)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '5px 0',
@@ -284,15 +196,19 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
                   {wp.name ?? `Waypoint ${i + 1}`}
                 </span>
 
-                {/* Snap toggles — labeled pill toggles, stacked */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0, width: 72, opacity: hoverX === i || snapInOn || snapOutOn ? 1 : 0.3, transition: 'opacity 0.15s ease' }}>
-                  {i > 0 && (
-                    <SnapToggle on={snapInOn} direction="in" onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i - 1 })} />
-                  )}
-                  {i < waypoints.length - 1 && (
-                    <SnapToggle on={snapOutOn} direction="out" onChange={() => dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: i })} />
-                  )}
-                </div>
+                <button
+                  onClick={() => onEditWaypoint?.(i)}
+                  aria-label={`Edit waypoint ${i + 1}`}
+                  style={{
+                    background: 'none', border: 'none', padding: '2px',
+                    color: 'var(--fog-dim)', cursor: 'pointer', lineHeight: 0, flexShrink: 0,
+                    opacity: 0.8,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                  </svg>
+                </button>
 
                 <button
                   onClick={() => dispatch({ type: 'REMOVE_WAYPOINT', index: i })}
