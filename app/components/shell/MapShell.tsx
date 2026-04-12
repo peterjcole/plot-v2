@@ -5,8 +5,8 @@ import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
-import { ActivitySummary, ActivityData, ActivityPhoto, PhotoItem, HeatmapActivity } from '@/lib/types';
-import { type MapLayer, type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
+import { ActivitySummary, ActivityData, PhotoItem, HeatmapActivity } from '@/lib/types';
+import { type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
@@ -90,7 +90,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   // Lightbox — index of -1 means closed
   const [lightboxIndex, setLightboxIndex] = useState(-1);
-  const lightboxPhotos = activityDetail?.photos ?? [];
+  const lightboxPhotos = useMemo(() => activityDetail?.photos ?? [], [activityDetail]);
   const handlePhotoClick = useCallback((index: number) => setLightboxIndex(index), []);
   const handleLightboxClose = useCallback(() => setLightboxIndex(-1), []);
   const handlePhotoMarkerClick = useCallback((photoId: string) => {
@@ -146,7 +146,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [hoveredElevationPoint, setHoveredElevationPoint] = useState<{ lat: number; lng: number; ele: number; distance: number } | null>(null);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -368,7 +367,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setCompassBearing(view.getRotation() * 180 / Math.PI);
       setMapResolution(view.getResolution() ?? 10);
     });
-  }, [allActivities.length, initialMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allActivities.length, initialMode]);
 
   // On initial /planner load, fit the map to the saved route once both the map and
   // waypoints are ready. Runs once — no animation so it snaps cleanly on load.
@@ -381,7 +380,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     if (!map) return;
     const coords = waypoints.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
     map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 9 });
-  }, [mapReady, waypoints, initialMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapReady, waypoints, initialMode]);
 
   // When navigating directly to an activity via URL, fit the map to it once both the map
   // and the full activity detail (which always has a route) are loaded.
@@ -544,7 +543,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     } finally {
       setIsExportingImage(false);
     }
-  }, [segments]);
+  }, [segments, osDark]);
 
   const plannerProps: PlannerProps | undefined = mode === 'planner'
     ? { waypoints, segments, dispatch }
@@ -617,14 +616,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onMapReady={handleMapReady}
             osDark={osDark}
             showHillshade={layerState.showHillshade}
-            showPhotos={mode === 'detail' ? true : layerState.showPhotos}
             dimBaseMap={layerState.dimBaseMap}
             showPersonalHeatmap={layerState.showPersonalHeatmap}
             showGlobalHeatmap={layerState.showGlobalHeatmap}
             heatmapSport={layerState.heatmapSport}
             heatmapColor={layerState.heatmapColor}
             showExplorer={layerState.showExplorer}
-            showPOIs={layerState.showPOIs}
             showOwnerPhotos={isOwner && layerState.showPhotos}
             onPhotoClick={handleOwnerPhotoClick}
             onClusterPhotosClick={handleOwnerClusterPhotosClick}
@@ -652,14 +649,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               canUndo={canUndo}
               canRedo={canRedo}
               dispatch={dispatch}
-              onGeolocate={handleGeolocate}
               addPointsEnabled={addPointsEnabled}
               onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
               snapEnabled={snapEnabled}
               onToggleSnap={() => setSnapEnabled((v) => !v)}
               elevationData={elevationData}
               isLoadingElevation={isLoadingElevation}
-              onElevationHover={setHoveredElevationPoint}
               onFitToRoute={handleFitToRoute}
               onExportImage={handleExportImage}
               isExportingImage={isExportingImage}
@@ -741,14 +736,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onMapReady={handleMapReady}
           osDark={osDark}
           showHillshade={layerState.showHillshade}
-          showPhotos={mode === 'detail' ? true : layerState.showPhotos}
           dimBaseMap={layerState.dimBaseMap}
           showPersonalHeatmap={layerState.showPersonalHeatmap}
           showGlobalHeatmap={layerState.showGlobalHeatmap}
           heatmapSport={layerState.heatmapSport}
           heatmapColor={layerState.heatmapColor}
           showExplorer={layerState.showExplorer}
-          showPOIs={layerState.showPOIs}
           showOwnerPhotos={isOwner && layerState.showPhotos}
           onPhotoClick={handleOwnerPhotoClick}
           onClusterPhotosClick={handleOwnerClusterPhotosClick}
@@ -862,14 +855,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             canUndo={canUndo}
             canRedo={canRedo}
             dispatch={dispatch}
-            onGeolocate={handleGeolocate}
             addPointsEnabled={addPointsEnabled}
             onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
             snapEnabled={snapEnabled}
             onToggleSnap={() => setSnapEnabled((v) => !v)}
             elevationData={elevationData}
             isLoadingElevation={isLoadingElevation}
-            onElevationHover={setHoveredElevationPoint}
             onFitToRoute={handleFitToRoute}
             onExportImage={handleExportImage}
             isExportingImage={isExportingImage}
@@ -877,7 +868,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
           />
-          {/* Note: onGeolocate kept for prop compat but Locate button moved to map chrome */}
 
           {/* Layers panel */}
           <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />

@@ -122,6 +122,7 @@ function Divider() {
 
 export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
 
   // Save layer state whenever it changes

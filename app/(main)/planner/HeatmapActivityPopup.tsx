@@ -37,20 +37,19 @@ export default function HeatmapActivityPopup({
   onClose,
   onHoverActivity,
 }: HeatmapActivityPopupProps) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(() =>
+    activities.length > 0 ? activities[0].id : null
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (activities.length > 0 && selectedId === null) {
-      setSelectedId(activities[0].id);
+    if (activities.length > 0) {
       onHoverActivity(activities[0].route, getSportColor(activities[0].sportType));
     }
-  }, [activities]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only on mount — activities and callbacks don't change after popup opens
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Escape') {

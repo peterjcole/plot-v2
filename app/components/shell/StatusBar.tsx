@@ -15,6 +15,7 @@ export default function StatusBar({ avatarInitials = '?', isLoggedIn = false }: 
   useEffect(() => {
     const fmt = () =>
       new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialise clock on mount, avoids SSR mismatch
     setTime(fmt());
     const id = setInterval(() => setTime(fmt()), 60_000);
     return () => clearInterval(id);

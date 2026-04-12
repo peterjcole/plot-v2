@@ -17,6 +17,7 @@ export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false,
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration guard
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {

@@ -12,6 +12,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
   const isLoggedIn = !!session.accessToken;
 
   if (isLoggedIn) {
+    // eslint-disable-next-line react-hooks/purity -- server component, Date.now() is safe
     const now = Math.floor(Date.now() / 1000);
     const isExpired = session.expiresAt !== undefined && session.expiresAt <= now;
     if (isExpired && session.refreshToken) {

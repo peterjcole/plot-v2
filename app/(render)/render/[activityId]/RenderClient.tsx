@@ -75,33 +75,6 @@ function StripDivider({ isDark }: { isDark: boolean }) {
   );
 }
 
-interface ElevSparklineProps { data: { ele: number; distance: number }[]; isDark: boolean }
-function ElevSparkline({ data, isDark }: ElevSparklineProps) {
-  if (data.length < 2) return null;
-  const eles = data.map(p => p.ele);
-  const minE = Math.min(...eles);
-  const maxE = Math.max(...eles);
-  const rangeE = maxE - minE || 1;
-  const totalD = data[data.length - 1].distance || 1;
-  const W = 160, H = 36;
-  const toX = (d: number) => (d / totalD) * W;
-  const toY = (e: number) => H - 2 - ((e - minE) / rangeE) * (H - 4);
-  const pts = data.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
-  const fill = `M0,${H} L${pts.split(' ').join(' L')} L${W},${H} Z`;
-  const gradId = `eg-${isDark ? 'd' : 'l'}`;
-  return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#E07020" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#E07020" stopOpacity="0.04" />
-        </linearGradient>
-      </defs>
-      <path d={fill} fill={`url(#${gradId})`} />
-      <polyline points={pts} fill="none" stroke="#E07020" strokeWidth="1.5" strokeOpacity="0.72" />
-    </svg>
-  );
-}
 
 interface RenderClientProps {
   activity: ActivityData;

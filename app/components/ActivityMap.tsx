@@ -138,7 +138,7 @@ function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string
       clearTimeout(timer);
       map.off('moveend', apply);
     };
-  }, [map]);
+  }, [map]); // eslint-disable-line react-hooks/exhaustive-deps -- filter created once per map; colors are static for a given render
 
   return null;
 }

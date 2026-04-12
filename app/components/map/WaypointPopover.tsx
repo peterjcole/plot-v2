@@ -3,6 +3,35 @@
 import { useEffect, useRef } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
 
+function SnapToggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}>
+        Snap to path {label}
+      </span>
+      <button
+        role="switch"
+        aria-checked={checked}
+        aria-label={`Snap to path ${label}`}
+        onClick={onToggle}
+        style={{
+          width: 28, height: 16, borderRadius: 8, border: 'none', padding: 0,
+          background: checked ? 'var(--ora)' : 'var(--p3)',
+          cursor: 'pointer', position: 'relative', flexShrink: 0,
+          transition: 'background 0.15s',
+        }}
+      >
+        <div style={{
+          width: 12, height: 12, borderRadius: '50%', background: 'var(--ice)',
+          position: 'absolute', top: 2,
+          left: checked ? 14 : 2,
+          transition: 'left 0.15s',
+        }} />
+      </button>
+    </div>
+  );
+}
+
 interface WaypointPopoverProps {
   waypoint: Waypoint;
   index: number;
@@ -56,35 +85,6 @@ export default function WaypointPopover({
   const lat = waypoint.lat.toFixed(4);
   const lngAbs = Math.abs(waypoint.lng).toFixed(4);
   const lngDir = waypoint.lng < 0 ? 'W' : 'E';
-
-  function SnapToggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.08em' }}>
-          Snap to path {label}
-        </span>
-        <button
-          role="switch"
-          aria-checked={checked}
-          aria-label={`Snap to path ${label}`}
-          onClick={onToggle}
-          style={{
-            width: 28, height: 16, borderRadius: 8, border: 'none', padding: 0,
-            background: checked ? 'var(--ora)' : 'var(--p3)',
-            cursor: 'pointer', position: 'relative', flexShrink: 0,
-            transition: 'background 0.15s',
-          }}
-        >
-          <div style={{
-            width: 12, height: 12, borderRadius: '50%', background: 'var(--ice)',
-            position: 'absolute', top: 2,
-            left: checked ? 14 : 2,
-            transition: 'left 0.15s',
-          }} />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div

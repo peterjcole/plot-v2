@@ -24,11 +24,13 @@ export default function MobileBottomSheet({
 
   // Compute expanded snap point after mount (depends on window height)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- window is only available after mount
     setSnapExpanded(Math.round(window.innerHeight * 0.72));
   }, []);
 
   // Auto-snap to expanded when parent forces it
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceExpanded prop to height state
     if (forceExpanded) setHeight((h) => Math.max(h, snapExpanded));
   }, [forceExpanded, snapExpanded]);
 

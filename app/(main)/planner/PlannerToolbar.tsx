@@ -13,7 +13,6 @@ interface PlannerToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   dispatch: React.Dispatch<RouteAction>;
-  onGeolocate?: () => void;
   addPointsEnabled: boolean;
   onToggleAddPoints: () => void;
   snapEnabled: boolean;
@@ -78,7 +77,6 @@ export default function PlannerToolbar({
   canUndo,
   canRedo,
   dispatch,
-  onGeolocate,
   snapEnabled,
   onToggleSnap,
   elevationData,

@@ -64,14 +64,12 @@ interface MainMapProps {
   onMapReady?: (map: Map) => void;
   osDark?: boolean;
   showHillshade?: boolean;
-  showPhotos?: boolean;
   dimBaseMap?: boolean;
   showPersonalHeatmap?: boolean;
   showGlobalHeatmap?: boolean;
   heatmapSport?: string;
   heatmapColor?: string;
   showExplorer?: boolean;
-  showPOIs?: boolean;
   showOwnerPhotos?: boolean;
   onPhotoClick?: (photo: PhotoItem, screenX: number, screenY: number) => void;
   onClusterPhotosClick?: (photos: PhotoItem[], screenX: number, screenY: number) => void;
@@ -203,14 +201,12 @@ export default function MainMap({
   onMapReady,
   osDark = true,
   showHillshade = false,
-  showPhotos = true,
   dimBaseMap = false,
   showPersonalHeatmap = false,
   showGlobalHeatmap = false,
   heatmapSport = 'all',
   heatmapColor = 'hot',
   showExplorer = false,
-  showPOIs = false,
   showOwnerPhotos = false,
   onPhotoClick,
   onClusterPhotosClick,
@@ -743,7 +739,7 @@ export default function MainMap({
       ownerPhotosSourceRef.current = null;
       ownerSuperclusterRef.current = null;
     };
-  }, [showOwnerPhotos]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showOwnerPhotos]);
 
   // Dim base map — reduce opacity of topo/OS layers
   useEffect(() => {
