@@ -210,12 +210,27 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleWaypointPopoverClose = useCallback(() => setWaypointPopover(null), []);
   const handleEditWaypoint = useCallback((index: number) => {
     const wp = waypointsRef.current[index];
-    if (!wp || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    if (!wp || !map) return;
     const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
-    const pixel = mapInstanceRef.current.getPixelFromCoordinate(coord);
-    if (!pixel) return;
-    const rect = mapInstanceRef.current.getTargetElement().getBoundingClientRect();
-    setWaypointPopover({ index, screenX: rect.left + pixel[0], screenY: rect.top + pixel[1] });
+
+    const showPopover = () => {
+      const px = map.getPixelFromCoordinate(coord);
+      if (!px) return;
+      const rect = map.getTargetElement().getBoundingClientRect();
+      setWaypointPopover({ index, screenX: rect.left + px[0], screenY: rect.top + px[1] });
+    };
+
+    const size = map.getSize();
+    const pixel = map.getPixelFromCoordinate(coord);
+    const offscreen = !pixel || !size ||
+      pixel[0] < 0 || pixel[1] < 0 || pixel[0] > size[0] || pixel[1] > size[1];
+
+    if (offscreen) {
+      map.getView().animate({ center: coord, duration: 300 }, showPopover);
+    } else {
+      showPopover();
+    }
   }, []);
   const handleWaypointDelete = useCallback((index: number) => {
     dispatch({ type: 'REMOVE_WAYPOINT', index });
