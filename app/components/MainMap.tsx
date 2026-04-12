@@ -228,6 +228,7 @@ export default function MainMap({
   const os25kLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const dimLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const explorerTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
@@ -316,6 +317,29 @@ export default function MainMap({
       zIndex: 5,
     });
 
+    // Dim overlay: semi-transparent dark fill sitting between base tiles (zIndex 0)
+    // and all overlay layers (zIndex 3.4+). Toggled visible by dimBaseMap prop.
+    const dimSource = new VectorSource();
+    const dimFeature = new Feature(
+      new Polygon([[
+        [-100000000, -100000000],
+        [ 100000000, -100000000],
+        [ 100000000,  100000000],
+        [-100000000,  100000000],
+        [-100000000, -100000000],
+      ]])
+    );
+    dimFeature.setStyle(new Style({
+      fill: new Fill({ color: 'rgba(0, 0, 0, 0.45)' }),
+    }));
+    dimSource.addFeature(dimFeature);
+    const dimLayer = new VectorLayer({
+      source: dimSource,
+      zIndex: 1,
+      visible: false,
+    });
+    dimLayerRef.current = dimLayer;
+
     const routeSource = new VectorSource();
     const routeLayer = new VectorLayer({ source: routeSource, zIndex: 10 });
 
@@ -376,7 +400,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
       view: new View({
         projection,
         center,
@@ -408,6 +432,7 @@ export default function MainMap({
       os25kLayerRef.current = null;
       satelliteLayerRef.current = null;
       hillshadeLayerRef.current = null;
+      dimLayerRef.current = null;
       photoLayerRef.current = null;
       plannerWpSourceRef.current = null;
       plannerRouteSourceRef.current = null;
@@ -739,12 +764,9 @@ export default function MainMap({
     };
   }, [showOwnerPhotos]);
 
-  // Dim base map — reduce opacity of topo/OS layers
+  // Dim base map — show/hide the dim overlay layer (sits above base tiles, below everything else)
   useEffect(() => {
-    const opacity = dimBaseMap ? 0.45 : 1;
-    topoLayerRef.current?.setOpacity(opacity);
-    osOverviewLayerRef.current?.setOpacity(opacity);
-    os25kLayerRef.current?.setOpacity(opacity);
+    dimLayerRef.current?.setVisible(dimBaseMap);
   }, [dimBaseMap]);
 
   // Personal heatmap — MVT vector tile layer
