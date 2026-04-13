@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { isOsTileInGB } from '@/lib/gb-tile-check';
 import { applyDarkMode } from '@/lib/dark-tile';
+import { stitchRetinaTile } from '@/lib/tile-stitch';
 
 let _transparent: Buffer | null = null;
 async function transparentTile(): Promise<Buffer> {
@@ -13,61 +14,54 @@ async function transparentTile(): Promise<Buffer> {
   return _transparent;
 }
 
+async function fetchTileBuffer(z: number, x: number, y: number): Promise<Buffer | null> {
+  if (!isOsTileInGB(z, x, y)) return transparentTile();
+
+  const apiKey = process.env.OS_MAPS_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch(
+      `https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/${z}/${x}/${y}.png?key=${apiKey}`
+    );
+    if (!response.ok) return null;
+    return Buffer.from(await applyDarkMode(await response.arrayBuffer()));
+  } catch {
+    return null;
+  }
+}
+
+const CACHE = 'public, max-age=1209600, s-maxage=1209600';
+
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const xStr = searchParams.get('x');
-  const yStr = searchParams.get('y');
-  const zStr = searchParams.get('z');
+  const sp = request.nextUrl.searchParams;
+  const xStr = sp.get('x');
+  const yStr = sp.get('y');
+  const zStr = sp.get('z');
 
   if (!xStr || !yStr || !zStr) {
-    return NextResponse.json(
-      { error: 'x, y, and z query parameters are required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'x, y, and z query parameters are required' }, { status: 400 });
   }
 
   const x = parseInt(xStr, 10);
   const y = parseInt(yStr, 10);
   const z = parseInt(zStr, 10);
 
-  if (!isOsTileInGB(z, x, y)) {
-    return new NextResponse(new Uint8Array(await transparentTile()), {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=1209600, s-maxage=1209600',
-      },
+  if (isNaN(x) || isNaN(y) || isNaN(z)) {
+    return NextResponse.json({ error: 'x, y, z must be integers' }, { status: 400 });
+  }
+
+  if (sp.get('scale') === '2') {
+    const buf = await stitchRetinaTile(fetchTileBuffer, z, x, y);
+    return new NextResponse(new Uint8Array(buf), {
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': CACHE },
     });
   }
 
-  const apiKey = process.env.OS_MAPS_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: 'OS Maps API key not configured' },
-      { status: 500 }
-    );
-  }
+  const buf = await fetchTileBuffer(z, x, y);
+  if (!buf) return new NextResponse(null, { status: 502 });
 
-  const tileUrl = `https://api.os.uk/maps/raster/v1/zxy/Leisure_27700/${z}/${x}/${y}.png?key=${apiKey}`;
-
-  try {
-    const response = await fetch(tileUrl);
-
-    if (!response.ok) {
-      return new NextResponse(null, { status: response.status });
-    }
-
-    const processed = await applyDarkMode(await response.arrayBuffer());
-
-    return new NextResponse(new Uint8Array(processed), {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=1209600, s-maxage=1209600',
-      },
-    });
-  } catch {
-    return NextResponse.json(
-      { error: 'Failed to fetch tile' },
-      { status: 502 }
-    );
-  }
+  return new NextResponse(new Uint8Array(buf), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': CACHE },
+  });
 }

@@ -4,6 +4,7 @@ import booleanIntersects from '@turf/boolean-intersects';
 import { polygon } from '@turf/helpers';
 import boundaries from '@/lib/country-boundaries.json';
 import { applyDarkMode } from '@/lib/dark-tile';
+import { stitchRetinaTile } from '@/lib/tile-stitch';
 
 // ── Transparent tile ─────────────────────────────────────────────────────────
 
@@ -169,6 +170,22 @@ async function getProviderTile(
 
 // ── Route handler ────────────────────────────────────────────────────────────
 
+async function fetchTileBuffer(dark: boolean, z: number, x: number, y: number): Promise<Buffer | null> {
+  const iso = getCountry(z, x, y);
+
+  // GB is covered by the OS tile layer — return transparent
+  if (iso === 'GBR') return getTransparentTile();
+
+  const result = await getProviderTile(iso, z, x, y);
+  if (!result) return null;
+
+  const buffer = await result.res.arrayBuffer();
+  if (dark) return Buffer.from(await applyDarkMode(buffer));
+  return Buffer.from(buffer);
+}
+
+const CACHE = 'public, max-age=1209600, s-maxage=1209600';
+
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const xStr = sp.get('x');
@@ -188,38 +205,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'x, y, z must be integers' }, { status: 400 });
   }
 
-  const iso = getCountry(z, x, y);
-
-  // GB is covered by the OS tile layer on top — return transparent to avoid
-  // a redundant OS Leisure_3857 request for tiles that will never be visible.
-  if (iso === 'GBR') {
-    const transparent = await getTransparentTile();
-    return new NextResponse(new Uint8Array(transparent), {
-      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=1209600, s-maxage=1209600' },
+  if (sp.get('scale') === '2') {
+    const buf = await stitchRetinaTile((tz, tx, ty) => fetchTileBuffer(dark, tz, tx, ty), z, x, y);
+    return new NextResponse(new Uint8Array(buf), {
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': CACHE },
     });
   }
 
-  const result = await getProviderTile(iso, z, x, y);
-
-  if (!result) {
+  const buf = await fetchTileBuffer(dark, z, x, y);
+  if (!buf) {
     const missing = !process.env.THUNDERFOREST_API_KEY ? 500 : 502;
     return new NextResponse(null, { status: missing });
   }
 
-  const buffer = await result.res.arrayBuffer();
-
-  const cacheHeaders = {
-    'Cache-Control': 'public, max-age=1209600, s-maxage=1209600',
-  };
-
-  if (dark) {
-    const processed = await applyDarkMode(buffer);
-    return new NextResponse(new Uint8Array(processed), {
-      headers: { 'Content-Type': 'image/png', ...cacheHeaders },
-    });
-  }
-
-  return new NextResponse(new Uint8Array(buffer), {
-    headers: { 'Content-Type': result.contentType, ...cacheHeaders },
+  return new NextResponse(new Uint8Array(buf), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': CACHE },
   });
 }

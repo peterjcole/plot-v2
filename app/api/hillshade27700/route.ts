@@ -7,7 +7,8 @@ import { OS_PROJECTION } from '@/lib/map-config';
 proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
 proj4.defs('EPSG:27700', OS_PROJECTION.proj4);
 
-const SIZE = 256;
+// DEM tiles from Terrarium are always 256×256 pixels.
+const DEM_SIZE = 256;
 
 // Hard-coded hillshade params (same as /api/hillshade)
 const Z_FACTOR = 3.5;
@@ -23,8 +24,8 @@ async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Ar
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     const { data } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const elev = new Float32Array(SIZE * SIZE);
-    for (let i = 0; i < SIZE * SIZE; i++) {
+    const elev = new Float32Array(DEM_SIZE * DEM_SIZE);
+    for (let i = 0; i < DEM_SIZE * DEM_SIZE; i++) {
       elev[i] = data[i * 4] * 256 + data[i * 4 + 1] + data[i * 4 + 2] / 256 - 32768;
     }
     return elev;
@@ -35,14 +36,14 @@ async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Ar
 
 function lngLatToTerrPx(lng: number, lat: number, terrN: number): [number, number] {
   const latRad = lat * (Math.PI / 180);
-  const px = ((lng + 180) / 360) * terrN * SIZE;
-  const py = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * terrN * SIZE;
+  const px = ((lng + 180) / 360) * terrN * DEM_SIZE;
+  const py = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * terrN * DEM_SIZE;
   return [px, py];
 }
 
-const emptyPng = async () => {
+const emptyPng = async (size: number) => {
   const buf = await sharp({
-    create: { width: SIZE, height: SIZE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   }).png().toBuffer();
   return new NextResponse(new Uint8Array(buf), {
     headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
@@ -55,8 +56,10 @@ export async function GET(req: NextRequest) {
   const x = parseInt(searchParams.get('x') ?? '0', 10);
   const y = parseInt(searchParams.get('y') ?? '0', 10);
   const dark = searchParams.get('dark') === '1';
+  // Output pixel size: 512 for retina (@2x), 256 for standard
+  const OUT = searchParams.get('scale') === '2' ? 512 : 256;
 
-  if (z < 0 || z > 9) return emptyPng();
+  if (z < 0 || z > 9) return emptyPng(OUT);
 
   // Scale terrarium zoom to match BNG resolution — avoids blocky DEM at high OS zoom levels.
   // OS z=8 (3.5 m/px) and z=9 (1.75 m/px) need finer DEM than the z=12 default (≈22 m/px at 55°N).
@@ -64,8 +67,8 @@ export async function GET(req: NextRequest) {
   const terrZ = Math.min(15, Math.max(12, z + 7));
   const terrN = 1 << terrZ;
 
-  // 1. Compute BNG tile bounds
-  const tileM = SIZE * OS_PROJECTION.resolutions[z];
+  // 1. Compute BNG tile bounds — always based on the 256px tile scheme regardless of output size
+  const tileM = DEM_SIZE * OS_PROJECTION.resolutions[z];
   const bngWest = OS_PROJECTION.origin[0] + x * tileM;
   const bngNorth = OS_PROJECTION.origin[1] - y * tileM;
   const bngEast = bngWest + tileM;
@@ -86,10 +89,10 @@ export async function GET(req: NextRequest) {
   // Find the bounding terrarium tile range (add 1 tile margin for gradient at edges)
   const allTpx = [nwTpx, neTpx, swTpx, seTpx];
   const allTpy = [nwTpy, neTpy, swTpy, seTpy];
-  const txMin = Math.max(0, Math.floor(Math.min(...allTpx) / SIZE) - 1);
-  const txMax = Math.min(terrN - 1, Math.floor(Math.max(...allTpx) / SIZE) + 1);
-  const tyMin = Math.max(0, Math.floor(Math.min(...allTpy) / SIZE) - 1);
-  const tyMax = Math.min(terrN - 1, Math.floor(Math.max(...allTpy) / SIZE) + 1);
+  const txMin = Math.max(0, Math.floor(Math.min(...allTpx) / DEM_SIZE) - 1);
+  const txMax = Math.min(terrN - 1, Math.floor(Math.max(...allTpx) / DEM_SIZE) + 1);
+  const tyMin = Math.max(0, Math.floor(Math.min(...allTpy) / DEM_SIZE) - 1);
+  const tyMax = Math.min(terrN - 1, Math.floor(Math.max(...allTpy) / DEM_SIZE) + 1);
 
   // 4. Fetch all needed terrarium tiles in parallel
   const tileMap = new Map<string, Float32Array | null>();
@@ -111,13 +114,13 @@ export async function GET(req: NextRequest) {
     const fy = tpy - y0;
 
     function sample(px: number, py: number): number {
-      const tileX = Math.floor(px / SIZE);
-      const tileY = Math.floor(py / SIZE);
+      const tileX = Math.floor(px / DEM_SIZE);
+      const tileY = Math.floor(py / DEM_SIZE);
       const elev = tileMap.get(`${tileX},${tileY}`);
       if (!elev) return 0;
-      const lx = Math.max(0, Math.min(SIZE - 1, px - tileX * SIZE));
-      const ly = Math.max(0, Math.min(SIZE - 1, py - tileY * SIZE));
-      return elev[ly * SIZE + lx];
+      const lx = Math.max(0, Math.min(DEM_SIZE - 1, px - tileX * DEM_SIZE));
+      const ly = Math.max(0, Math.min(DEM_SIZE - 1, py - tileY * DEM_SIZE));
+      return elev[ly * DEM_SIZE + lx];
     }
 
     return (
@@ -128,25 +131,26 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // 5. Affine mapping from OS pixel (col, row) → terrarium pixel (tpx, tpy)
-  // Using 3 corners (NW, NE, SW) to define the affine transform
-  const duTpx = (neTpx - nwTpx) / (SIZE - 1); // terrarium x step per OS column pixel
-  const duTpy = (neTpy - nwTpy) / (SIZE - 1); // terrarium y step per OS column pixel
-  const dvTpx = (swTpx - nwTpx) / (SIZE - 1); // terrarium x step per OS row pixel
-  const dvTpy = (swTpy - nwTpy) / (SIZE - 1); // terrarium y step per OS row pixel
+  // 5. Affine mapping from output pixel (col, row) → terrarium pixel (tpx, tpy)
+  // Using 3 corners (NW, NE, SW) to define the affine transform.
+  // Dividing by (OUT - 1) gives finer steps for higher output resolution.
+  const duTpx = (neTpx - nwTpx) / (OUT - 1); // terrarium x step per output column pixel
+  const duTpy = (neTpy - nwTpy) / (OUT - 1); // terrarium y step per output column pixel
+  const dvTpx = (swTpx - nwTpx) / (OUT - 1); // terrarium x step per output row pixel
+  const dvTpy = (swTpy - nwTpy) / (OUT - 1); // terrarium y step per output row pixel
 
-  // Physical cell size in metres per OS pixel (BNG resolution)
-  const cellSizeM = OS_PROJECTION.resolutions[z];
+  // Physical cell size in metres per output pixel (halved at 2× for finer gradient)
+  const cellSizeM = (OS_PROJECTION.resolutions[z] * DEM_SIZE) / OUT;
 
-  const out = Buffer.alloc(SIZE * SIZE * 4);
+  const out = Buffer.alloc(OUT * OUT * 4);
 
-  // 6. Compute hillshade for each OS output pixel
-  for (let row = 0; row < SIZE; row++) {
-    for (let col = 0; col < SIZE; col++) {
+  // 6. Compute hillshade for each output pixel
+  for (let row = 0; row < OUT; row++) {
+    for (let col = 0; col < OUT; col++) {
       const tpx = nwTpx + col * duTpx + row * dvTpx;
       const tpy = nwTpy + col * duTpy + row * dvTpy;
 
-      // Sample DEM at ±1 OS pixel in east/south directions for gradient
+      // Sample DEM at ±1 output pixel in east/south directions for gradient
       const elevE = getElev(tpx + duTpx, tpy + duTpy);
       const elevW = getElev(tpx - duTpx, tpy - duTpy);
       const elevS = getElev(tpx + dvTpx, tpy + dvTpy); // row+1 = south
@@ -162,7 +166,7 @@ export async function GET(req: NextRequest) {
 
       const hillshade = Math.max(0, (nx / len) * Lx + (ny / len) * Ly + (nz / len) * Lz);
 
-      const idx = (row * SIZE + col) * 4;
+      const idx = (row * OUT + col) * 4;
       if (dark) {
         out[idx]     = 255;
         out[idx + 1] = 255;
@@ -178,7 +182,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 7. Return RGBA PNG
-  const png = await sharp(out, { raw: { width: SIZE, height: SIZE, channels: 4 } }).png().toBuffer();
+  const png = await sharp(out, { raw: { width: OUT, height: OUT, channels: 4 } }).png().toBuffer();
   return new NextResponse(new Uint8Array(png), {
     headers: {
       'Content-Type': 'image/png',

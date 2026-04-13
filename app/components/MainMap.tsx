@@ -294,31 +294,35 @@ export default function MainMap({
       origin: OS_PROJECTION.origin,
     });
 
+    // Use 2× stitched tiles on retina displays for sharper map rendering.
+    const tilePixelRatio = (window.devicePixelRatio || 1) > 1 ? 2 : 1;
+    const scaleParam = tilePixelRatio === 2 ? '&scale=2' : '';
+
     const topoLayer = new TileLayer({
-      source: new XYZ({ url: TOPO_DARK_TILE_URL, maxZoom: 16 }),
+      source: new XYZ({ url: `${TOPO_DARK_TILE_URL}${scaleParam}`, maxZoom: 16, tilePixelRatio }),
       visible: true,
       zIndex: 0,
     });
     const osOverviewLayer = new TileLayer({
-      source: new XYZ({ url: OS_DARK_TILE_URL, projection, tileGrid: overviewTileGrid }),
+      source: new XYZ({ url: `${OS_DARK_TILE_URL}${scaleParam}`, projection, tileGrid: overviewTileGrid, tilePixelRatio }),
       maxZoom: 6,
       visible: false,
       zIndex: 0,
     });
     const os25kLayer = new TileLayer({
-      source: new XYZ({ url: OS_DARK_TILE_URL, projection, tileGrid: hiResTileGrid }),
+      source: new XYZ({ url: `${OS_DARK_TILE_URL}${scaleParam}`, projection, tileGrid: hiResTileGrid, tilePixelRatio }),
       minZoom: 6,
       visible: false,
       zIndex: 0,
     });
     const satelliteLayer = new TileLayer({
-      source: new XYZ({ url: SATELLITE_TILE_URL, maxZoom: 18 }),
+      source: new XYZ({ url: `${SATELLITE_TILE_URL}${scaleParam}`, maxZoom: 18, tilePixelRatio }),
       visible: false,
       zIndex: 0,
     });
 
     const hillshadeLayer = new TileLayer({
-      source: new XYZ({ url: HILLSHADE_TILE_URL, projection, tileGrid: overviewTileGrid }),
+      source: new XYZ({ url: `${HILLSHADE_TILE_URL}${scaleParam}`, projection, tileGrid: overviewTileGrid, tilePixelRatio }),
       opacity: 0.65,
       visible: false,
       zIndex: 5,
