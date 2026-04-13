@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://plot.fit">
-    <img src="public/logo.png" alt="Plot" width="400" style="border-radius: 12px;">
+    <img src="public/screenshot.webp" alt="Plot" width="2178" style="border-radius: 12px;">
   </a>
 </p>
 
