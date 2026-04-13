@@ -15,91 +15,64 @@ export default async function AppleIcon() {
           width: "100%",
           height: "100%",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#070E14",
+          background: "#C84200",
           borderRadius: "36px",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Contour arcs — more detail at this size */}
+        {/* Topo contour lines — white, low opacity */}
         <svg
           width="180"
           height="180"
           viewBox="0 0 180 180"
           style={{ position: "absolute", top: 0, left: 0 }}
         >
-          <path
-            d="M -10,30 Q 90,10 190,30"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="3"
-            opacity="0.5"
-          />
-          <path
-            d="M -10,46 Q 90,26 190,46"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="2"
-            opacity="0.35"
-          />
-          <path
-            d="M -10,60 Q 90,40 190,60"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="3"
-            opacity="0.5"
-          />
-          <path
-            d="M -10,76 Q 90,56 190,76"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="2"
-            opacity="0.35"
-          />
-          <path
-            d="M -10,92 Q 90,72 190,92"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="3"
-            opacity="0.5"
-          />
-          <path
-            d="M -10,108 Q 90,88 190,108"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="2"
-            opacity="0.35"
-          />
-          <path
-            d="M -10,124 Q 90,104 190,124"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="3"
-            opacity="0.5"
-          />
-          <path
-            d="M -10,140 Q 90,120 190,140"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="2"
-            opacity="0.35"
-          />
-          <path
-            d="M -10,156 Q 90,136 190,156"
-            fill="none"
-            stroke="#D4872B"
-            strokeWidth="3"
-            opacity="0.5"
-          />
+          <path d="M -10,18 Q 90,5 190,18" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,32 Q 90,19 190,32" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
+          <path d="M -10,46 Q 90,33 190,46" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,60 Q 90,47 190,60" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
+          <path d="M -10,74 Q 90,61 190,74" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,88 Q 90,75 190,88" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
+          <path d="M -10,102 Q 90,89 190,102" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,116 Q 90,103 190,116" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
+          <path d="M -10,130 Q 90,117 190,130" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,144 Q 90,131 190,144" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
+          <path d="M -10,158 Q 90,145 190,158" fill="none" stroke="#ffffff" strokeWidth="2.5" opacity="0.12" />
+          <path d="M -10,172 Q 90,159 190,172" fill="none" stroke="#ffffff" strokeWidth="1.5" opacity="0.07" />
         </svg>
-        {/* "plot" text — legible at 180×180 */}
+        {/* GPS route trace above wordmark */}
+        <svg
+          width="100"
+          height="36"
+          viewBox="0 0 100 36"
+          style={{ position: "relative", marginBottom: "8px" }}
+        >
+          {/* Route line */}
+          <path
+            d="M 10,26 C 24,18 30,22 40,14 C 52,6 60,10 75,8"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.9"
+          />
+          {/* Start dot */}
+          <circle cx="10" cy="26" r="4" fill="#ffffff" opacity="0.7" />
+          {/* End waypoint — filled ring */}
+          <circle cx="75" cy="8" r="7" fill="#ffffff" opacity="0.9" />
+          <circle cx="75" cy="8" r="3.5" fill="#C84200" />
+        </svg>
+        {/* "plot" wordmark */}
         <span
           style={{
             fontFamily: "RibeyeMarrow",
             fontSize: "72px",
-            color: "#E07020",
+            color: "#FFFFFF",
             lineHeight: 1,
             position: "relative",
           }}

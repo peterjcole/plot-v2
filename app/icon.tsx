@@ -17,13 +17,13 @@ export default async function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#070E14",
+          background: "#C84200",
           borderRadius: "6px",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Subtle dark-teal contour arcs */}
+        {/* Topo contour lines — white, very subtle */}
         <svg
           width="32"
           height="32"
@@ -31,40 +31,40 @@ export default async function Icon() {
           style={{ position: "absolute", top: 0, left: 0 }}
         >
           <path
-            d="M -2,8 Q 16,2 34,8"
+            d="M -2,7 Q 16,3 34,7"
             fill="none"
-            stroke="#1E4858"
-            strokeWidth="1.5"
-            opacity="0.7"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            opacity="0.12"
           />
           <path
-            d="M -2,14 Q 16,8 34,14"
+            d="M -2,13 Q 16,9 34,13"
             fill="none"
-            stroke="#1E4858"
+            stroke="#ffffff"
             strokeWidth="1"
-            opacity="0.5"
+            opacity="0.08"
           />
           <path
-            d="M -2,20 Q 16,14 34,20"
+            d="M -2,19 Q 16,15 34,19"
             fill="none"
-            stroke="#1E4858"
-            strokeWidth="1.5"
-            opacity="0.7"
+            stroke="#ffffff"
+            strokeWidth="1.2"
+            opacity="0.12"
           />
           <path
-            d="M -2,26 Q 16,20 34,26"
+            d="M -2,25 Q 16,21 34,25"
             fill="none"
-            stroke="#1E4858"
+            stroke="#ffffff"
             strokeWidth="1"
-            opacity="0.5"
+            opacity="0.08"
           />
         </svg>
-        {/* "p" monogram in orange */}
+        {/* "p" monogram — white on orange */}
         <span
           style={{
             fontFamily: "RibeyeMarrow",
             fontSize: "26px",
-            color: "#E07020",
+            color: "#FFFFFF",
             lineHeight: 1,
             position: "absolute",
             top: "50%",
