@@ -310,14 +310,16 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     saveTheme(t);
   }, []);
 
-  // Fetch activity detail
+  // Fetch activity detail — AbortController cancels in-flight requests when selectedId changes
   useEffect(() => {
-    if (!selectedId) { setActivityDetail(null); return; }
+    if (!selectedId) { setActivityDetail(null); setDetailLoading(false); return; }
     setDetailLoading(true);
-    fetch(`/api/activities/${selectedId}`)
+    const controller = new AbortController();
+    fetch(`/api/activities/${selectedId}`, { signal: controller.signal })
       .then((r) => r.ok ? r.json() : Promise.reject(r.status))
       .then((data: ActivityData) => { setActivityDetail(data); setDetailLoading(false); })
-      .catch(() => setDetailLoading(false));
+      .catch((err) => { if (err.name !== 'AbortError') setDetailLoading(false); });
+    return () => controller.abort();
   }, [selectedId]);
 
   // Load saved route on mount
@@ -409,14 +411,21 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     }
   }, [allActivities]);
 
-  const fitToAllActivities = useCallback(() => {
+  // Mirror the initial page-load fit: 3 most recent activities sorted by startDate.
+  // Avoids zooming out to include European activities that pull the extent far from the UK.
+  const fitToDefaultView = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    const allCoords = allActivities
-      .filter(a => a.route?.length)
-      .flatMap(a => a.route!.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code)));
-    if (allCoords.length > 1) {
-      map.getView().fit(boundingExtent(allCoords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 10 });
+    const withRoutes = allActivities.filter(a => a.route?.length);
+    if (!withRoutes.length) return;
+    const recent = [...withRoutes]
+      .sort((a, b) => (b.startDate ?? '').localeCompare(a.startDate ?? ''))
+      .slice(0, 3);
+    const coords = recent.flatMap(a =>
+      a.route!.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code))
+    );
+    if (coords.length > 1) {
+      map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 9 });
     }
   }, [allActivities]);
 
@@ -424,8 +433,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setMode('browse');
     setSelectedId(null);
     setActivityDetail(null);
-    fitToAllActivities();
-  }, [fitToAllActivities]);
+    fitToDefaultView();
+  }, [fitToDefaultView]);
 
   const handleFitToRoute = useCallback((wps: typeof waypoints) => {
     const map = mapInstanceRef.current;
@@ -453,8 +462,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleExitPlanner = useCallback(() => {
     setMode('browse');
-    fitToAllActivities();
-  }, [fitToAllActivities]);
+    fitToDefaultView();
+  }, [fitToDefaultView]);
 
   const handleOpenAbout = useCallback(() => setMode('about'), []);
   const handleCloseAbout = useCallback(() => setMode('browse'), []);
@@ -598,11 +607,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onThemeChange={handleThemeChange}
           onAbout={handleOpenAbout}
         >
-          {mode === 'browse' && (
-            isLoggedIn
+          {/* Keep BrowsePanel mounted to avoid remount cost and preserve scroll position */}
+          <div style={{ display: mode === 'browse' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+            {isLoggedIn
               ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
               : <UnauthPanel />
-          )}
+            }
+          </div>
           {mode === 'detail' && (
             detailLoading || !activityDetail ? (
               <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
@@ -782,11 +793,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             count={sheetCount}
             forceExpanded={mode === 'detail' || mode === 'about'}
           >
-            {mode === 'browse' && (
-              isLoggedIn
+            {/* Keep BrowsePanel mounted to avoid remount cost and preserve scroll position */}
+            <div style={{ display: mode === 'browse' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+              {isLoggedIn
                 ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
                 : <UnauthPanel />
-            )}
+              }
+            </div>
             {mode === 'detail' && (
               detailLoading || !activityDetail ? (
                 <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
