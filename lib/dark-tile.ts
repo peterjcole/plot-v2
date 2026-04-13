@@ -37,6 +37,9 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
 }
 
 export async function applyDarkMode(buffer: ArrayBuffer): Promise<Buffer> {
+  const DARK_BG: [number, number, number] = [28, 24, 20];    // #1c1814 — paper/white areas
+  const DARK_OLIVE: [number, number, number] = [26, 38, 14]; // #1a260e — access land / open terrain
+
   const { data, info } = await sharp(Buffer.from(buffer))
     .ensureAlpha()
     .raw()
@@ -44,10 +47,35 @@ export async function applyDarkMode(buffer: ArrayBuffer): Promise<Buffer> {
 
   const channels = info.channels;
   for (let i = 0; i < data.length; i += channels) {
-    const [h, s, l] = rgbToHsl(data[i], data[i + 1], data[i + 2]);
-    const lNew = Math.min(0.88, 1 - Math.pow(l, 0.8));
-    const sNew = Math.min(1, s * 1.2);
-    const [rNew, gNew, bNew] = hslToRgb(h, sNew, lNew);
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const [h, s, l] = rgbToHsl(r, g, b);
+
+    let rNew: number, gNew: number, bNew: number;
+
+    if (l > 0.75) {
+      // Terrain fill or paper — lightness alone cleanly separates fills (l > 0.80)
+      // from all map features (contours, paths, water, text — all l < 0.75).
+      const isGreenFill = h > 0.22 && h < 0.48;
+      if (isGreenFill) {
+        // Forest/vegetation: route through features curve → medium dark green
+        const lNew = Math.min(0.92, 1 - Math.pow(l, 0.85) * 0.85);
+        const sNew = Math.min(1, s * 1.15);
+        [rNew, gNew, bNew] = hslToRgb(h, sNew, lNew);
+      } else {
+        const isWarmFill = h > 0.07 && h < 0.22 && s > 0.08;
+        const TARGET = isWarmFill ? DARK_OLIVE : DARK_BG;
+        const blend = Math.min(1, (l - 0.75) / 0.25);
+        rNew = Math.round(TARGET[0] * blend + r * (1 - l) * (1 - blend));
+        gNew = Math.round(TARGET[1] * blend + g * (1 - l) * (1 - blend));
+        bNew = Math.round(TARGET[2] * blend + b * (1 - l) * (1 - blend));
+      }
+    } else {
+      // Map features: contours, paths, water, text
+      const lNew = Math.min(0.92, 1 - Math.pow(l, 0.85) * 0.85);
+      const sNew = Math.min(1, s * 1.15);
+      [rNew, gNew, bNew] = hslToRgb(h, sNew, lNew);
+    }
+
     data[i] = rNew;
     data[i + 1] = gNew;
     data[i + 2] = bNew;
