@@ -62,12 +62,25 @@ export async function applyDarkMode(buffer: ArrayBuffer): Promise<Buffer> {
         const sNew = Math.min(1, s * 1.15);
         [rNew, gNew, bNew] = hslToRgb(h, sNew, lNew);
       } else {
-        const isWarmFill = h > 0.07 && h < 0.22 && s > 0.08;
-        const TARGET = isWarmFill ? DARK_OLIVE : DARK_BG;
-        const blend = Math.min(1, (l - 0.75) / 0.25);
-        rNew = Math.round(TARGET[0] * blend + r * (1 - l) * (1 - blend));
-        gNew = Math.round(TARGET[1] * blend + g * (1 - l) * (1 - blend));
-        bNew = Math.round(TARGET[2] * blend + b * (1 - l) * (1 - blend));
+        // At low zoom, orange contour/road pixels blend with the background, producing
+        // high-lightness pixels that still have warm hue. Use raw RGB chroma (max-min,
+        // 0-255) to detect them: blended contour pixels have rawChroma ≥ 34, while
+        // access land fills (pale buff) top out at ~30. HSL saturation is unreliable
+        // here because it amplifies artificially at high lightness values.
+        const rawChroma = Math.max(r, g, b) - Math.min(r, g, b);
+        const isWarmFeature = h < 0.20 && rawChroma > 35;
+        if (isWarmFeature) {
+          const lNew = Math.min(0.92, 1 - Math.pow(l, 0.85) * 0.85);
+          const sNew = Math.min(1, s * 1.15);
+          [rNew, gNew, bNew] = hslToRgb(h, sNew, lNew);
+        } else {
+          const isWarmFill = h > 0.07 && h < 0.22 && s > 0.08;
+          const TARGET = isWarmFill ? DARK_OLIVE : DARK_BG;
+          const blend = Math.min(1, (l - 0.75) / 0.25);
+          rNew = Math.round(TARGET[0] * blend + r * (1 - l) * (1 - blend));
+          gNew = Math.round(TARGET[1] * blend + g * (1 - l) * (1 - blend));
+          bNew = Math.round(TARGET[2] * blend + b * (1 - l) * (1 - blend));
+        }
       }
     } else {
       // Map features: contours, paths, water, text
