@@ -78,6 +78,8 @@ interface MainMapProps {
   hoveredActivityColor?: string | null;
   onGeolocate?: () => void;
   onPlaceSelect?: (coordinates: [number, number]) => void;
+  detailRoute?: [number, number][] | null;
+  elevationHoverPoint?: { lat: number; lng: number } | null;
 }
 
 export type { WaypointClickInfo };
@@ -214,6 +216,8 @@ export default function MainMap({
   hoveredActivityColor,
   onGeolocate,
   onPlaceSelect,
+  detailRoute,
+  elevationHoverPoint,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -238,6 +242,9 @@ export default function MainMap({
 
   // Zoom state for zoom buttons
   const [currentZoom, setCurrentZoom] = useState(OS_ZOOM.default);
+
+  // Elevation hover marker ref
+  const elevHoverSourceRef = useRef<VectorSource | null>(null);
 
   // Planner drawing refs
   const plannerWpSourceRef = useRef<VectorSource | null>(null);
@@ -358,6 +365,11 @@ export default function MainMap({
     const plannerWpSource = new VectorSource();
     const plannerWpLayer = new VectorLayer({ source: plannerWpSource, zIndex: 30, visible: false });
 
+    // Elevation chart hover marker
+    const elevHoverSource = new VectorSource();
+    const elevHoverLayer = new VectorLayer({ source: elevHoverSource, zIndex: 35 });
+    elevHoverSourceRef.current = elevHoverSource;
+
     // Planner Modify interaction (added/removed based on plannerProps)
     const plannerModify = new Modify({
       source: plannerWpSource,
@@ -400,7 +412,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer],
+      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, elevHoverLayer],
       view: new View({
         projection,
         center,
@@ -439,6 +451,7 @@ export default function MainMap({
       plannerWpLayerRef.current = null;
       plannerRouteLayerRef.current = null;
       plannerModifyRef.current = null;
+      elevHoverSourceRef.current = null;
       personalHeatmapLayerRef.current = null;
       activityHighlightSourceRef.current = null;
       activityHighlightLayerRef.current = null;
@@ -598,21 +611,38 @@ export default function MainMap({
     const source = new VectorSource();
     const thumbnailCache: Record<string, HTMLCanvasElement | null | undefined> = {};
 
+    // Rounded-rect path helper (matches the angular HUD aesthetic)
+    function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
     function loadThumbnail(proxyUrl: string) {
       thumbnailCache[proxyUrl] = null;
       const img = new window.Image();
       img.onload = () => {
+        // Render at 2× for retina sharpness; displayed at 40×40 via Icon scale:0.5
+        const DPR = 2;
+        const DISPLAY = 40;
+        const SIZE = DISPLAY * DPR;
+        const RADIUS = 6 * DPR; // rounded corners, not full circle
         const c = document.createElement('canvas');
-        c.width = 40; c.height = 40;
+        c.width = SIZE; c.height = SIZE;
         const ctx = c.getContext('2d')!;
+        // Clip to rounded square
         ctx.beginPath();
-        ctx.arc(20, 20, 19, 0, Math.PI * 2);
+        roundedRect(ctx, 0, 0, SIZE, SIZE, RADIUS);
         ctx.clip();
-        ctx.drawImage(img, 0, 0, 40, 40);
+        ctx.drawImage(img, 0, 0, SIZE, SIZE);
+        // Orange accent border
         ctx.beginPath();
-        ctx.arc(20, 20, 19, 0, Math.PI * 2);
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2.5;
+        roundedRect(ctx, 0, 0, SIZE, SIZE, RADIUS);
+        ctx.strokeStyle = '#E07020';
+        ctx.lineWidth = 3 * DPR;
         ctx.stroke();
         thumbnailCache[proxyUrl] = c;
         source.changed();
@@ -622,40 +652,53 @@ export default function MainMap({
     }
 
     function makeClusterCanvas(count: number, topPhotoCanvas: HTMLCanvasElement): HTMLCanvasElement {
-      const SIZE = 52;
-      const PHOTO_R = 19;
-      const cx = 22, cy = 22;
+      // topPhotoCanvas is 80×80 (2× retina); display the cluster at 52×52 logical
+      const DPR = 2;
+      const LOGICAL = 52;
+      const SIZE = LOGICAL * DPR;
+      const PHOTO_SIZE = 40 * DPR;
+      const cx = 22 * DPR, cy = 22 * DPR;
+      const RADIUS = 5 * DPR;
       const canvas = document.createElement('canvas');
       canvas.width = SIZE; canvas.height = SIZE;
       const ctx = canvas.getContext('2d')!;
+      // Drop shadow layers for stacked effect
       for (let i = 2; i >= 1; i--) {
         ctx.beginPath();
-        ctx.arc(cx + i * 3, cy + i * 3, PHOTO_R, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(0,0,0,${0.18 * i})`;
+        roundedRect(ctx, cx - PHOTO_SIZE / 2 + i * 5, cy - PHOTO_SIZE / 2 + i * 5, PHOTO_SIZE, PHOTO_SIZE, RADIUS);
+        ctx.fillStyle = `rgba(0,0,0,${0.22 * i})`;
         ctx.fill();
       }
-      ctx.drawImage(topPhotoCanvas, cx - PHOTO_R, cy - PHOTO_R, PHOTO_R * 2, PHOTO_R * 2);
-      const label = String(count);
-      const fontSize = 11;
-      const tmp = document.createElement('canvas').getContext('2d')!;
-      tmp.font = `700 ${fontSize}px sans-serif`;
-      const textW = tmp.measureText(label).width;
-      const bw = Math.max(18, Math.ceil(textW) + 10);
-      const bh = 16;
-      const bx = cx + PHOTO_R - bw / 2 + 4;
-      const by = cy + PHOTO_R - bh / 2 + 4;
-      const br = bh / 2;
+      // Main thumbnail (already 2× retina)
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(bx + br, by);
-      ctx.arcTo(bx + bw, by, bx + bw, by + bh, br);
-      ctx.arcTo(bx + bw, by + bh, bx, by + bh, br);
-      ctx.arcTo(bx, by + bh, bx, by, br);
-      ctx.arcTo(bx, by, bx + bw, by, br);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(15,15,15,0.92)';
+      roundedRect(ctx, cx - PHOTO_SIZE / 2, cy - PHOTO_SIZE / 2, PHOTO_SIZE, PHOTO_SIZE, RADIUS);
+      ctx.clip();
+      ctx.drawImage(topPhotoCanvas, cx - PHOTO_SIZE / 2, cy - PHOTO_SIZE / 2, PHOTO_SIZE, PHOTO_SIZE);
+      ctx.restore();
+      // Border
+      ctx.beginPath();
+      roundedRect(ctx, cx - PHOTO_SIZE / 2, cy - PHOTO_SIZE / 2, PHOTO_SIZE, PHOTO_SIZE, RADIUS);
+      ctx.strokeStyle = '#E07020';
+      ctx.lineWidth = 3 * DPR;
+      ctx.stroke();
+      // Count badge — monospace font, HUD aesthetic
+      const label = String(count);
+      const fontSize = 10 * DPR;
+      const tmp = document.createElement('canvas').getContext('2d')!;
+      tmp.font = `700 ${fontSize}px "IBM Plex Mono", monospace`;
+      const textW = tmp.measureText(label).width;
+      const bw = Math.max(16 * DPR, Math.ceil(textW) + 8 * DPR);
+      const bh = 14 * DPR;
+      const bx = cx + PHOTO_SIZE / 2 - bw / 2 + 3 * DPR;
+      const by = cy + PHOTO_SIZE / 2 - bh / 2 + 3 * DPR;
+      const br = 3 * DPR;
+      ctx.beginPath();
+      roundedRect(ctx, bx, by, bw, bh, br);
+      ctx.fillStyle = 'rgba(7,14,20,0.94)';
       ctx.fill();
-      ctx.fillStyle = 'white';
-      ctx.font = `700 ${fontSize}px sans-serif`;
+      ctx.fillStyle = '#E07020';
+      ctx.font = `700 ${fontSize}px "IBM Plex Mono", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, bx + bw / 2, by + bh / 2);
@@ -672,15 +715,17 @@ export default function MainMap({
           const cached = thumbnailCache[proxyUrl];
           if (cached) {
             const clusterCanvas = makeClusterCanvas(count, cached);
-            return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height] }) });
+            // clusterCanvas is 2× retina; scale:0.5 so it displays at the correct logical size
+            return new Style({ image: new Icon({ img: clusterCanvas, size: [clusterCanvas.width, clusterCanvas.height], scale: 0.5 }) });
           }
           if (cached === undefined) loadThumbnail(proxyUrl);
-          return new Style({ image: new CircleStyle({ radius: 19, fill: new Fill({ color: 'rgba(20,20,20,0.85)' }), stroke: new Stroke({ color: 'white', width: 2 }) }) });
+          return new Style({ image: new CircleStyle({ radius: 19, fill: new Fill({ color: 'rgba(7,14,20,0.85)' }), stroke: new Stroke({ color: '#E07020', width: 2 }) }) });
         }
         const cached = thumbnailCache[proxyUrl];
-        if (cached) return new Style({ image: new Icon({ img: cached, size: [40, 40] }) });
+        // cached canvas is 80×80 (2× retina); scale:0.5 displays at 40×40 logical pixels
+        if (cached) return new Style({ image: new Icon({ img: cached, size: [cached.width, cached.height], scale: 0.5 }) });
         if (cached === undefined) loadThumbnail(proxyUrl);
-        return new Style({ image: new CircleStyle({ radius: 14, fill: new Fill({ color: 'rgba(74,90,43,0.82)' }), stroke: new Stroke({ color: 'rgba(58,71,34,0.9)', width: 2 }) }) });
+        return new Style({ image: new CircleStyle({ radius: 14, fill: new Fill({ color: 'rgba(7,14,20,0.85)' }), stroke: new Stroke({ color: '#E07020', width: 2 }) }) });
       },
       zIndex: 4.8,
     });
@@ -1041,6 +1086,25 @@ export default function MainMap({
     source.addFeature(feature);
   }, [hoveredActivityRoute, hoveredActivityColor, osDark]);
 
+  // Elevation chart hover — renders a pulsing dot on the planner route
+  useEffect(() => {
+    const source = elevHoverSourceRef.current;
+    if (!source) return;
+    source.clear();
+    if (!elevationHoverPoint) return;
+    const coord = fromLonLat([elevationHoverPoint.lng, elevationHoverPoint.lat], OS_PROJECTION.code);
+    const feature = new Feature({ geometry: new Point(coord) });
+    feature.setStyle(new Style({
+      image: new CircleStyle({
+        radius: 6,
+        fill: new Fill({ color: '#E07020' }),
+        stroke: new Stroke({ color: osDark ? 'rgba(7,14,20,0.9)' : 'rgba(238,232,213,0.9)', width: 2 }),
+      }),
+      zIndex: 40,
+    }));
+    source.addFeature(feature);
+  }, [elevationHoverPoint, osDark]);
+
   // Sync activity route features (dim in planner mode)
   useEffect(() => {
     const source = routeSourceRef.current;
@@ -1056,12 +1120,14 @@ export default function MainMap({
     for (const activity of withRoutes) {
       if (!showRecentActivities && !inPlanner && String(activity.id) !== selectedId) continue;
       const id = String(activity.id);
-      const coords = activity.route!.map(([lat, lng]) =>
+      const isSelected = !!selectedId && selectedId === id;
+      // Use the full-resolution detail route when available for the selected activity
+      const routePoints = (isSelected && detailRoute?.length) ? detailRoute : activity.route!;
+      const coords = routePoints.map(([lat, lng]) =>
         fromLonLat([lng, lat], OS_PROJECTION.code)
       );
       const color = getActivityColor(activity.type);
       const [r, g, b] = hexToComponents(color);
-      const isSelected = !!selectedId && selectedId === id;
 
       if (isSelected && selectedSource) {
         // Selected route goes in its own layer (opacity 0.68) with full-saturation
@@ -1140,7 +1206,7 @@ export default function MainMap({
         }, 450);
       }
     }
-  }, [activities, highlightedId, selectedId, showRecentActivities, !!plannerProps, osDark, loadedActivityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activities, highlightedId, selectedId, showRecentActivities, !!plannerProps, osDark, loadedActivityId, detailRoute]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync photo pin markers
   useEffect(() => {

@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 interface ExportOptionsPopoverProps {
   activityId: string;
   osDark: boolean;
+  initialBaseMap?: 'os' | 'satellite';
+  initialHillshade?: boolean;
   anchorRect: { x: number; y: number };
   onClose: () => void;
 }
@@ -44,14 +46,14 @@ function SegLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function ExportOptionsPopover({ activityId, osDark, anchorRect, onClose }: ExportOptionsPopoverProps) {
+export default function ExportOptionsPopover({ activityId, osDark, initialBaseMap = 'os', initialHillshade = false, anchorRect, onClose }: ExportOptionsPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
 
   const [includeImages, setIncludeImages] = useState(true);
-  const [baseMap, setBaseMap] = useState<'os' | 'satellite'>('os');
+  const [baseMap, setBaseMap] = useState<'os' | 'satellite'>(initialBaseMap);
   const [darkMode, setDarkMode] = useState(osDark);
-  const [hillshade, setHillshade] = useState(false);
+  const [hillshade, setHillshade] = useState(initialHillshade);
   const [showDescription, setShowDescription] = useState(false);
   const [includeLogo, setIncludeLogo] = useState(true);
 

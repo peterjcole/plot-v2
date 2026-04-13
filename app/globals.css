@@ -47,6 +47,15 @@
     --blu: #1E60A8;
     --glass: rgba(238, 232, 213, 0.93);
     --glass-hvy: rgba(238, 232, 213, 0.97);
+
+    /* Splash screen — warm olive/sage tones for readability on warm tan background */
+    --splash-tag-primary: #4A5A30;
+    --splash-tag-secondary: #7A8A60;
+    --splash-dismiss: #8A9A70;
+    --splash-dismiss-hover: #4A5A30;
+    --splash-ghost-btn-border: #A09070;
+    --splash-wordmark-shadow: 0 0 40px rgba(224, 112, 32, 0.30), 0 2px 12px rgba(0, 0, 0, 0.15);
+    --splash-hud-color: #8A9A70;
   }
 }
 

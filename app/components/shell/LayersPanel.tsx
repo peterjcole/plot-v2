@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { type MapLayer } from '@/app/components/MainMap';
+import ThemeToggle from './ThemeToggle';
+import { type Theme } from '@/lib/theme';
 
 export interface LayerState {
   baseLayer: MapLayer;
@@ -73,6 +75,8 @@ interface LayersPanelProps {
   fixed?: boolean;
   forceOpen?: boolean;
   isOwner?: boolean;
+  theme?: Theme;
+  onThemeChange?: (t: Theme) => void;
 }
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -120,7 +124,7 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
@@ -254,6 +258,19 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
 
           {/* Dim base map */}
           <Row label="Dim base map" on={state.dimBaseMap} onChange={(v) => onChange({ dimBaseMap: v })} />
+
+          {/* Theme */}
+          {onThemeChange && (
+            <>
+              <Divider />
+              <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0', gap: 8 }}>
+                <span style={{ flex: 1, font: '400 10px/1 var(--mono)', color: 'var(--fog)', letterSpacing: '0.03em' }}>
+                  Theme
+                </span>
+                <ThemeToggle theme={theme ?? 'system'} onChange={onThemeChange} />
+              </div>
+            </>
+          )}
         </div>
       )}
 

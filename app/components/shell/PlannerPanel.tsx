@@ -4,6 +4,7 @@ import { Waypoint, RouteSegment } from '@/lib/types';
 import { type ElevationPoint } from '@/app/(main)/planner/useElevationProfile';
 import { type RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import { downloadGpx } from '@/lib/gpx';
+import ElevationChart, { type ElevationHoverPoint } from '@/app/(main)/planner/ElevationChart';
 
 interface PlannerPanelProps {
   distance: number;
@@ -17,6 +18,7 @@ interface PlannerPanelProps {
   onExportImage?: () => void;
   isExportingImage?: boolean;
   onEditWaypoint?: (index: number) => void;
+  onElevationHover?: (point: ElevationHoverPoint | null) => void;
 }
 
 function fmtDist(m: number): string {
@@ -45,52 +47,8 @@ function StatCell({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ElevationSparkline({ data }: { data: ElevationPoint[] }) {
-  if (data.length < 2) return null;
 
-  const eles = data.map(p => p.ele);
-  const minE = Math.min(...eles);
-  const maxE = Math.max(...eles);
-  const rangeE = maxE - minE || 1;
-  const totalD = data[data.length - 1].distance || 1;
-
-  const toX = (d: number) => (d / totalD) * 100;
-  const toY = (e: number) => 38 - ((e - minE) / rangeE) * 34;
-
-  const pts = data.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
-  const fillPath = `M0,38 L${pts.split(' ').map(pt => pt).join(' L')} L100,38 Z`;
-  const meanY = toY(eles.reduce((a, b) => a + b, 0) / eles.length);
-  const peakIdx = eles.indexOf(maxE);
-  const peakX = toX(data[peakIdx].distance);
-  const peakLabel = maxE >= 1000 ? `${(maxE / 1000).toFixed(1)}km` : `${Math.round(maxE)}m`;
-
-  return (
-    <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: '100%', height: 40, display: 'block' }}>
-      <defs>
-        <linearGradient id="elev-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--ora)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="var(--ora)" stopOpacity="0.05" />
-        </linearGradient>
-      </defs>
-      {/* Fill */}
-      <path d={fillPath} fill="url(#elev-fill)" />
-      {/* Stroke */}
-      <polyline points={pts} fill="none" stroke="var(--ora)" strokeWidth="1.5" strokeLinejoin="round" />
-      {/* Mean guide */}
-      <line x1="0" y1={meanY} x2="100" y2={meanY} stroke="var(--fog-ghost)" strokeWidth="0.8" strokeDasharray="2 2" />
-      {/* Peak dot */}
-      <circle cx={peakX} cy={toY(maxE)} r="2" fill="var(--ora)" />
-      {/* Peak label */}
-      <text
-        x={Math.min(peakX + 2, 80)} y={toY(maxE) - 3}
-        fontSize="4" fontFamily="IBM Plex Mono" fill="var(--fog-dim)"
-        textAnchor={peakX > 80 ? 'end' : 'start'}
-      >{peakLabel}</text>
-    </svg>
-  );
-}
-
-export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false, onEditWaypoint }: PlannerPanelProps) {
+export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false, onEditWaypoint, onElevationHover }: PlannerPanelProps) {
   const hasRoute = waypoints.length >= 2;
 
   function handleExportGpx() {
@@ -120,7 +78,7 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
               <StatCell label="Est. time" value={distance > 0 ? fmtTime(distance) : '—'} />
             </div>
 
-            {/* Elevation sparkline */}
+            {/* Elevation chart */}
             {isLoadingElevation && (
               <div style={{ fontSize: 9, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', marginTop: 8 }}>
                 Loading elevation…
@@ -128,7 +86,7 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
             )}
             {elevationData && !isLoadingElevation && (
               <div style={{ marginTop: 8, borderTop: '1px solid var(--fog-ghost)', paddingTop: 8 }}>
-                <ElevationSparkline data={elevationData} />
+                <ElevationChart data={elevationData} onHover={onElevationHover} />
               </div>
             )}
           </div>

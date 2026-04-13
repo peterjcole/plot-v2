@@ -17,7 +17,7 @@ export default async function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#FFF8EC",
+          background: "#070E14",
           borderRadius: "36px",
           position: "relative",
           overflow: "hidden",
@@ -99,7 +99,7 @@ export default async function AppleIcon() {
           style={{
             fontFamily: "RibeyeMarrow",
             fontSize: "72px",
-            color: "#4A5A2B",
+            color: "#E07020",
             lineHeight: 1,
             position: "relative",
           }}

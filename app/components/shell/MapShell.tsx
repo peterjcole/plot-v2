@@ -20,6 +20,7 @@ import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
 import PlannerPanel from './PlannerPanel';
+import { type ElevationHoverPoint } from '@/app/(main)/planner/ElevationChart';
 import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileBottomSheet from './MobileBottomSheet';
@@ -31,6 +32,7 @@ import PhotoLightbox from './PhotoLightbox';
 import WaypointPopover from '@/app/components/map/WaypointPopover';
 import AboutSection from './AboutSection';
 import SplashOverlay from './SplashOverlay';
+import SidebarToggle from './SidebarToggle';
 import PhotoPopup from '@/app/(main)/planner/PhotoPopup';
 import ClusterPhotosPopup from '@/app/(main)/planner/ClusterPhotosPopup';
 import HeatmapActivityPopup from '@/app/(main)/planner/HeatmapActivityPopup';
@@ -133,6 +135,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [sysDark, setSysDark] = useState(false);
   const osDark = theme === 'dark' || (theme === 'system' && sysDark);
 
+  // Sidebar
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   // Owner photo popups
   const [photoPopup, setPhotoPopup] = useState<{ photo: PhotoItem; screenX: number; screenY: number } | null>(null);
   const [clusterPhotosPopup, setClusterPhotosPopup] = useState<{ photos: PhotoItem[]; screenX: number; screenY: number } | null>(null);
@@ -149,6 +154,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [popupLoading, setPopupLoading] = useState(false);
   const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
   const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
+
+  // Elevation chart hover → map crosshair
+  const [elevationHoverPoint, setElevationHoverPoint] = useState<ElevationHoverPoint | null>(null);
+  const handleElevationHover = useCallback((pt: ElevationHoverPoint | null) => setElevationHoverPoint(pt), []);
 
   // Planner state
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
@@ -400,11 +409,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     }
   }, [allActivities]);
 
+  const fitToAllActivities = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const allCoords = allActivities
+      .filter(a => a.route?.length)
+      .flatMap(a => a.route!.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code)));
+    if (allCoords.length > 1) {
+      map.getView().fit(boundingExtent(allCoords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 10 });
+    }
+  }, [allActivities]);
+
   const handleBack = useCallback(() => {
     setMode('browse');
     setSelectedId(null);
     setActivityDetail(null);
-  }, []);
+    fitToAllActivities();
+  }, [fitToAllActivities]);
 
   const handleFitToRoute = useCallback((wps: typeof waypoints) => {
     const map = mapInstanceRef.current;
@@ -430,7 +451,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     runtimePlannerFitRef.current = true;
   }, []);
 
-  const handleExitPlanner = useCallback(() => setMode('browse'), []);
+  const handleExitPlanner = useCallback(() => {
+    setMode('browse');
+    fitToAllActivities();
+  }, [fitToAllActivities]);
 
   const handleOpenAbout = useCallback(() => setMode('about'), []);
   const handleCloseAbout = useCallback(() => setMode('browse'), []);
@@ -563,6 +587,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     <div className="relative h-screen w-screen overflow-hidden sm:flex" style={{ background: 'var(--p0)' }}>
 
       {/* ── Desktop sidebar (hidden on mobile) ────────────────────────── */}
+      {!sidebarCollapsed && (
       <div className="hidden sm:flex sm:flex-col sm:shrink-0">
         <LeftPanel
           avatarInitials={avatarInitials}
@@ -584,7 +609,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 {detailLoading ? 'Loading…' : 'No data'}
               </div>
             ) : (
-              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} />
+              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
             )
           )}
           {mode === 'planner' && (
@@ -600,6 +625,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               onExportImage={handleExportImage}
               isExportingImage={isExportingImage}
               onEditWaypoint={handleEditWaypoint}
+              onElevationHover={handleElevationHover}
             />
           )}
           {mode === 'about' && (
@@ -607,9 +633,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           )}
         </LeftPanel>
       </div>
+      )}
 
       {/* ── Map area ────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 overflow-hidden sm:relative sm:inset-auto sm:flex-1">
+        <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(v => !v)} />
         <MainMap
           activities={allActivities}
           highlightedId={hoveredId}
@@ -640,11 +668,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           hoveredActivityColor={hoveredActivityColor}
           onGeolocate={handleGeolocate}
           onPlaceSelect={handlePlaceSelect}
+          detailRoute={activityDetail?.route ?? null}
+          elevationHoverPoint={elevationHoverPoint}
         />
 
         {/* Desktop chrome — layers, compass, scale, legend (hidden on mobile) */}
         <div className="hidden sm:block">
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
         </div>
         <div className="hidden sm:flex absolute bottom-[68px] left-3 z-[14] items-center gap-2">
           <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
@@ -673,7 +703,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onFitToRoute={handleFitToRoute}
             onExportImage={handleExportImage}
             isExportingImage={isExportingImage}
-            onBack={handleExitPlanner}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
           />
@@ -764,7 +793,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   {detailLoading ? 'Loading…' : 'No data'}
                 </div>
               ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} />
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
               )
             )}
             {mode === 'about' && (
@@ -777,7 +806,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {mode === 'planner' && (
         <>
           {/* Layers panel */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
 
           {/* Bottom HUD — draggable */}
           {(() => {

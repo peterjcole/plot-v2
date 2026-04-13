@@ -85,7 +85,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
       {/* Top-left */}
       <div style={{
         position: 'absolute', top: 18, left: 20, zIndex: 10,
-        fontSize: 9, letterSpacing: '0.14em', color: 'var(--fog-ghost)',
+        fontSize: 9, letterSpacing: '0.14em', color: 'var(--splash-hud-color, var(--fog-ghost))',
         lineHeight: 1.9, textTransform: 'uppercase',
         ...fade(1),
       }}>
@@ -97,7 +97,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
       {/* Top-right */}
       <div style={{
         position: 'absolute', top: 18, right: 20, zIndex: 10,
-        fontSize: 9, letterSpacing: '0.14em', color: 'var(--fog-ghost)',
+        fontSize: 9, letterSpacing: '0.14em', color: 'var(--splash-hud-color, var(--fog-ghost))',
         lineHeight: 1.9, textTransform: 'uppercase', textAlign: 'right',
         ...fade(1),
       }}>
@@ -109,7 +109,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
       {/* Bottom-left coordinate */}
       <div style={{
         position: 'absolute', bottom: 18, left: 20, zIndex: 10,
-        fontSize: 9, letterSpacing: '0.12em', color: 'var(--fog-ghost)',
+        fontSize: 9, letterSpacing: '0.12em', color: 'var(--splash-hud-color, var(--fog-ghost))',
         textTransform: 'uppercase',
         ...fade(4),
       }}>
@@ -120,7 +120,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
       <div style={{
         position: 'absolute', bottom: 18, right: 20, zIndex: 10,
         display: 'flex', alignItems: 'center', gap: 6,
-        fontSize: 9, letterSpacing: '0.12em', color: 'var(--fog-ghost)',
+        fontSize: 9, letterSpacing: '0.12em', color: 'var(--splash-hud-color, var(--fog-ghost))',
         textTransform: 'uppercase',
         ...fade(4),
       }}>
@@ -154,7 +154,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
             lineHeight: 1,
             letterSpacing: '-0.01em',
             display: 'block',
-            textShadow: '0 0 60px rgba(224,112,32,0.20), 0 2px 32px rgba(0,0,0,0.8)',
+            textShadow: 'var(--splash-wordmark-shadow, 0 0 60px rgba(224,112,32,0.20) , 0 2px 32px rgba(0,0,0,0.8))',
           }}>
             plot
           </span>
@@ -171,13 +171,13 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
         {/* Tagline */}
         <div style={{
           fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: 'var(--fog-dim)', fontFamily: 'var(--mono)',
+          color: 'var(--splash-tag-primary, var(--fog-dim))', fontFamily: 'var(--mono)',
           lineHeight: 1.7, marginBottom: 36,
           ...fade(2),
         }}>
           Strava activities on OS maps.
           <br />
-          <span style={{ color: 'var(--fog-ghost)' }}>Route planning + GPX export included.</span>
+          <span style={{ color: 'var(--splash-tag-secondary, var(--fog-ghost))' }}>Route planning + GPX export included.</span>
         </div>
 
         {/* Connect CTA */}
@@ -218,7 +218,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
             onClick={onPlanRoute}
             style={{
               background: 'none',
-              border: '1px solid var(--p3)',
+              border: '1px solid var(--splash-ghost-btn-border, var(--p3))',
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600,
@@ -233,7 +233,7 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
               (e.currentTarget as HTMLElement).style.color = 'var(--ice)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.borderColor = 'var(--p3)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--splash-ghost-btn-border, var(--p3))';
               (e.currentTarget as HTMLElement).style.color = 'var(--fog)';
             }}
           >
@@ -247,13 +247,13 @@ export default function SplashOverlay({ onDismiss, onPlanRoute }: { onDismiss: (
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontFamily: 'var(--mono)', fontSize: 10, letterSpacing: '0.12em',
-            color: 'var(--fog-ghost)', textTransform: 'uppercase',
+            color: 'var(--splash-dismiss, var(--fog-ghost))', textTransform: 'uppercase',
             padding: '4px 0',
             transition: 'color 0.2s',
             ...fade(4),
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = 'var(--fog-dim)')}
-          onMouseLeave={e => (e.currentTarget.style.color = 'var(--fog-ghost)')}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--splash-dismiss-hover, var(--fog-dim))')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--splash-dismiss, var(--fog-ghost))')}
         >
           Peek at the map <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle' }}><path d="m9 18 6-6-6-6"/></svg>
         </button>

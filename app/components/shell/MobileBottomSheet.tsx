@@ -136,13 +136,29 @@ export default function MobileBottomSheet({
       </div>
 
       {/* Scrollable content */}
-      <div className="hide-scrollbar" style={{
+      <div style={{
         flex: 1,
         overflowY: isExpanded ? 'auto' : 'hidden',
         overscrollBehavior: 'contain',
-        scrollbarWidth: 'none',
+        position: 'relative',
       }}>
         {children}
+        {/* Gradient fade hinting at scrollable content below */}
+        {isExpanded && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'sticky',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 48,
+              background: 'linear-gradient(to bottom, transparent, var(--p1))',
+              pointerEvents: 'none',
+              flexShrink: 0,
+            }}
+          />
+        )}
       </div>
     </div>
   );

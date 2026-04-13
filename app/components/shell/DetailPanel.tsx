@@ -36,9 +36,11 @@ interface DetailPanelProps {
   onOpenPlanner?: () => void;
   onPhotoClick?: (index: number) => void;
   osDark?: boolean;
+  exportBaseMap?: 'os' | 'satellite';
+  exportHillshade?: boolean;
 }
 
-export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true }: DetailPanelProps) {
+export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true, exportBaseMap, exportHillshade }: DetailPanelProps) {
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
   const [showExportPopover, setShowExportPopover] = useState(false);
@@ -229,6 +231,8 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
         <ExportOptionsPopover
           activityId={String(activity.id)}
           osDark={osDark}
+          initialBaseMap={exportBaseMap}
+          initialHillshade={exportHillshade}
           anchorRect={anchorRect}
           onClose={() => setShowExportPopover(false)}
         />
