@@ -1,8 +1,5 @@
-<p align="center">
-  <a href="https://plot.fit">
-    <img src="public/screenshot.webp" alt="Plot" width="2178" style="border-radius: 12px;">
-  </a>
-</p>
+
+![Plot](public/screenshot.webp) 
 
 https://plot.fit
 
