@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { Waypoint, RouteSegment } from '@/lib/types';
 
 function SnapToggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
@@ -105,14 +106,23 @@ export default function WaypointPopover({
         outline: 'none',
       }}
     >
-      {/* Name + coords */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)', lineHeight: 1.3 }}>
-          {waypoint.name ?? `Waypoint ${index + 1}`}
+      {/* Name + coords + X */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)', lineHeight: 1.3 }}>
+            {waypoint.name ?? `Waypoint ${index + 1}`}
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', marginTop: 2 }}>
+            {lat}°N, {lngAbs}°{lngDir}
+          </div>
         </div>
-        <div style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', marginTop: 2 }}>
-          {lat}°N, {lngAbs}°{lngDir}
-        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--fog-dim)', lineHeight: 1, flexShrink: 0 }}
+        >
+          <X size={12} strokeWidth={2.5} />
+        </button>
       </div>
 
       {/* Snap toggles */}

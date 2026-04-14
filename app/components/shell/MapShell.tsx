@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
@@ -937,52 +938,44 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* ── Shared overlays ──────────────────────────────────────────────── */}
       {segmentTap && mode === 'planner' && (
         <>
-          {/* Backdrop */}
-          <div
-            onClick={() => setSegmentTap(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-          />
-          {/* Action sheet */}
+          <div onClick={() => setSegmentTap(null)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
           <div style={{
             position: 'fixed',
-            left: Math.min(segmentTap.screenX - 100, (typeof window !== 'undefined' ? window.innerWidth : 400) - 216),
-            top: segmentTap.screenY - 60,
-            width: 208,
-            background: 'var(--glass-hvy)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            left: segmentTap.screenX,
+            top: segmentTap.screenY,
+            transform: 'translateX(-50%) translateY(calc(-100% - 12px))',
+            width: 200,
+            background: 'var(--p1)',
             border: '1px solid var(--p3)',
             borderRadius: 8,
-            padding: '6px 0',
-            zIndex: 9999,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            padding: 10,
+            zIndex: 40,
           }}>
+            {/* Header + X */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)' }}>
+                Insert waypoint
+              </div>
+              <button
+                onClick={() => setSegmentTap(null)}
+                aria-label="Close"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--fog-dim)', lineHeight: 1 }}
+              >
+                <X size={12} strokeWidth={2.5} />
+              </button>
+            </div>
+            <div style={{ height: 1, background: 'var(--fog-ghost)', marginBottom: 8 }} />
             <button
               onClick={handleSegmentInsert}
               style={{
-                width: '100%', padding: '10px 14px', border: 'none',
-                background: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 10,
-                fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ice)',
-                textAlign: 'left',
+                width: '100%', padding: '6px 8px',
+                background: 'var(--p2)', border: '1px solid var(--fog-ghost)', borderRadius: 4,
+                color: 'var(--ice)', fontFamily: 'var(--mono)', fontSize: 10,
+                fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Insert waypoint here
-            </button>
-            <button
-              onClick={() => setSegmentTap(null)}
-              style={{
-                width: '100%', padding: '10px 14px', border: 'none',
-                borderTop: '1px solid var(--p3)',
-                background: 'none', cursor: 'pointer',
-                fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fog-dim)',
-                textAlign: 'left',
-              }}
-            >
-              Cancel
+              Insert here
             </button>
           </div>
         </>

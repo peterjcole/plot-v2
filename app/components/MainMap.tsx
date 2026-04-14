@@ -23,7 +23,7 @@ import { get as getProjection, fromLonLat, toLonLat, transformExtent } from 'ol/
 import { register } from 'ol/proj/proj4';
 import { unByKey } from 'ol/Observable';
 import proj4 from 'proj4';
-import { getCenter, boundingExtent } from 'ol/extent';
+import { boundingExtent } from 'ol/extent';
 import Supercluster from 'supercluster';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
@@ -580,35 +580,10 @@ export default function MainMap({
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
 
-    // Mobile tap-on-segment: show insert modal instead of drag
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const onSingleClick = (e: any) => {
-      if (lastPointerTypeRef.current !== 'touch') return;
-      const wpHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
-        layerFilter: (l) => l === plannerWpLayerRef.current, hitTolerance: 20,
-      });
-      if (wpHit) return; // tapping a waypoint is handled elsewhere
-      const routeFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
-        layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 20,
-      });
-      if (!routeFeature) return;
-      const segIdx = routeFeature.get('segmentIndex') as number;
-      const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
-      const rect = map.getViewport().getBoundingClientRect();
-      onSegmentTapRef.current?.({
-        segmentIndex: segIdx + 1,
-        waypoint: { lat, lng },
-        screenX: rect.left + e.pixel[0],
-        screenY: rect.top + e.pixel[1],
-      });
-    };
-    const singleClickKey = map.on('singleclick', onSingleClick);
-
     return () => {
       viewport.removeEventListener('pointerdown', onPointerDown);
       viewport.removeEventListener('pointermove', onPointerMove);
       viewport.removeEventListener('pointerup', onPointerUp);
-      unByKey(singleClickKey);
     };
   }, [!!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1230,28 +1205,44 @@ export default function MainMap({
 
     if (!fittedRef.current && !inPlanner && withRoutes.length > 0 && map) {
       // If an activity is pre-selected (e.g. loaded via URL), fit to it.
-      // Otherwise fit to the 3 most recent to avoid European activities
-      // pulling the extent centre far outside the UK.
+      // Otherwise fit to the 3 most recent. If those span too large an area
+      // (estimated zoom < 6), fall back to just the single most recent so
+      // the user always has a meaningful starting view.
+      const PADDING: [number, number, number, number] = [60, 60, 60, 60];
+      const MIN_ZOOM = 6;
+      const MAX_ZOOM = 8;
       const selectedActivity = selectedId ? withRoutes.find(a => String(a.id) === selectedId) : null;
-      const fitActivities = selectedActivity
+      const candidates = selectedActivity
         ? [selectedActivity]
         : [...withRoutes].sort((a, b) => (b.startDate ?? '').localeCompare(a.startDate ?? '')).slice(0, 3);
-      const fitCoords = fitActivities.flatMap(a =>
+
+      map.updateSize();
+      const view = map.getView();
+      const size = map.getSize();
+
+      let fitActivities = candidates;
+      let fitCoords = fitActivities.flatMap(a =>
         a.route!.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code))
       );
-      const extent = fitCoords.length > 0 ? boundingExtent(fitCoords) : source.getExtent();
+      let extent = fitCoords.length > 0 ? boundingExtent(fitCoords) : source.getExtent();
+
+      // Pre-flight zoom check: if 3 activities are too spread out, fall back to the single most recent.
+      if (!selectedActivity && size && isFinite(extent[0])) {
+        const paddedSize: [number, number] = [size[0] - PADDING[1] - PADDING[3], size[1] - PADDING[0] - PADDING[2]];
+        const res = view.getResolutionForExtent(extent, paddedSize);
+        const estimatedZoom = view.getZoomForResolution(res) ?? MIN_ZOOM;
+        if (estimatedZoom < MIN_ZOOM) {
+          fitActivities = candidates.slice(0, 1);
+          fitCoords = fitActivities.flatMap(a =>
+            a.route!.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code))
+          );
+          extent = boundingExtent(fitCoords);
+        }
+      }
+
       if (isFinite(extent[0])) {
-        // Ensure OL has read the current container dimensions before fitting,
-        // otherwise it may use a stale size and produce a misaligned view.
-        map.updateSize();
-        map.getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 9, duration: 400 });
+        view.fit(extent, { padding: PADDING, maxZoom: MAX_ZOOM, duration: 400 });
         fittedRef.current = true;
-        // Clamp minimum zoom — prevents "whole of UK" view for very spread extents
-        const fitMap = map;
-        setTimeout(() => {
-          const z = fitMap.getView().getZoom() ?? 6;
-          if (z < 6) fitMap.getView().animate({ center: getCenter(extent), zoom: 6, duration: 200 });
-        }, 450);
       }
     }
   }, [activities, highlightedId, selectedId, showRecentActivities, !!plannerProps, osDark, loadedActivityId, detailRoute]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1305,6 +1296,25 @@ export default function MainMap({
             screenY: e.originalEvent.clientY,
           });
           return;
+        }
+        // On mobile touch: if the tap hit a route segment, show the insert action sheet
+        // instead of appending a new waypoint at the end.
+        if (lastPointerTypeRef.current === 'touch') {
+          const routeFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
+            layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 20,
+          });
+          if (routeFeature) {
+            const segIdx = routeFeature.get('segmentIndex') as number;
+            const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+            const rect = map.getViewport().getBoundingClientRect();
+            onSegmentTapRef.current?.({
+              segmentIndex: segIdx + 1,
+              waypoint: { lat, lng },
+              screenX: rect.left + e.pixel[0],
+              screenY: rect.top + e.pixel[1],
+            });
+            return;
+          }
         }
         const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
         pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
