@@ -48,6 +48,13 @@ interface WaypointClickInfo {
   screenY: number;
 }
 
+interface SegmentTapInfo {
+  segmentIndex: number;
+  waypoint: { lat: number; lng: number };
+  screenX: number;
+  screenY: number;
+}
+
 interface MainMapProps {
   activities: ActivitySummary[];
   highlightedId?: string | null;
@@ -58,6 +65,7 @@ interface MainMapProps {
   onActivityHover?: (id: string | null) => void;
   onPhotoMarkerClick?: (photoId: string) => void;
   onWaypointClick?: (info: WaypointClickInfo) => void;
+  onSegmentTap?: (info: SegmentTapInfo) => void;
   loadedActivityId?: string;
   baseLayer?: MapLayer;
   plannerProps?: PlannerProps;
@@ -82,7 +90,7 @@ interface MainMapProps {
   elevationHoverPoint?: { lat: number; lng: number } | null;
 }
 
-export type { WaypointClickInfo };
+export type { WaypointClickInfo, SegmentTapInfo };
 
 // ── Activity trace styles ────────────────────────────────────────────────────
 
@@ -196,6 +204,7 @@ export default function MainMap({
   onActivityHover,
   onPhotoMarkerClick,
   onWaypointClick,
+  onSegmentTap,
   loadedActivityId,
   baseLayer = 'topo',
   plannerProps,
@@ -254,6 +263,9 @@ export default function MainMap({
   const plannerModifyRef = useRef<Modify | null>(null);
   const plannerPropsRef = useRef(plannerProps);
   useEffect(() => { plannerPropsRef.current = plannerProps; }, [plannerProps]);
+  const onSegmentTapRef = useRef(onSegmentTap);
+  useEffect(() => { onSegmentTapRef.current = onSegmentTap; }, [onSegmentTap]);
+  const lastPointerTypeRef = useRef<string>('');
   const onActivityHoverRef = useRef(onActivityHover);
   useEffect(() => { onActivityHoverRef.current = onActivityHover; }, [onActivityHover]);
   const lastHoveredIdRef = useRef<string | null>(null);
@@ -507,6 +519,7 @@ export default function MainMap({
     const viewport = map.getViewport();
 
     const onPointerDown = (e: PointerEvent) => {
+      lastPointerTypeRef.current = e.pointerType;
       if (e.pointerType === 'touch') return;
       const pixel = map.getEventPixel(e);
       const wpHit = map.forEachFeatureAtPixel(pixel, () => true, {
@@ -567,10 +580,35 @@ export default function MainMap({
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
 
+    // Mobile tap-on-segment: show insert modal instead of drag
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onSingleClick = (e: any) => {
+      if (lastPointerTypeRef.current !== 'touch') return;
+      const wpHit = map.forEachFeatureAtPixel(e.pixel, () => true, {
+        layerFilter: (l) => l === plannerWpLayerRef.current, hitTolerance: 20,
+      });
+      if (wpHit) return; // tapping a waypoint is handled elsewhere
+      const routeFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
+        layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 20,
+      });
+      if (!routeFeature) return;
+      const segIdx = routeFeature.get('segmentIndex') as number;
+      const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+      const rect = map.getViewport().getBoundingClientRect();
+      onSegmentTapRef.current?.({
+        segmentIndex: segIdx + 1,
+        waypoint: { lat, lng },
+        screenX: rect.left + e.pixel[0],
+        screenY: rect.top + e.pixel[1],
+      });
+    };
+    const singleClickKey = map.on('singleclick', onSingleClick);
+
     return () => {
       viewport.removeEventListener('pointerdown', onPointerDown);
       viewport.removeEventListener('pointermove', onPointerMove);
       viewport.removeEventListener('pointerup', onPointerUp);
+      unByKey(singleClickKey);
     };
   }, [!!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
 

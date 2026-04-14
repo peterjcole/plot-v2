@@ -6,7 +6,7 @@ import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
 import { ActivitySummary, ActivityData, PhotoItem, HeatmapActivity } from '@/lib/types';
-import { type PlannerProps, type WaypointClickInfo } from '@/app/components/MainMap';
+import { type PlannerProps, type WaypointClickInfo, type SegmentTapInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
@@ -223,6 +223,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   // Waypoint popover
   const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
   const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
+
+  // Mobile segment tap — insert waypoint action sheet
+  const [segmentTap, setSegmentTap] = useState<SegmentTapInfo | null>(null);
+  const handleSegmentTap = useCallback((info: SegmentTapInfo) => setSegmentTap(info), []);
+  const handleSegmentInsert = useCallback(() => {
+    if (!segmentTap) return;
+    dispatch({ type: 'INSERT_WAYPOINT', index: segmentTap.segmentIndex, waypoint: segmentTap.waypoint, snap: false });
+    setSegmentTap(null);
+  }, [segmentTap, dispatch]);
   const handleWaypointPopoverClose = useCallback(() => setWaypointPopover(null), []);
   const handleEditWaypoint = useCallback((index: number) => {
     const wp = waypointsRef.current[index];
@@ -657,6 +666,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onActivityHover={mode !== 'planner' ? setHoveredId : undefined}
           onPhotoMarkerClick={mode !== 'planner' ? handlePhotoMarkerClick : undefined}
           onWaypointClick={mode === 'planner' ? handleWaypointClick : undefined}
+          onSegmentTap={mode === 'planner' ? handleSegmentTap : undefined}
           loadedActivityId={loadedActivityId ?? undefined}
           photoMarkers={photoMarkers}
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
@@ -925,6 +935,58 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       </div>{/* end sm:hidden mobile chrome */}
 
       {/* ── Shared overlays ──────────────────────────────────────────────── */}
+      {segmentTap && mode === 'planner' && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setSegmentTap(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+          />
+          {/* Action sheet */}
+          <div style={{
+            position: 'fixed',
+            left: Math.min(segmentTap.screenX - 100, (typeof window !== 'undefined' ? window.innerWidth : 400) - 216),
+            top: segmentTap.screenY - 60,
+            width: 208,
+            background: 'var(--glass-hvy)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid var(--p3)',
+            borderRadius: 8,
+            padding: '6px 0',
+            zIndex: 9999,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}>
+            <button
+              onClick={handleSegmentInsert}
+              style={{
+                width: '100%', padding: '10px 14px', border: 'none',
+                background: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ice)',
+                textAlign: 'left',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Insert waypoint here
+            </button>
+            <button
+              onClick={() => setSegmentTap(null)}
+              style={{
+                width: '100%', padding: '10px 14px', border: 'none',
+                borderTop: '1px solid var(--p3)',
+                background: 'none', cursor: 'pointer',
+                fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--fog-dim)',
+                textAlign: 'left',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
       {waypointPopover && mode === 'planner' && waypoints[waypointPopover.index] && (
         <WaypointPopover
           waypoint={waypoints[waypointPopover.index]}
