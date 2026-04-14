@@ -589,9 +589,12 @@ export default function MainMap({
     const topoSrc = topoLayerRef.current?.getSource() as XYZ | null;
     const ovSrc = osOverviewLayerRef.current?.getSource() as XYZ | null;
     const hkSrc = os25kLayerRef.current?.getSource() as XYZ | null;
+    const hsSrc = hillshadeLayerRef.current?.getSource() as XYZ | null;
+    const sp = (window.devicePixelRatio || 1) > 1 ? '&scale=2' : '';
     if (topoSrc) { topoSrc.setUrl(osDark ? TOPO_DARK_TILE_URL : TOPO_TILE_URL); topoSrc.refresh(); }
     if (ovSrc) { ovSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); ovSrc.refresh(); }
     if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
+    if (hsSrc) { hsSrc.setUrl(`${HILLSHADE_TILE_URL}${sp}${osDark ? '&dark=1' : ''}`); hsSrc.refresh(); }
   }, [osDark]);
 
   // Hillshade visibility
