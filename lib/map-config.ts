@@ -14,4 +14,5 @@ export const SATELLITE_TILE_URL  = '/api/satellite?z={z}&x={x}&y={y}';
 export const TOPO_TILE_URL       = '/api/maps/topo?z={z}&x={x}&y={y}';
 export const TOPO_DARK_TILE_URL  = '/api/maps/topo?z={z}&x={x}&y={y}&dark=1';
 export const HILLSHADE_TILE_URL  = '/api/hillshade27700?z={z}&x={x}&y={y}';
-export type BaseMap = 'os' | 'satellite';
+export const NGD_TILE_URL        = '/api/maps/ngd?z={z}&x={x}&y={y}';
+export type BaseMap = 'os' | 'os-vector' | 'satellite';

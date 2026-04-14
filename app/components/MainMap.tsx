@@ -27,14 +27,16 @@ import { boundingExtent } from 'ol/extent';
 import Supercluster from 'supercluster';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
-  HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
+  HILLSHADE_TILE_URL, NGD_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
+import { getNgdStyle } from '@/lib/ngd-style';
 import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
 import { getActivityColor } from '@/lib/activity-categories';
 import type { RouteAction } from '@/app/(main)/planner/useRouteHistory';
+import { applyStyle } from 'ol-mapbox-style';
 import 'ol/ol.css';
 
-export type MapLayer = 'topo' | 'satellite';
+export type MapLayer = 'topo' | 'satellite' | 'os-vector';
 
 export interface PlannerProps {
   waypoints: Waypoint[];
@@ -241,6 +243,7 @@ export default function MainMap({
   const os25kLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
+  const ngdLayerRef = useRef<OlVectorTileLayer | null>(null);
   const dimLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
@@ -340,6 +343,11 @@ export default function MainMap({
       zIndex: 5,
     });
 
+    // OS Vector NGD layer (MapLibre GL style via ol-mapbox-style)
+    const ngdLayer = new OlVectorTileLayer({ visible: false, zIndex: 0 });
+    applyStyle(ngdLayer, getNgdStyle(false, NGD_TILE_URL), { updateSource: true }).catch(() => {});
+    ngdLayerRef.current = ngdLayer;
+
     // Dim overlay: semi-transparent dark fill sitting between base tiles (zIndex 0)
     // and all overlay layers (zIndex 3.4+). Toggled visible by dimBaseMap prop.
     const dimSource = new VectorSource();
@@ -428,7 +436,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, elevHoverLayer],
+      layers: [ngdLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, elevHoverLayer],
       view: new View({
         projection,
         center,
@@ -460,6 +468,7 @@ export default function MainMap({
       os25kLayerRef.current = null;
       satelliteLayerRef.current = null;
       hillshadeLayerRef.current = null;
+      ngdLayerRef.current = null;
       dimLayerRef.current = null;
       photoLayerRef.current = null;
       plannerWpSourceRef.current = null;
@@ -590,11 +599,13 @@ export default function MainMap({
   // Sync tile layer visibility when baseLayer prop changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
+    const isVec = baseLayer === 'os-vector';
     const isSat = baseLayer === 'satellite';
-    topoLayerRef.current?.setVisible(!isSat);
-    osOverviewLayerRef.current?.setVisible(!isSat);
-    os25kLayerRef.current?.setVisible(!isSat);
+    topoLayerRef.current?.setVisible(!isSat && !isVec);
+    osOverviewLayerRef.current?.setVisible(!isSat && !isVec);
+    os25kLayerRef.current?.setVisible(!isSat && !isVec);
     satelliteLayerRef.current?.setVisible(isSat);
+    ngdLayerRef.current?.setVisible(isVec);
   }, [baseLayer]);
 
   // Swap OS tile URLs when dark/light theme changes
@@ -608,6 +619,9 @@ export default function MainMap({
     if (ovSrc) { ovSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); ovSrc.refresh(); }
     if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
     if (hsSrc) { hsSrc.setUrl(`${HILLSHADE_TILE_URL}${sp}${osDark ? '&dark=1' : ''}`); hsSrc.refresh(); }
+    if (ngdLayerRef.current) {
+      applyStyle(ngdLayerRef.current, getNgdStyle(osDark, NGD_TILE_URL), { updateSource: true }).catch(() => {});
+    }
   }, [osDark]);
 
   // Hillshade visibility

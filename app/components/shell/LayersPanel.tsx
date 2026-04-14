@@ -172,7 +172,11 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
             Base map
           </div>
           <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-            {(['topo', 'satellite'] as MapLayer[]).map((l) => {
+            {([
+              ['topo', 'OS / Topo'],
+              ['os-vector', 'OS Vector'],
+              ['satellite', 'Satellite'],
+            ] as [MapLayer, string][]).map(([l, label]) => {
               const active = state.baseLayer === l;
               return (
                 <button
@@ -182,14 +186,14 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
                     flex: 1, height: 26, borderRadius: 3,
                     background: active ? 'rgba(224,112,32,0.15)' : 'transparent',
                     border: `1px solid ${active ? 'var(--ora)' : 'var(--p3)'}`,
-                    font: '600 9px/1 var(--mono)',
-                    letterSpacing: '0.06em',
+                    font: '600 8px/1 var(--mono)',
+                    letterSpacing: '0.04em',
                     textTransform: 'uppercase',
                     color: active ? 'var(--ora)' : 'var(--fog-dim)',
                     cursor: 'pointer',
                   }}
                 >
-                  {l === 'topo' ? 'OS / Topo' : 'Satellite'}
+                  {label}
                 </button>
               );
             })}
