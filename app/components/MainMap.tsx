@@ -1409,7 +1409,7 @@ export default function MainMap({
 
       {/* Mobile: search + zoom top-right */}
       <div className="absolute top-[100px] right-4 z-[12] flex flex-col gap-1 sm:hidden">
-        {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} />}
+        {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} dropDown />}
         <button onClick={handleZoomIn} disabled={currentZoom >= 12} aria-label="Zoom in" style={zoomBtnStyle(currentZoom >= 12)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

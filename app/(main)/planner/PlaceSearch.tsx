@@ -7,9 +7,11 @@ interface PlaceSearchProps {
   onSelect: (coordinates: [number, number]) => void;
   /** If true, render just the 36×36 icon button. Dropdown anchors relative to button. */
   btnStyle?: React.CSSProperties;
+  /** If true, dropdown opens downward (for use near the top of the screen, e.g. mobile). */
+  dropDown?: boolean;
 }
 
-export default function PlaceSearch({ onSelect, btnStyle }: PlaceSearchProps) {
+export default function PlaceSearch({ onSelect, btnStyle, dropDown }: PlaceSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -100,10 +102,10 @@ export default function PlaceSearch({ onSelect, btnStyle }: PlaceSearchProps) {
         </svg>
       </button>
 
-      {/* Dropdown panel — floats to the left of the button */}
+      {/* Dropdown panel — floats to the left of the button, opens up or down */}
       {open && (
         <div style={{
-          position: 'absolute', bottom: 0, right: 44, zIndex: 50,
+          position: 'absolute', ...(dropDown ? { top: 36 } : { bottom: 0 }), right: 44, zIndex: 50,
           width: 260,
           background: 'var(--glass-hvy)',
           backdropFilter: 'blur(12px)',
@@ -127,7 +129,7 @@ export default function PlaceSearch({ onSelect, btnStyle }: PlaceSearchProps) {
               placeholder="Search for a place…"
               style={{
                 flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ice)',
+                fontFamily: 'var(--mono)', fontSize: 16, color: 'var(--ice)',
                 letterSpacing: '0.02em',
               }}
             />

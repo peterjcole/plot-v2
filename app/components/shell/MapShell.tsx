@@ -756,20 +756,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
 
       {/* Map chrome — bottom-left cluster (above the buttons) */}
-      <div style={{ position: 'fixed', bottom: 220, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'fixed', bottom: 191, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
         {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
       </div>
 
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={139} fixed isOwner={isOwner} />
           <button
             onClick={handleOpenPlanner}
             style={{
               position: 'fixed',
               right: 16,
-              bottom: 168,
+              bottom: 139,
               width: 48,
               height: 48,
               borderRadius: 6,
