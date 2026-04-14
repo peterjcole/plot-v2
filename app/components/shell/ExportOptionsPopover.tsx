@@ -56,6 +56,7 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
   const [hillshade, setHillshade] = useState(initialHillshade);
   const [showDescription, setShowDescription] = useState(false);
   const [includeLogo, setIncludeLogo] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     returnFocusRef.current = document.activeElement;
@@ -94,14 +95,30 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
     return `/api/activity-printout?${params.toString()}`;
   }
 
-  function handleDownload() {
-    window.open(buildUrl(), '_blank', 'noopener');
-    onClose();
+  async function handleDownload() {
+    setIsDownloading(true);
+    try {
+      const res = await fetch(buildUrl());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'activity.jpg';
+      a.click();
+      URL.revokeObjectURL(url);
+      onClose();
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
-  // Position: appear below the anchor, or above if too close to screen bottom
+  // Position: appear below the anchor, or above if too close to screen bottom.
+  // Clamp right edge so the popover doesn't overflow on narrow screens.
   const POPOVER_HEIGHT = 380;
-  const left = Math.max(8, anchorRect.x - 200);
+  const left = Math.min(
+    Math.max(8, anchorRect.x - 200),
+    (typeof window !== 'undefined' ? window.innerWidth : 400) - 248,
+  );
   const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - anchorRect.y : 400;
   const top = spaceBelow < POPOVER_HEIGHT + 16 ? anchorRect.y - POPOVER_HEIGHT - 8 : anchorRect.y + 8;
 
@@ -187,19 +204,34 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
       {/* Download button */}
       <button
         onClick={handleDownload}
+        disabled={isDownloading}
         style={{
           width: '100%', padding: '9px 12px',
-          background: 'var(--ora)', border: 'none', borderRadius: 4,
-          color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
-          fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
+          background: isDownloading ? 'var(--p3)' : 'var(--ora)', border: 'none', borderRadius: 4,
+          color: isDownloading ? 'var(--fog)' : 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
+          fontWeight: 600, cursor: isDownloading ? 'default' : 'pointer', letterSpacing: '0.04em',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Download JPEG
+        {isDownloading ? (
+          <>
+            <div style={{
+              width: 11, height: 11, borderRadius: '50%',
+              border: '2px solid var(--fog-ghost)', borderTopColor: 'var(--ora)',
+              animation: 'spin 0.8s linear infinite', flexShrink: 0,
+            }} />
+            Generating…
+          </>
+        ) : (
+          <>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download JPEG
+          </>
+        )}
       </button>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
