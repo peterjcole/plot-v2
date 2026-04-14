@@ -1241,6 +1241,9 @@ export default function MainMap({
       );
       const extent = fitCoords.length > 0 ? boundingExtent(fitCoords) : source.getExtent();
       if (isFinite(extent[0])) {
+        // Ensure OL has read the current container dimensions before fitting,
+        // otherwise it may use a stale size and produce a misaligned view.
+        map.updateSize();
         map.getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 9, duration: 400 });
         fittedRef.current = true;
         // Clamp minimum zoom — prevents "whole of UK" view for very spread extents
