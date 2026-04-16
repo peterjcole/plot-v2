@@ -48,14 +48,6 @@
     --glass: rgba(238, 232, 213, 0.93);
     --glass-hvy: rgba(238, 232, 213, 0.97);
 
-    /* Splash screen — warm olive/sage tones for readability on warm tan background */
-    --splash-tag-primary: #4A5A30;
-    --splash-tag-secondary: #7A8A60;
-    --splash-dismiss: #8A9A70;
-    --splash-dismiss-hover: #4A5A30;
-    --splash-ghost-btn-border: #A09070;
-    --splash-wordmark-shadow: 0 0 40px rgba(224, 112, 32, 0.30), 0 2px 12px rgba(0, 0, 0, 0.15);
-    --splash-hud-color: #8A9A70;
   }
 }
 
@@ -79,6 +71,12 @@
   --color-glass-hvy: var(--glass-hvy);
   --font-mono: var(--font-ibm-plex-mono);
   --font-logo: var(--font-ribeye-marrow);
+  --animate-contour-ping: contour-ping 2.1s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+@keyframes contour-ping {
+  0%   { width: 6px;  height: 6px;  opacity: 0.85; }
+  100% { width: 76px; height: 76px; opacity: 0; }
 }
 
 html, body {
