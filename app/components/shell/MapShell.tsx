@@ -131,9 +131,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     }
   }, [page]);
 
-  // Theme
-  const [theme, setTheme] = useState<Theme>('system');
-  const [sysDark, setSysDark] = useState(false);
+  // Theme — lazy init reads browser state immediately so first render is correct (no light-flash)
+  const [theme, setTheme] = useState<Theme>(() =>
+    typeof window === 'undefined' ? 'system' : loadTheme()
+  );
+  const [sysDark, setSysDark] = useState(() =>
+    typeof window === 'undefined' ? false : window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
   const osDark = theme === 'dark' || (theme === 'system' && sysDark);
 
   // Sidebar
@@ -289,13 +293,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       .catch(() => { /* silently ignore */ });
   }, [isOwner, layerState.showPhotos]);
 
-  // Theme initialisation + system preference tracking
+  // Track system colour-scheme changes (initial values come from lazy useState above)
   useEffect(() => {
-    const stored = loadTheme();
     const sysMq = window.matchMedia('(prefers-color-scheme: dark)');
-    const dark = sysMq.matches;
-    setSysDark(dark);
-    setTheme(stored);
     const handler = (e: MediaQueryListEvent) => setSysDark(e.matches);
     sysMq.addEventListener('change', handler);
     return () => sysMq.removeEventListener('change', handler);

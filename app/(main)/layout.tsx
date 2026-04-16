@@ -36,11 +36,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Runs before body renders: sets data-theme + html background to prevent white flash and theme flash */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('plot-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'':'light';document.documentElement.style.background=d?'#070E14':'#DDD8C4';}catch(e){}` }} />
+      </head>
       <body
         className={`${ibmPlexMono.variable} ${ribeyeMarrow.variable} antialiased`}
       >
-        {/* Apply stored theme before first paint — must be first child of body */}
-        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('plot-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'':'light';}catch(e){}` }} />
         {children}
         <Analytics />
         <Script
