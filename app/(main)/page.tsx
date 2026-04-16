@@ -4,6 +4,8 @@ import { getAthleteActivities, StravaApiError } from '@/lib/strava';
 import MapShell, { type PanelMode } from '@/app/components/shell/MapShell';
 import { ActivitySummary } from '@/lib/types';
 
+export const runtime = 'edge';
+
 export default async function Home({ searchParams }: { searchParams: Promise<{ mode?: string; activity?: string }> }) {
   const { mode, activity } = await searchParams;
   const initialMode: PanelMode = mode === 'planner' ? 'planner' : mode === 'about' ? 'about' : 'browse';
