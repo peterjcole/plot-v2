@@ -8,6 +8,8 @@ interface PaintProps {
   'fill-outline-color'?: string | unknown;
   'line-color'?: string | unknown;
   'line-opacity'?: number | unknown;
+  'line-width'?: number | unknown;
+  'line-dasharray'?: number[] | unknown;
   'text-color'?: string | unknown;
   'text-halo-color'?: string | unknown;
   'circle-color'?: string | unknown;
@@ -37,27 +39,30 @@ interface StyleSpec {
 
 // ─── OS Explorer (light) theme colours ──────────────────────────────────────
 // Key: original NGD Outdoor colour  Value: Explorer replacement
+// Colours calibrated against actual OS Explorer 1:25,000 raster tiles.
+// General enclosed land is near-white; access land/open fell gets the warm peach.
+// Contours and road hierarchy handled in applyExplorerAdjustments().
 const EXPLORER_SWAP: Record<string, string> = {
-  '#F5F5F0': '#f0e8d4', // GB land paper → warm cream (Explorer-like)
-  '#FAFAF3': '#f0e8d4', // European land
-  '#F8F6F0': '#f0e8d4',
-  '#F4F4EE': '#f0e8d4',
-  '#F4F0D3': '#e8dcc4',
-  '#F7F3CA': '#f0e8a8', // sandy
-  '#EEEFDA': '#eae4c8',
-  '#EAEAD2': '#e4e0c4', // foreshore
-  '#EAEAD3': '#e4e0c4',
-  '#EEE8D3': '#e8e0c4',
-  '#D1E7C3': '#9bc89c', // woodland (solid)
-  '#CEE6BD': '#90c090', // woodland variant
-  '#DDE6D5': '#a8d4a4',
-  '#DBE6D5': '#a8d4a4',
-  '#DCE5D3': '#b0d8a8',
-  '#D6EDCF': '#c4e8bc', // arable / grazing
-  '#E4EFDA': '#cce8c4', // bare earth / grass
-  '#E3F0DB': '#c8e8c4',
-  '#F3F9F4': '#e8f4e4',
-  '#E2EFCE': '#fff8b8', // national parks → pale yellow
+  '#F5F5F0': '#f8f6f2', // GB land paper → near-white (OS explorer farmland is ~white)
+  '#FAFAF3': '#f8f6f2', // European land
+  '#F8F6F0': '#f8f6f2',
+  '#F4F4EE': '#f8f6f2',
+  '#F4F0D3': '#f4e4c8', // access land / open fell → warm peach (OS distinctive)
+  '#F7F3CA': '#f0e4a8', // sandy / beach
+  '#EEEFDA': '#eee8d4', // semi-natural land — very slightly warm
+  '#EAEAD2': '#e8e2cc', // foreshore
+  '#EAEAD3': '#e8e2cc',
+  '#EEE8D3': '#ece4cc',
+  '#D1E7C3': '#c8d878', // woodland — calibrated to OS yellow-lime-green
+  '#CEE6BD': '#bcd070', // woodland variant
+  '#DDE6D5': '#c4d87c',
+  '#DBE6D5': '#c0d47c',
+  '#DCE5D3': '#bcce74',
+  '#D6EDCF': '#cce480', // arable / grazing
+  '#E4EFDA': '#d4e888', // bare earth / grass
+  '#E3F0DB': '#d0e884',
+  '#F3F9F4': '#e8f4c8',
+  '#E2EFCE': '#f0f0b0', // national parks → pale yellow-green
   '#A9DDEF': '#aad4e8', // surface water fills
   '#AADEEF': '#aad4e8',
   '#A4DAEB': '#9ccce0', // waterlines
@@ -136,23 +141,23 @@ const DARK_SWAP: Record<string, string> = {
   '#B2B1B1': '#2c2a26',
   '#B0B0B0': '#2c2a26',
 
-  // Roads — casings (darker borders)
-  '#4E94A3': '#2a4a60', // motorway casing
-  '#7A9CA3': '#263a50',
-  '#6A99A3': '#243848',
-  '#73A06F': '#2a4028', // primary casing
-  '#83A080': '#2a3a28',
-  '#A09C92': '#3a3530', // A road casing
-  '#9F9C93': '#363230', // B road casing
-  '#8C8C8C': '#3a3838', // local road casing
-  '#949290': '#3a3838',
-  '#95968F': '#383630',
+  // Roads — casings (coloured borders, override by applyDarkAdjustments)
+  '#4E94A3': '#305898', // motorway casing
+  '#7A9CA3': '#2a4870',
+  '#6A99A3': '#284568',
+  '#73A06F': '#505a3c', // primary casing
+  '#83A080': '#485238',
+  '#A09C92': '#604030', // A road casing
+  '#9F9C93': '#4e3e28', // B road casing
+  '#8C8C8C': '#3a322a', // local road casing
+  '#949290': '#3a322a',
+  '#95968F': '#383028',
   '#949197': '#403c40', // railway
 
-  // Roads — fills (lighter)
-  '#FFFFFF': '#302c28', // road fill
-  '#AAC7A9': '#243a22', // primary fill
-  '#A0C79F': '#243a22',
+  // Roads — fills (slightly lighter than background #1c1814 to be visible)
+  '#FFFFFF': '#383028', // road fill — was nearly-invisible #302c28
+  '#AAC7A9': '#383e2c', // primary fill
+  '#A0C79F': '#383e2c',
 
   // Arable / extra
   '#AEB4A6': '#303028',
@@ -225,10 +230,13 @@ function applyExplorerAdjustments(layer: StyleLayer): void {
   const sl = layer['source-layer'];
   const id = layer.id;
 
-  // Contours: boost visibility — the Outdoor style uses 0.3 opacity which is too subtle
+  // Contours: OS Explorer raster uses a vivid orange-brown (#f7955b).
+  // Override both colour AND width (base style uses a stops expression that can
+  // mismatch ol-mapbox-style zoom offsets, making contours near-invisible).
   if (sl === 'Contours') {
-    paint['line-color'] = '#b87040'; // warm Explorer brown
-    paint['line-opacity'] = id.includes('/Index') ? 0.75 : 0.55;
+    paint['line-color'] = '#d87840';
+    paint['line-width'] = id.includes('/Index') ? 1.1 : 0.7;
+    paint['line-opacity'] = id.includes('/Index') ? 0.85 : 0.65;
   }
 
   // National parks: bump opacity
@@ -238,30 +246,42 @@ function applyExplorerAdjustments(layer: StyleLayer): void {
     }
   }
 
-  // Woodland rgba variants: standardise to Explorer green
+  // Woodland rgba variants: calibrated to OS yellow-lime-green (#c8d878 family)
   if (
     (sl === 'Woodland:3' || sl === 'Woodland:2' || sl === 'Woodland:1') &&
     typeof paint['fill-color'] === 'string'
   ) {
     const rgba = parseRgba(paint['fill-color']);
     if (rgba) {
-      paint['fill-color'] = `rgba(140,195,142,${rgba.a})`;
+      paint['fill-color'] = `rgba(185,208,112,${rgba.a})`;
     }
   }
 
-  // Roads: OS Explorer colour hierarchy
-  // Casing layers end with "/1"; fill layers end with "_N" (zoom number)
+  // Roads: OS Explorer colour hierarchy.
+  // Casing layers end in "/1", fill layers end in "/0".
+  // Both casing AND fill are coloured so the road body reads correctly at all widths.
   if (sl === 'Roads' && layer.type === 'line' && typeof paint['line-color'] === 'string') {
     const isCasing = id.endsWith('/1');
     if (id.includes('/Motorway')) {
-      paint['line-color'] = isCasing ? '#2060b0' : '#88c0e8';
+      paint['line-color'] = isCasing ? '#1a58a8' : '#78b8e8';
     } else if (id.includes('/Primary')) {
-      paint['line-color'] = isCasing ? '#b03020' : '#f0a898';
+      paint['line-color'] = isCasing ? '#a02818' : '#e89888';
     } else if (id.includes('/A Road')) {
-      if (isCasing) paint['line-color'] = '#c84818';
+      paint['line-color'] = isCasing ? '#c04018' : '#f0b070';
     } else if (id.includes('/B Road')) {
-      if (isCasing) paint['line-color'] = '#b07810';
+      paint['line-color'] = isCasing ? '#a07010' : '#f0e068';
+    } else if (id.includes('/Minor') || id.includes('/Local') || id.includes('/Restricted')) {
+      paint['line-color'] = isCasing ? '#888480' : '#ffffff';
     }
+  }
+
+  // PRoW paths: green dashes (bridleway convention; NGD _symbol doesn't expose
+  // footpath vs bridleway distinction so we use a single colour for all paths).
+  if (sl === 'trn_ntwk_pathlink' && layer.type === 'line') {
+    paint['line-color'] = '#2a8c2a';
+    paint['line-opacity'] = 0.9;
+    paint['line-dasharray'] = [5, 4];
+    paint['line-width'] = 1.4;
   }
 }
 
@@ -271,25 +291,37 @@ function applyDarkAdjustments(layer: StyleLayer): void {
   const sl = layer['source-layer'];
   const id = layer.id;
 
-  // Contours: bright amber/golden to match raster dark mode
+  // Contours: golden amber, override width to ensure visibility regardless of
+  // any zoom-offset issue between MapLibre GL stops and ol-mapbox-style.
   if (sl === 'Contours') {
     paint['line-color'] = '#c89828';
-    paint['line-opacity'] = id.includes('/Index') ? 0.9 : 0.7;
+    paint['line-width'] = id.includes('/Index') ? 1.3 : 0.85;
+    paint['line-opacity'] = id.includes('/Index') ? 0.95 : 0.85;
   }
 
-  // Roads: subtle warm tones readable on dark background
+  // Roads: need enough contrast to be visible on the very dark background (#1c1814).
+  // Casings are the colour-coded element; fills are just slightly lighter than bg.
   if (sl === 'Roads' && layer.type === 'line' && typeof paint['line-color'] === 'string') {
     const isCasing = id.endsWith('/1');
-    if (isCasing) {
-      if (id.includes('/Motorway')) paint['line-color'] = '#1a3858';
-      else if (id.includes('/Primary')) paint['line-color'] = '#283020';
-      else if (id.includes('/A Road')) paint['line-color'] = '#382818';
-      else if (id.includes('/B Road')) paint['line-color'] = '#302818';
-      else paint['line-color'] = '#2e2820';
+    if (id.includes('/Motorway')) {
+      paint['line-color'] = isCasing ? '#305898' : '#283848';
+    } else if (id.includes('/Primary')) {
+      paint['line-color'] = isCasing ? '#505a3c' : '#383e2c';
+    } else if (id.includes('/A Road')) {
+      paint['line-color'] = isCasing ? '#604030' : '#3c2c1e';
+    } else if (id.includes('/B Road')) {
+      paint['line-color'] = isCasing ? '#4e3e28' : '#342c1c';
     } else {
-      // Fill colour — all roads use a dark warm tone
-      paint['line-color'] = '#2a2620';
+      paint['line-color'] = isCasing ? '#3a322a' : '#2e2820';
     }
+  }
+
+  // PRoW paths: bright green on dark bg — algorithm F on #2a8c2a gives ~#44cc44
+  if (sl === 'trn_ntwk_pathlink' && layer.type === 'line') {
+    paint['line-color'] = '#44cc44';
+    paint['line-opacity'] = 0.9;
+    paint['line-dasharray'] = [5, 4];
+    paint['line-width'] = 1.4;
   }
 
   // Labels: light text on dark background
@@ -327,6 +359,12 @@ export function getNgdStyle(dark: boolean, tileUrl: string): StyleSpec {
   const colorMap = dark ? DARK_SWAP : EXPLORER_SWAP;
 
   for (const layer of style.layers) {
+    // Lower minzoom for PRoW path links so they appear at walking-map zoom levels.
+    // The NGD base style sets these to zoom 16 (street-level only).
+    if (layer['source-layer'] === 'trn_ntwk_pathlink' && (layer.minzoom ?? 0) > 13) {
+      layer.minzoom = 13;
+    }
+
     if (!layer.paint) continue;
 
     // Global colour swap based on lookup table
