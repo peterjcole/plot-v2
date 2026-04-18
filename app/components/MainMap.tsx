@@ -106,11 +106,14 @@ function hexToComponents(hex: string): [number, number, number] {
 
 function routeStyles(color: string, alpha: number): Style[] {
   const [r, g, b] = hexToComponents(color);
-  // Very dimmed — thin line only.
   if (alpha < 0.2) {
+    return [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 3 }) })];
+  }
+  // Recent/background activities — thinner to reduce visual noise.
+  if (alpha < 0.6) {
     return [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 5 }) })];
   }
-  // Normal / hovered: clean single-colour stroke.
+  // Hovered: thicker single-colour stroke.
   return [new Style({ stroke: new Stroke({ color: `rgba(${r},${g},${b},${alpha})`, width: 9 }) })];
 }
 
