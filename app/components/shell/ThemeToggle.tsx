@@ -59,6 +59,7 @@ export default function ThemeToggle({ theme, onChange }: ThemeToggleProps) {
         return (
           <button
             key={value}
+            suppressHydrationWarning
             onClick={() => onChange(value)}
             aria-label={label}
             aria-pressed={active}

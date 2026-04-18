@@ -606,8 +606,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     <div className="relative h-screen w-screen overflow-hidden sm:flex" style={{ background: 'var(--p0)' }}>
 
       {/* ── Desktop sidebar (hidden on mobile) ────────────────────────── */}
-      {!sidebarCollapsed && (
-      <div className="hidden sm:flex sm:flex-col sm:shrink-0">
+      <div
+        className="hidden sm:flex sm:flex-col"
+        style={{
+          overflow: 'hidden',
+          width: sidebarCollapsed ? 0 : 'var(--panel-w)',
+          flexShrink: 0,
+          transition: 'width 0.3s ease',
+        }}
+      >
         <LeftPanel
           avatarInitials={avatarInitials}
           isLoggedIn={isLoggedIn}
@@ -618,43 +625,54 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onAbout={handleOpenAbout}
         >
           {/* Keep BrowsePanel mounted to avoid remount cost and preserve scroll position */}
-          <div style={{ display: mode === 'browse' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            opacity: mode === 'browse' ? 1 : 0,
+            pointerEvents: mode === 'browse' ? 'auto' : 'none',
+            transition: 'opacity 0.18s ease',
+          }}>
             {isLoggedIn
               ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
               : <UnauthPanel />
             }
           </div>
           {mode === 'detail' && (
-            detailLoading || !activityDetail ? (
-              <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-                {detailLoading ? 'Loading…' : 'No data'}
-              </div>
-            ) : (
-              <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
-            )
+            <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {detailLoading || !activityDetail ? (
+                <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+                  {detailLoading ? 'Loading…' : 'No data'}
+                </div>
+              ) : (
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
+              )}
+            </div>
           )}
           {mode === 'planner' && (
-            <PlannerPanel
-              distance={distance}
-              elevGain={elevGain}
-              waypoints={waypoints}
-              segments={segments}
-              elevationData={elevationData}
-              isLoadingElevation={isLoadingElevation}
-              dispatch={dispatch}
-              onFitToRoute={() => handleFitToRoute(waypoints)}
-              onExportImage={handleExportImage}
-              isExportingImage={isExportingImage}
-              onEditWaypoint={handleEditWaypoint}
-              onElevationHover={handleElevationHover}
-            />
+            <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <PlannerPanel
+                distance={distance}
+                elevGain={elevGain}
+                waypoints={waypoints}
+                segments={segments}
+                elevationData={elevationData}
+                isLoadingElevation={isLoadingElevation}
+                dispatch={dispatch}
+                onFitToRoute={() => handleFitToRoute(waypoints)}
+                onExportImage={handleExportImage}
+                isExportingImage={isExportingImage}
+                onEditWaypoint={handleEditWaypoint}
+                onElevationHover={handleElevationHover}
+              />
+            </div>
           )}
           {mode === 'about' && (
-            <AboutSection onBack={handleCloseAbout} />
+            <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <AboutSection onBack={handleCloseAbout} />
+            </div>
           )}
         </LeftPanel>
       </div>
-      )}
 
       {/* ── Map area ────────────────────────────────────────────────────── */}
       <div className="absolute inset-0 overflow-hidden sm:relative sm:inset-auto sm:flex-1">
@@ -733,7 +751,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
       {/* ── Mobile-only chrome (hidden on desktop) ───────────────────────── */}
       <div className="sm:hidden">
-        {mode !== 'planner' && <MobileHeader avatarInitials={avatarInitials} isLoggedIn={isLoggedIn} theme={theme} onThemeChange={handleThemeChange} onAbout={handleOpenAbout} />}
+        <MobileHeader
+          avatarInitials={avatarInitials}
+          isLoggedIn={isLoggedIn}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          onAbout={handleOpenAbout}
+          hidden={mode === 'planner'}
+          style={{
+            // Stay below PlannerToolbar (z-20) in planner mode so its background shows through;
+            // jump to z-30 in other modes. Background is always rendered so no fade-in flash.
+            zIndex: mode !== 'planner' ? 30 : 15,
+            pointerEvents: mode !== 'planner' ? 'auto' : 'none',
+          }}
+        />
 
       {/* Tab bar — always shown on mobile */}
       <div style={{
@@ -750,7 +781,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
             color: mode !== 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
-            borderBottom: mode !== 'planner' ? '2px solid var(--ora)' : '2px solid transparent',
+            transition: 'color 0.2s ease',
           }}
         >Activities</button>
         <button
@@ -760,9 +791,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
             color: mode === 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
-            borderBottom: mode === 'planner' ? '2px solid var(--ora)' : '2px solid transparent',
+            transition: 'color 0.2s ease',
           }}
         >Planner</button>
+        {/* Sliding active indicator */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: mode === 'planner' ? '50%' : '0',
+          width: '50%',
+          height: 2,
+          background: 'var(--ora)',
+          transition: 'left 0.22s ease',
+          pointerEvents: 'none',
+        }} />
       </div>
 
 
@@ -772,6 +814,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
       </div>
 
+      {/* Conditional non-animated elements */}
       {mode !== 'planner' && (
         <>
           <LayersPanel state={layerState} onChange={patchLayers} bottom={139} fixed isOwner={isOwner} />
@@ -799,70 +842,79 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </button>
-          <MobileBottomSheet
-            title={sheetTitle}
-            count={sheetCount}
-            forceExpanded={mode === 'detail' || mode === 'about'}
-          >
-            {/* Keep BrowsePanel mounted to avoid remount cost and preserve scroll position */}
-            <div style={{ display: mode === 'browse' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-              {isLoggedIn
-                ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
-                : <UnauthPanel />
-              }
-            </div>
-            {mode === 'detail' && (
-              detailLoading || !activityDetail ? (
-                <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-                  {detailLoading ? 'Loading…' : 'No data'}
-                </div>
-              ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
-              )
-            )}
-            {mode === 'about' && (
-              <AboutSection onBack={handleCloseAbout} />
-            )}
-          </MobileBottomSheet>
         </>
       )}
 
       {mode === 'planner' && (
-        <>
-          {/* Layers panel */}
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
+        <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
+      )}
 
-          {/* Bottom HUD — draggable */}
-          {(() => {
-            const pts = elevationData ?? [];
-            const totalD = pts.length > 1 ? pts[pts.length - 1].distance : 0;
-            const W = 358; const H = 34;
-            let sparklinePts = '';
-            let fillPath = '';
-            if (pts.length >= 2) {
-              const eles = pts.map(p => p.ele);
-              const minE = Math.min(...eles);
-              const maxE = Math.max(...eles);
-              const rangeE = maxE - minE || 1;
-              const toX = (d: number) => totalD ? (d / totalD) * W : 0;
-              const toY = (e: number) => H - 2 - ((e - minE) / rangeE) * (H - 4);
-              sparklinePts = pts.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
-              fillPath = `M0,${H} L${sparklinePts.split(' ').join(' L')} L${W},${H} Z`;
-            }
-            const distKm = (distance / 1000).toFixed(1);
-            return (
-              <div style={{
-                position: 'fixed', bottom: 0, left: 0, right: 0,
-                height: plannerHudHeight,
-                background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                borderTop: '1px solid var(--p3)', borderRadius: '12px 12px 0 0',
-                zIndex: 20,
-                display: 'flex', flexDirection: 'column',
-                transition: plannerHudDragging ? 'none' : 'height 0.3s ease',
-                touchAction: 'none',
-                overflow: 'hidden',
-              }}>
+      {/* Activities bottom sheet — always mounted, crossfades out when entering planner */}
+      <MobileBottomSheet
+        title={sheetTitle}
+        count={sheetCount}
+        forceExpanded={mode === 'detail' || mode === 'about'}
+        style={{
+          opacity: mode !== 'planner' ? 1 : 0,
+          pointerEvents: mode !== 'planner' ? 'auto' : 'none',
+          transform: mode !== 'planner' ? 'translateY(0)' : 'translateY(100%)',
+          transition: 'opacity 0.28s ease, transform 0.28s ease',
+        }}
+      >
+        {/* Keep BrowsePanel mounted to avoid remount cost and preserve scroll position */}
+        <div style={{ display: mode === 'browse' ? 'flex' : 'none', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          {isLoggedIn
+            ? <BrowsePanel activities={allActivities} selectedId={selectedId} onSelectActivity={handleSelectActivity} hoveredId={hoveredId} onHoverActivity={setHoveredId} hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={handleLoadMore} authError={authError} />
+            : <UnauthPanel />
+          }
+        </div>
+        {mode === 'detail' && (
+          detailLoading || !activityDetail ? (
+            <div style={{ padding: 16, fontSize: 11, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+              {detailLoading ? 'Loading…' : 'No data'}
+            </div>
+          ) : (
+            <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
+          )
+        )}
+        {mode === 'about' && (
+          <AboutSection onBack={handleCloseAbout} />
+        )}
+      </MobileBottomSheet>
+
+      {/* Planner HUD — always mounted, crossfades in when entering planner */}
+      {(() => {
+        const pts = elevationData ?? [];
+        const totalD = pts.length > 1 ? pts[pts.length - 1].distance : 0;
+        const W = 358; const H = 34;
+        let sparklinePts = '';
+        let fillPath = '';
+        if (pts.length >= 2) {
+          const eles = pts.map(p => p.ele);
+          const minE = Math.min(...eles);
+          const maxE = Math.max(...eles);
+          const rangeE = maxE - minE || 1;
+          const toX = (d: number) => totalD ? (d / totalD) * W : 0;
+          const toY = (e: number) => H - 2 - ((e - minE) / rangeE) * (H - 4);
+          sparklinePts = pts.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
+          fillPath = `M0,${H} L${sparklinePts.split(' ').join(' L')} L${W},${H} Z`;
+        }
+        const distKm = (distance / 1000).toFixed(1);
+        return (
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0,
+            height: plannerHudHeight,
+            background: 'var(--p1)',
+            borderTop: '1px solid var(--p3)', borderRadius: '16px 16px 0 0',
+            zIndex: 20,
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden',
+            touchAction: 'none',
+            opacity: mode === 'planner' ? 1 : 0,
+            pointerEvents: mode === 'planner' ? 'auto' : 'none',
+            transform: mode === 'planner' ? 'translateY(0)' : 'translateY(100%)',
+            transition: plannerHudDragging ? 'none' : 'height 0.3s ease, opacity 0.28s ease, transform 0.28s ease',
+          }}>
                 {/* Drag zone — handle bar + stats row, large touch target */}
                 <div
                   onTouchStart={handlePlannerHudTouchStart}
@@ -928,11 +980,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                     Export GPX
                   </button>
                 </div>
-              </div>
-            );
-          })()}
-        </>
-      )}
+          </div>
+          );
+        })()}
       </div>{/* end sm:hidden mobile chrome */}
 
       {/* ── Shared overlays ──────────────────────────────────────────────── */}

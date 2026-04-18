@@ -79,6 +79,15 @@
   100% { width: 76px; height: 76px; opacity: 0; }
 }
 
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.panel-fade-in {
+  animation: panel-in 0.18s ease forwards;
+}
+
 html, body {
   overflow: hidden;
   overscroll-behavior: none;

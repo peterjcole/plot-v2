@@ -81,6 +81,7 @@ export default function LeftPanel({ avatarInitials, isLoggedIn = false, activeTa
         style={{
           height: 36,
           display: 'flex',
+          position: 'relative',
           borderBottom: '1px solid var(--fog-ghost)',
           flexShrink: 0,
         }}
@@ -93,7 +94,6 @@ export default function LeftPanel({ avatarInitials, isLoggedIn = false, activeTa
               flex: 1,
               background: 'none',
               border: 'none',
-              borderBottom: activeTab === tab ? '2px solid var(--ora)' : '2px solid transparent',
               color: activeTab === tab ? 'var(--ice)' : 'var(--fog-dim)',
               fontSize: 11,
               fontFamily: 'var(--mono)',
@@ -101,17 +101,28 @@ export default function LeftPanel({ avatarInitials, isLoggedIn = false, activeTa
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               cursor: 'pointer',
-              transition: 'color 0.15s, border-color 0.15s',
-              marginBottom: -1,
+              transition: 'color 0.15s',
+              paddingBottom: 2,
             }}
           >
             {tab === 'activities' ? 'Activities' : 'Planner'}
           </button>
         ))}
+        {/* Sliding active indicator */}
+        <div style={{
+          position: 'absolute',
+          bottom: -1,
+          left: activeTab === 'planner' ? '50%' : '0',
+          width: '50%',
+          height: 2,
+          background: 'var(--ora)',
+          transition: 'left 0.22s ease',
+          pointerEvents: 'none',
+        }} />
       </div>
 
       {/* Panel content slot */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
         {children}
       </div>
     </div>

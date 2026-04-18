@@ -8,6 +8,7 @@ interface MobileBottomSheetProps {
   title?: string;
   count?: number;
   forceExpanded?: boolean;
+  style?: React.CSSProperties;
   children: React.ReactNode;
 }
 
@@ -15,6 +16,7 @@ export default function MobileBottomSheet({
   title = 'Activities',
   count,
   forceExpanded,
+  style: styleProp,
   children,
 }: MobileBottomSheetProps) {
   const [snapExpanded, setSnapExpanded] = useState(520);
@@ -62,6 +64,11 @@ export default function MobileBottomSheet({
     setHeight((h) => (h > COLLAPSED + 20 ? COLLAPSED : snapExpanded));
   }
 
+  const { transition: extraTransition, ...restStyleProp } = styleProp ?? {};
+  const transition = isDragging
+    ? 'none'
+    : ['height 0.3s ease', extraTransition].filter(Boolean).join(', ');
+
   return (
     <div style={{
       position: 'fixed',
@@ -74,8 +81,9 @@ export default function MobileBottomSheet({
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      transition: isDragging ? 'none' : 'height 0.3s ease',
       touchAction: 'none',
+      ...restStyleProp,
+      transition,
     }}>
       {/* Draggable handle */}
       <div

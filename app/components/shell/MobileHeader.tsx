@@ -10,9 +10,11 @@ interface MobileHeaderProps {
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
   onAbout?: () => void;
+  style?: React.CSSProperties;
+  hidden?: boolean;
 }
 
-export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false, theme = 'system', onThemeChange, onAbout }: MobileHeaderProps) {
+export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false, theme = 'system', onThemeChange, onAbout, style: styleProp, hidden = false }: MobileHeaderProps) {
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -36,7 +38,7 @@ export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false,
       position: 'absolute',
       top: 0, left: 0, right: 0,
       height: 60,
-      background: 'var(--glass)',
+      background: 'var(--glass-hvy)',
       backdropFilter: 'blur(8px)',
       WebkitBackdropFilter: 'blur(8px)',
       display: 'flex',
@@ -45,7 +47,13 @@ export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false,
       zIndex: 30,
       borderBottom: '1px solid var(--p3)',
       touchAction: 'none',
+      ...styleProp,
     }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', width: '100%',
+        opacity: hidden ? 0 : 1,
+        pointerEvents: hidden ? 'none' : 'auto',
+      }}>
       <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', lineHeight: 1, marginRight: 12 }}>
         plot
       </span>
@@ -129,6 +137,7 @@ export default function MobileHeader({ avatarInitials = '?', isLoggedIn = false,
           </div>
         </div>
       )}
+      </div>{/* end content wrapper */}
     </div>
   );
 }
