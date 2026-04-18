@@ -1,5 +1,3 @@
-export const runtime = 'edge';
-
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Ribeye_Marrow } from "next/font/google";
 import Script from "next/script";
