@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
 import { boundingExtent } from 'ol/extent';
-import { ActivitySummary, ActivityData, PhotoItem, HeatmapActivity } from '@/lib/types';
+import { ActivitySummary, ActivityData, PhotoItem } from '@/lib/types';
 import { type PlannerProps, type WaypointClickInfo, type SegmentTapInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
@@ -16,7 +16,6 @@ import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { selectGpxWaypoints, downloadGpx } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
-import { type Theme, loadTheme, saveTheme, applyThemeToDocument } from '@/lib/theme';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
@@ -37,6 +36,13 @@ import SidebarToggle from './SidebarToggle';
 import PhotoPopup from '@/app/(main)/planner/PhotoPopup';
 import ClusterPhotosPopup from '@/app/(main)/planner/ClusterPhotosPopup';
 import HeatmapActivityPopup from '@/app/(main)/planner/HeatmapActivityPopup';
+import { useTheme } from './hooks/useTheme';
+import { useActivityBrowse } from './hooks/useActivityBrowse';
+import { useActivityDetail } from './hooks/useActivityDetail';
+import { useLightbox } from './hooks/useLightbox';
+import { usePlannerHud, PLANNER_HUD_COLLAPSED, PLANNER_HUD_EXPANDED } from './hooks/usePlannerHud';
+import { useMapPopups } from './hooks/useMapPopups';
+import { useWaypointInteraction } from './hooks/useWaypointInteraction';
 
 const MainMap = dynamic(() => import('@/app/components/MainMap'), { ssr: false });
 
@@ -73,8 +79,6 @@ interface MapShellProps {
 export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isOwner = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>(initialSelectedId ? 'detail' : initialMode);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
-  const [activityDetail, setActivityDetail] = useState<ActivityData | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [layerState, setLayerState] = useState<LayerState>(() => loadLayerState());
   const patchLayers = useCallback((patch: Partial<LayerState>) => {
     setLayerState(prev => {
@@ -94,71 +98,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [mapReady, setMapReady] = useState(false);
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [loadedActivityId, setLoadedActivityId] = useState<string | null>(null);
-
-  // Lightbox — index of -1 means closed
-  const [lightboxIndex, setLightboxIndex] = useState(-1);
-  const lightboxPhotos = useMemo(() => activityDetail?.photos ?? [], [activityDetail]);
-  const handlePhotoClick = useCallback((index: number) => setLightboxIndex(index), []);
-  const handleLightboxClose = useCallback(() => setLightboxIndex(-1), []);
-  const handlePhotoMarkerClick = useCallback((photoId: string) => {
-    const idx = lightboxPhotos.findIndex(p => p.id === photoId);
-    if (idx >= 0) setLightboxIndex(idx);
-  }, [lightboxPhotos]);
-  const lightboxOpen = lightboxIndex >= 0 && lightboxPhotos.length > 0;
-
-  // Reset lightbox when activity changes
-  useEffect(() => { setLightboxIndex(-1); }, [selectedId]);
-
-  // Pagination
-  const [allActivities, setAllActivities] = useState(activities);
-  const [page, setPage] = useState(1);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(activities.length === 50);
-
-  const handleLoadMore = useCallback(async () => {
-    setIsLoadingMore(true);
-    try {
-      const res = await fetch(`/api/activities?page=${page + 1}&perPage=50`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const next = await res.json() as typeof activities;
-      setAllActivities(prev => [...prev, ...next]);
-      setPage(p => p + 1);
-      setHasMore(next.length === 50);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [page]);
-
-  // Theme — lazy init reads browser state immediately so first render is correct (no light-flash)
-  const [theme, setTheme] = useState<Theme>(() =>
-    typeof window === 'undefined' ? 'system' : loadTheme()
-  );
-  const [sysDark, setSysDark] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
-  const osDark = theme === 'dark' || (theme === 'system' && sysDark);
 
   // Sidebar
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  // Owner photo popups
-  const [photoPopup, setPhotoPopup] = useState<{ photo: PhotoItem; screenX: number; screenY: number } | null>(null);
-  const [clusterPhotosPopup, setClusterPhotosPopup] = useState<{ photos: PhotoItem[]; screenX: number; screenY: number } | null>(null);
-  const photosImportTriggeredRef = useRef(false);
-
-  // Heatmap activity popup + route highlight
-  const [activityPopup, setActivityPopup] = useState<{
-    activities: HeatmapActivity[];
-    screenX: number;
-    screenY: number;
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [popupLoading, setPopupLoading] = useState(false);
-  const [hoveredActivityRoute, setHoveredActivityRoute] = useState<[number, number][] | null>(null);
-  const [hoveredActivityColor, setHoveredActivityColor] = useState<string | null>(null);
 
   // Elevation chart hover → map crosshair
   const [elevationHoverPoint, setElevationHoverPoint] = useState<ElevationHoverPoint | null>(null);
@@ -193,86 +136,30 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
 
-  // Mobile planner HUD — draggable bottom panel
-  // COLLAPSED = thin grab strip, map almost fully visible; EXPANDED = natural content height
-  const PLANNER_HUD_COLLAPSED = 38;
-  const PLANNER_HUD_EXPANDED = 158;
-  const [plannerHudHeight, setPlannerHudHeight] = useState(PLANNER_HUD_EXPANDED);
-  const [plannerHudDragging, setPlannerHudDragging] = useState(false);
-  const plannerHudDragRef = useRef<{ startY: number; startH: number } | null>(null);
-  const handlePlannerHudTouchStart = useCallback((e: React.TouchEvent) => {
-    plannerHudDragRef.current = { startY: e.touches[0].clientY, startH: plannerHudHeight };
-    setPlannerHudDragging(true);
-  }, [plannerHudHeight]);
-  const handlePlannerHudTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!plannerHudDragRef.current) return;
-    const delta = plannerHudDragRef.current.startY - e.touches[0].clientY;
-    // Allow drag from collapsed up to expanded; clamp between collapsed and expanded
-    const next = Math.max(PLANNER_HUD_COLLAPSED, Math.min(PLANNER_HUD_EXPANDED, plannerHudDragRef.current.startH + delta));
-    setPlannerHudHeight(next);
-  }, []);
-  const handlePlannerHudTouchEnd = useCallback(() => {
-    if (!plannerHudDragRef.current) return;
-    setPlannerHudDragging(false);
-    // Snap: if dragged past halfway, collapse; otherwise expand
-    const mid = (PLANNER_HUD_COLLAPSED + PLANNER_HUD_EXPANDED) / 2;
-    setPlannerHudHeight(h => h >= mid ? PLANNER_HUD_EXPANDED : PLANNER_HUD_COLLAPSED);
-    plannerHudDragRef.current = null;
-  }, []);
+  // ── Extracted hooks ───────────────────────────────────────────────────────
+  const { theme, osDark, handleThemeChange } = useTheme();
+  const { allActivities, isLoadingMore, hasMore, hoveredId, setHoveredId, handleLoadMore } = useActivityBrowse(activities);
+  const { activityDetail, setActivityDetail, detailLoading } = useActivityDetail(selectedId);
+  const { lightboxPhotos, lightboxOpen, lightboxIndex, handlePhotoClick, handleLightboxClose, handlePhotoMarkerClick } = useLightbox(activityDetail, selectedId);
+  const { plannerHudHeight, setPlannerHudHeight, plannerHudDragging, handlePlannerHudTouchStart, handlePlannerHudTouchMove, handlePlannerHudTouchEnd } = usePlannerHud();
+  const {
+    photoPopup, setPhotoPopup,
+    clusterPhotosPopup, setClusterPhotosPopup,
+    activityPopup, setActivityPopup,
+    popupLoading,
+    hoveredActivityRoute, setHoveredActivityRoute,
+    hoveredActivityColor, setHoveredActivityColor,
+    handleOwnerPhotoClick, handleOwnerClusterPhotosClick, handleHeatmapClick,
+  } = useMapPopups();
+  const {
+    waypointPopover,
+    segmentTap, setSegmentTap,
+    handleWaypointClick, handleSegmentTap, handleSegmentInsert,
+    handleWaypointPopoverClose, handleEditWaypoint,
+    handleWaypointDelete, handleToggleSnapIn, handleToggleSnapOut,
+  } = useWaypointInteraction(waypoints, segments, dispatch, mapInstanceRef);
 
-  const handleMobileExportGpx = useCallback(() => {
-    if (waypoints.length === 0) return;
-    downloadGpx(waypoints, segments);
-  }, [waypoints, segments]);
-
-  // Waypoint popover
-  const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
-  const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
-
-  // Mobile segment tap — insert waypoint action sheet
-  const [segmentTap, setSegmentTap] = useState<SegmentTapInfo | null>(null);
-  const handleSegmentTap = useCallback((info: SegmentTapInfo) => setSegmentTap(info), []);
-  const handleSegmentInsert = useCallback(() => {
-    if (!segmentTap) return;
-    dispatch({ type: 'INSERT_WAYPOINT', index: segmentTap.segmentIndex, waypoint: segmentTap.waypoint, snap: false });
-    setSegmentTap(null);
-  }, [segmentTap, dispatch]);
-  const handleWaypointPopoverClose = useCallback(() => setWaypointPopover(null), []);
-  const handleEditWaypoint = useCallback((index: number) => {
-    const wp = waypointsRef.current[index];
-    const map = mapInstanceRef.current;
-    if (!wp || !map) return;
-    const coord = fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code);
-
-    const showPopover = () => {
-      const px = map.getPixelFromCoordinate(coord);
-      if (!px) return;
-      const rect = map.getTargetElement().getBoundingClientRect();
-      setWaypointPopover({ index, screenX: rect.left + px[0], screenY: rect.top + px[1] });
-    };
-
-    const size = map.getSize();
-    const pixel = map.getPixelFromCoordinate(coord);
-    const offscreen = !pixel || !size ||
-      pixel[0] < 0 || pixel[1] < 0 || pixel[0] > size[0] || pixel[1] > size[1];
-
-    if (offscreen) {
-      map.getView().animate({ center: coord, duration: 300 }, showPopover);
-    } else {
-      showPopover();
-    }
-  }, []);
-  const handleWaypointDelete = useCallback((index: number) => {
-    dispatch({ type: 'REMOVE_WAYPOINT', index });
-    setWaypointPopover(null);
-  }, [dispatch]);
-  const handleToggleSnapIn = useCallback((index: number) => {
-    if (index > 0) dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index: index - 1 });
-  }, [dispatch]);
-  const handleToggleSnapOut = useCallback((index: number) => {
-    if (index < segments.length) dispatch({ type: 'TOGGLE_SEGMENT_SNAP', index });
-  }, [dispatch, segments.length]);
-
+  const photosImportTriggeredRef = useRef(false);
 
   // Trigger photo catch-up import the first time "My photos" is enabled
   useEffect(() => {
@@ -293,19 +180,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       .catch(() => { /* silently ignore */ });
   }, [isOwner, layerState.showPhotos]);
 
-  // Track system colour-scheme changes (initial values come from lazy useState above)
-  useEffect(() => {
-    const sysMq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => setSysDark(e.matches);
-    sysMq.addEventListener('change', handler);
-    return () => sysMq.removeEventListener('change', handler);
-  }, []);
-
-  // Apply theme to document whenever theme or sysDark changes
-  useEffect(() => {
-    applyThemeToDocument(theme, sysDark);
-  }, [theme, sysDark]);
-
   // Reflect panel mode in URL bar (no navigation, just history state)
   useEffect(() => {
     let path = '/';
@@ -314,23 +188,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     else if (mode === 'about') path = '/about';
     window.history.replaceState(null, '', path);
   }, [mode, selectedId]);
-
-  const handleThemeChange = useCallback((t: Theme) => {
-    setTheme(t);
-    saveTheme(t);
-  }, []);
-
-  // Fetch activity detail — AbortController cancels in-flight requests when selectedId changes
-  useEffect(() => {
-    if (!selectedId) { setActivityDetail(null); setDetailLoading(false); return; }
-    setDetailLoading(true);
-    const controller = new AbortController();
-    fetch(`/api/activities/${selectedId}`, { signal: controller.signal })
-      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data: ActivityData) => { setActivityDetail(data); setDetailLoading(false); })
-      .catch((err) => { if (err.name !== 'AbortError') setDetailLoading(false); });
-    return () => controller.abort();
-  }, [selectedId]);
 
   // Load saved route on mount
   useEffect(() => {
@@ -444,7 +301,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setSelectedId(null);
     setActivityDetail(null);
     fitToDefaultView();
-  }, [fitToDefaultView]);
+  }, [fitToDefaultView, setActivityDetail]);
 
   const handleFitToRoute = useCallback((wps: typeof waypoints) => {
     const map = mapInstanceRef.current;
@@ -468,7 +325,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setActivityDetail(null);
     setLoadedActivityId(null);
     runtimePlannerFitRef.current = true;
-  }, []);
+  }, [setActivityDetail]);
 
   const handleExitPlanner = useCallback(() => {
     setMode('browse');
@@ -477,54 +334,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleOpenAbout = useCallback(() => setMode('about'), []);
   const handleCloseAbout = useCallback(() => setMode('browse'), []);
-
-  const handleOwnerPhotoClick = useCallback(async (photo: PhotoItem, screenX: number, screenY: number) => {
-    setActivityPopup(null);
-    setClusterPhotosPopup(null);
-    setHoveredActivityRoute(null);
-    setPhotoPopup({ photo, screenX, screenY });
-    try {
-      const res = await fetch(`/api/tiles/activities?lat=${photo.lat}&lng=${photo.lng}`);
-      if (res.ok) {
-        const data = await res.json() as { id: number; route: [number, number][] }[];
-        const match = data.find(a => a.id === photo.activityId) ?? data[0];
-        if (match) { setHoveredActivityRoute(match.route); setHoveredActivityColor(null); }
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  const handleOwnerClusterPhotosClick = useCallback((photos: PhotoItem[], screenX: number, screenY: number) => {
-    setActivityPopup(null);
-    setPhotoPopup(null);
-    setHoveredActivityRoute(null);
-    setClusterPhotosPopup({ photos, screenX, screenY });
-  }, []);
-
-  const handleHeatmapClick = useCallback(async (lat: number, lng: number, screenX: number, screenY: number) => {
-    if (popupLoading) return;
-    // Same point → toggle close
-    if (activityPopup && Math.abs(activityPopup.lat - lat) < 0.0001 && Math.abs(activityPopup.lng - lng) < 0.0001) {
-      setActivityPopup(null);
-      setHoveredActivityRoute(null);
-      return;
-    }
-    setActivityPopup({ activities: [], screenX, screenY, lat, lng });
-    setPopupLoading(true);
-    setHoveredActivityRoute(null);
-    try {
-      const res = await fetch(`/api/tiles/activities?lat=${lat}&lng=${lng}`);
-      if (res.ok) {
-        const data = await res.json();
-        setActivityPopup(prev => prev ? { ...prev, activities: data } : null);
-      } else {
-        setActivityPopup(null);
-      }
-    } catch {
-      setActivityPopup(null);
-    } finally {
-      setPopupLoading(false);
-    }
-  }, [activityPopup, popupLoading]);
 
   const handleTabChange = useCallback((tab: 'activities' | 'planner') => {
     if (tab === 'planner') handleOpenPlanner();
@@ -543,7 +352,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setSelectedId(null);
     setActivityDetail(null);
     handleFitToRoute(viaPoints);
-  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner, waypoints.length]);
+  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner, waypoints.length, setActivityDetail]);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -563,6 +372,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     const rotation = computeGridNorthBearing(center) * Math.PI / 180;
     map.getView().animate({ center, zoom: 8, rotation, duration: 500 });
   }, []);
+
+  const handleMobileExportGpx = useCallback(() => {
+    if (waypoints.length === 0) return;
+    downloadGpx(waypoints, segments);
+  }, [waypoints, segments]);
 
   const handleExportImage = useCallback(async () => {
     const map = mapInstanceRef.current;
