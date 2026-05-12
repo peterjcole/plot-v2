@@ -77,6 +77,8 @@ export default function PlannerToolbar({
   canUndo,
   canRedo,
   dispatch,
+  addPointsEnabled,
+  onToggleAddPoints,
   snapEnabled,
   onToggleSnap,
   elevationData,
@@ -174,8 +176,18 @@ export default function PlannerToolbar({
 
         {SEP}
 
+        {/* Add-points toggle (mobile only) */}
+        <div className="sm:hidden">
+          <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              <line x1="12" y1="7" x2="12" y2="11"/><line x1="10" y1="9" x2="14" y2="9"/>
+            </svg>
+          </TbBtn>
+        </div>
+
         {/* Snap toggle */}
-        <TbBtn label="Snap" active={snapEnabled} onClick={onToggleSnap}>
+        <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -240,19 +252,6 @@ export default function PlannerToolbar({
           )}
           {SEP}
         </div>
-
-        {/* Layers (mobile only) */}
-        {onToggleLayers && (
-          <div className="sm:hidden">
-            <TbBtn label="Layers" onClick={onToggleLayers}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-                <polyline points="2 17 12 22 22 17"/>
-                <polyline points="2 12 12 17 22 12"/>
-              </svg>
-            </TbBtn>
-          </div>
-        )}
 
         {/* Back (desktop only, when onBack provided) */}
         {onBack && (

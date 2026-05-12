@@ -109,7 +109,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   // Planner state
   const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
-  const [addPointsEnabled, setAddPointsEnabled] = useState(false);
+  const [addPointsEnabled, setAddPointsEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -406,7 +406,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [segments, osDark]);
 
   const plannerProps: PlannerProps | undefined = mode === 'planner'
-    ? { waypoints, segments, dispatch }
+    ? { waypoints, segments, dispatch, addPointsEnabled, snapEnabled }
     : undefined;
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';

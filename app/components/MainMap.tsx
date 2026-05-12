@@ -42,6 +42,8 @@ export interface PlannerProps {
   waypoints: Waypoint[];
   segments: RouteSegment[];
   dispatch: React.Dispatch<RouteAction>;
+  addPointsEnabled: boolean;
+  snapEnabled: boolean;
 }
 
 interface WaypointClickInfo {
@@ -1301,6 +1303,7 @@ export default function MainMap({
     const onClick = (e: any) => {
       const pp = plannerPropsRef.current;
       if (pp) {
+        if (!pp.addPointsEnabled) return;
         // In planner mode: check for waypoint hit (open popover) otherwise add
         const wpFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
           layerFilter: (l) => l === plannerWpLayerRef.current,
@@ -1334,7 +1337,7 @@ export default function MainMap({
           }
         }
         const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
-        pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: true });
+        pp.dispatch({ type: 'ADD_WAYPOINT', waypoint: { lat, lng }, snap: pp.snapEnabled });
         return;
       }
       // Browse mode: check owner photo clusters first, then activity photo pins, then traces
