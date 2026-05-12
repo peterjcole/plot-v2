@@ -46,9 +46,9 @@ function fmtDate(iso: string): string {
 
 interface StatCellProps { label: string; value: string; unit?: ReactNode; isDark: boolean }
 function StatCell({ label, value, unit, isDark }: StatCellProps) {
-  const dimColor = isDark ? 'rgba(240,248,250,0.34)' : 'rgba(7,54,66,0.38)';
+  const dimColor = isDark ? 'rgba(240,248,250,0.62)' : 'rgba(7,54,66,0.68)';
   const valColor = isDark ? '#F0F8FA' : '#073642';
-  const unitColor = isDark ? 'rgba(240,248,250,0.44)' : 'rgba(7,54,66,0.44)';
+  const unitColor = isDark ? 'rgba(240,248,250,0.72)' : 'rgba(7,54,66,0.75)';
   return (
     <div style={{ padding: '0 18px' }}>
       <div style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 9, fontWeight: 400, color: dimColor, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 6 }}>
@@ -59,7 +59,7 @@ function StatCell({ label, value, unit, isDark }: StatCellProps) {
           {value}
         </span>
         {unit && (
-          <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 15, fontWeight: 400, color: unitColor }}>
+          <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: 15, fontWeight: 400, color: unitColor, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
             {unit}
           </span>
         )}
@@ -130,8 +130,8 @@ export default function RenderClient({
   const stripBg = isDark ? 'rgba(7,14,20,0.97)' : 'rgba(238,232,213,0.98)';
   const stripBorder = isDark ? 'rgba(30,72,88,0.68)' : 'rgba(189,174,132,0.68)';
   const nameColor = isDark ? '#F0F8FA' : '#073642';
-  const dimColor = isDark ? 'rgba(240,248,250,0.44)' : 'rgba(7,54,66,0.44)';
-  const dotColor = isDark ? 'rgba(240,248,250,0.22)' : 'rgba(7,54,66,0.22)';
+  const dimColor = isDark ? 'rgba(240,248,250,0.72)' : 'rgba(7,54,66,0.75)';
+  const dotColor = isDark ? 'rgba(240,248,250,0.45)' : 'rgba(7,54,66,0.50)';
   const attribColor = isDark ? 'rgba(240,248,250,0.16)' : 'rgba(7,54,66,0.18)';
 
   return (
@@ -252,7 +252,7 @@ export default function RenderClient({
         <div style={{ display: 'flex', alignItems: 'center', flex: 1, padding: '0 8px' }}>
           <StatCell label="Distance" value={fmtKm(stats.distance)} unit="km" isDark={isDark} />
           <StripDivider isDark={isDark} />
-          <StatCell label="Elevation" value={fmtElev(stats.elevationGain)} unit={<>m<ArrowUp size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /></>} isDark={isDark} />
+          <StatCell label="Elevation" value={fmtElev(stats.elevationGain)} unit={<>m<ArrowUp size={13} /></>} isDark={isDark} />
           <StripDivider isDark={isDark} />
           <StatCell label="Time" value={fmtTime(stats.movingTime)} isDark={isDark} />
           <StripDivider isDark={isDark} />

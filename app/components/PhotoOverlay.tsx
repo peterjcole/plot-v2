@@ -14,9 +14,9 @@ interface PhotoOverlayProps {
   isDark?: boolean;
 }
 
-function createNumberedIcon(number: number, isDark: boolean) {
-  const bg = isDark ? 'rgba(212, 135, 43, 0.82)' : 'rgba(74, 90, 43, 0.82)';
-  const border = isDark ? 'rgba(90, 45, 0, 0.9)' : 'rgba(58, 71, 34, 0.9)';
+function createNumberedIcon(number: number) {
+  const bg = 'rgba(224, 112, 32, 0.82)';
+  const border = 'rgba(160, 72, 8, 0.9)';
   return L.divIcon({
     className: 'photo-numbered-pin',
     html: `<div style="
@@ -43,8 +43,8 @@ export default function PhotoOverlay({ photos, onPinClick, isDark = false }: Pho
   const map = useMap();
 
   useEffect(() => {
-    const bg = isDark ? 'rgba(212, 135, 43, 0.82)' : 'rgba(74, 90, 43, 0.82)';
-    const border = isDark ? 'rgba(90, 45, 0, 0.9)' : 'rgba(58, 71, 34, 0.9)';
+    const bg = 'rgba(224, 112, 32, 0.82)';
+    const border = 'rgba(160, 72, 8, 0.9)';
     const clusterGroup = L.markerClusterGroup({
       maxClusterRadius: 40,
       iconCreateFunction: (cluster) => {
@@ -82,7 +82,7 @@ export default function PhotoOverlay({ photos, onPinClick, isDark = false }: Pho
 
     photos.forEach((photo, index) => {
       const marker = L.marker([photo.lat, photo.lng], {
-        icon: createNumberedIcon(index + 1, isDark),
+        icon: createNumberedIcon(index + 1),
       }) as L.Marker & { _photoNumber?: number };
       marker._photoNumber = index + 1;
 
@@ -98,7 +98,7 @@ export default function PhotoOverlay({ photos, onPinClick, isDark = false }: Pho
     return () => {
       map.removeLayer(clusterGroup);
     };
-  }, [map, photos, onPinClick, isDark]);
+  }, [map, photos, onPinClick]);
 
   return null;
 }

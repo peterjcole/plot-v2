@@ -115,7 +115,7 @@ function RouteOutlineFilter({ strokeColor, outlineColor }: { strokeColor: string
           '<feComponentTransfer in="SourceAlpha" result="opaque-alpha">',
           '  <feFuncA type="linear" slope="100" intercept="0"/>',
           '</feComponentTransfer>',
-          '<feMorphology in="opaque-alpha" operator="dilate" radius="3" result="dilated"/>',
+          '<feMorphology in="opaque-alpha" operator="dilate" radius="2" result="dilated"/>',
           `<feFlood flood-color="${outlineColor}" flood-opacity="1.0" result="color"/>`,
           '<feComposite in="color" in2="dilated" operator="in" result="full-outline"/>',
           '<feComposite in="full-outline" in2="opaque-alpha" operator="out" result="border-only"/>',
@@ -152,22 +152,22 @@ function StartEndMarkers({ route, color }: { route: [number, number][]; color: s
     const startIcon = L.divIcon({
       className: '',
       html: `<div style="
-        width:16px;height:16px;border-radius:50%;
+        width:20px;height:20px;border-radius:50%;
         background:${color};
-        border:2.5px solid white;
+        border:3px solid white;
         box-shadow:0 1px 4px rgba(0,0,0,0.45);
         box-sizing:border-box;
         opacity:0.75;
       "></div>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
 
     const endIcon = L.divIcon({
       className: '',
-      html: `<svg width="16" height="16" viewBox="0 0 16 16" style="display:block"><defs><clipPath id="end-checker-clip"><circle cx="8" cy="8" r="6"/></clipPath></defs><g clip-path="url(#end-checker-clip)"><rect x="2" y="2" width="6" height="6" fill="${color}"/><rect x="8" y="2" width="6" height="6" fill="white"/><rect x="2" y="8" width="6" height="6" fill="white"/><rect x="8" y="8" width="6" height="6" fill="${color}"/></g><circle cx="8" cy="8" r="6" fill="none" stroke="white" stroke-width="2"/></svg>`,
-      iconSize: [16, 16],
-      iconAnchor: [8, 8],
+      html: `<svg width="20" height="20" viewBox="0 0 20 20" style="display:block"><defs><clipPath id="end-checker-clip"><circle cx="10" cy="10" r="8"/></clipPath></defs><g clip-path="url(#end-checker-clip)"><rect x="2" y="2" width="8" height="8" fill="${color}"/><rect x="10" y="2" width="8" height="8" fill="white"/><rect x="2" y="10" width="8" height="8" fill="white"/><rect x="10" y="10" width="8" height="8" fill="${color}"/></g><circle cx="10" cy="10" r="8" fill="none" stroke="white" stroke-width="2.5"/></svg>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
     });
 
     const startMarker = L.marker(route[0], { icon: startIcon, interactive: false, zIndexOffset: 1000 });
@@ -197,9 +197,9 @@ function DirectionArrows({ route, color, opacity = 1 }: { route: [number, number
       const deg = bearing(route[idx][0], route[idx][1], route[ahead][0], route[ahead][1]);
       const icon = L.divIcon({
         className: '',
-        html: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" style="display:block;transform:rotate(${deg}deg);opacity:${opacity}"><path d="M18 15 L12 9 L6 15" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        html: `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="display:block;transform:rotate(${deg}deg);opacity:${opacity}"><path d="M18 15 L12 9 L6 15" stroke="${color}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
       });
       return L.marker(route[idx], { icon, interactive: false }).addTo(map);
     });
@@ -322,7 +322,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
 
   const isDark = isSatellite || osDark;
   const routeColor = getActivityColor(activity.type ?? '');
-  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.92)' : 'rgba(7,14,20,0.80)';
+  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.65)' : 'rgba(7,14,20,0.60)';
   const routeOpacity = 0.68;
 
   return (
@@ -369,7 +369,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
           }}
         />
         <RouteOutlineFilter strokeColor={routeColor} outlineColor={routeOutlineColor} />
-        <DirectionArrows route={route} color={routeColor} opacity={isDark ? routeOpacity : 1} />
+        <DirectionArrows route={route} color={routeOutlineColor} opacity={1} />
         <StartEndMarkers route={route} color={routeColor} />
         <MapController route={route} paddingRight={paddingRight ?? 0} paddingBottom={extraBottomPadding} centerZoom={centerZoom} />
         <TileLoadHandler />

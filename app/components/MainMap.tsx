@@ -132,7 +132,7 @@ function pinIconSvg(hasPhoto: boolean): string {
 // Cased lines: dark outer border drawn first, orange inner on top.
 // Layer opacity (0.52) makes the whole thing translucent so the map shows through the center.
 const snappedRouteStyle = [
-  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.95)', width: 16 }) }),
+  new Style({ stroke: new Stroke({ color: 'rgba(7,14,20,0.85)', width: 16 }) }),
   new Style({ stroke: new Stroke({ color: '#E07020', width: 11 }) }),
 ];
 const unsnappedRouteStyle = [

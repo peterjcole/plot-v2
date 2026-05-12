@@ -152,28 +152,28 @@ export default function TextOverlay({ activity, baseMap, osDark, hideDescription
         </p>
         <div className="flex gap-6 flex-wrap">
           <div>
-            <div className="text-xl font-bold tracking-tight">
+            <div className="text-2xl font-bold tracking-tight">
               {formatDistance(activity.stats.distance)}
             </div>
-            <div className="text-[15px] font-medium opacity-90">Distance</div>
+            <div className="text-[16px] font-medium">Distance</div>
           </div>
           <div>
-            <div className="text-xl font-bold tracking-tight">
+            <div className="text-2xl font-bold tracking-tight">
               {formatDuration(activity.stats.movingTime)}
             </div>
-            <div className="text-[15px] font-medium opacity-90">Time</div>
+            <div className="text-[16px] font-medium">Time</div>
           </div>
           <div>
-            <div className="text-xl font-bold tracking-tight">
+            <div className="text-2xl font-bold tracking-tight">
               {formatPace(activity.stats.averageSpeed)}
             </div>
-            <div className="text-[15px] font-medium opacity-90">Pace</div>
+            <div className="text-[16px] font-medium">Pace</div>
           </div>
           <div>
-            <div className="text-xl font-bold tracking-tight">
+            <div className="text-2xl font-bold tracking-tight">
               {activity.stats.elevationGain} m
             </div>
-            <div className="text-[15px] font-medium opacity-90">Elevation</div>
+            <div className="text-[16px] font-medium">Elevation</div>
           </div>
         </div>
         {!hideDescription && activity.description && (
