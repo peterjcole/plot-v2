@@ -22,8 +22,7 @@ interface PlannerToolbarProps {
   isLoadingElevation: boolean;
   onElevationHover?: (point: { lat: number; lng: number; ele: number; distance: number } | null) => void;
   onFitToRoute?: (waypoints: Waypoint[]) => void;
-  onExportImage?: () => void;
-  isExportingImage?: boolean;
+  onReverse: () => void;
   onBack?: () => void;
   onToggleLayers?: () => void;
   onExportGpx?: () => void;
@@ -83,8 +82,7 @@ export default function PlannerToolbar({
   onToggleSnap,
   elevationData,
   onFitToRoute,
-  onExportImage,
-  isExportingImage = false,
+  onReverse,
   onBack,
   onToggleLayers,
   onExportGpx,
@@ -223,17 +221,12 @@ export default function PlannerToolbar({
           </TbBtn>
         </div>
 
-        {/* Export Image — available on both desktop and mobile */}
-        <TbBtn label="Image" disabled={isExportingImage} onClick={onExportImage}>
-          {isExportingImage ? (
-            <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid var(--fog-ghost)', borderTopColor: 'var(--ora)', animation: 'spin 0.8s linear infinite' }} />
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-          )}
+        {/* Reverse route */}
+        <TbBtn label="Reverse" disabled={waypoints.length < 2} onClick={onReverse}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+            <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+          </svg>
         </TbBtn>
 
         {/* Spacer */}

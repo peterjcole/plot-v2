@@ -18,7 +18,8 @@ export type RouteAction =
   | { type: 'REDO' }
   | { type: 'LOAD'; waypoints: Waypoint[]; segments?: RouteSegment[] }
   | { type: 'UPDATE_SEGMENT'; index: number; coordinates: Waypoint[]; distance?: number }
-  | { type: 'TOGGLE_SEGMENT_SNAP'; index: number };
+  | { type: 'TOGGLE_SEGMENT_SNAP'; index: number }
+  | { type: 'REVERSE' };
 
 interface HistoryState {
   past: RouteState[];
@@ -143,6 +144,16 @@ function applyAction(state: RouteState, action: RouteAction): RouteState | null 
         return seg;
       });
       return { waypoints: state.waypoints, segments: newSegments };
+    }
+    case 'REVERSE': {
+      if (state.waypoints.length < 2) return null;
+      const waypoints = [...state.waypoints].reverse();
+      const segments = [...state.segments].reverse().map(seg => ({
+        ...seg,
+        coordinates: [],
+        distance: undefined,
+      }));
+      return { waypoints, segments };
     }
     default:
       return null;
