@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo, useRef } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, ChevronLeft } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -161,15 +161,11 @@ export default function PlannerToolbar({
 
         {/* Undo */}
         <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
-          </svg>
+          <Undo2 size={16} />
         </TbBtn>
         {/* Redo */}
         <TbBtn label="Redo" disabled={!canRedo} onClick={handleRedo}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>
-          </svg>
+          <Redo2 size={16} />
         </TbBtn>
 
         {SEP}
@@ -177,27 +173,18 @@ export default function PlannerToolbar({
         {/* Add-points toggle (mobile only) */}
         <div className="sm:hidden">
           <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-              <line x1="12" y1="7" x2="12" y2="11"/><line x1="10" y1="9" x2="14" y2="9"/>
-            </svg>
+            <MapPinPlus size={16} />
           </TbBtn>
         </div>
 
         {/* Snap toggle */}
         <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-          </svg>
+          <Link2 size={16} />
         </TbBtn>
 
         {/* Clear */}
         <TbBtn label="Clear" disabled={waypoints.length === 0} onClick={handleClear}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
+          <Trash2 size={16} />
         </TbBtn>
 
         {/* Desktop-only: Import + Export GPX */}
@@ -206,27 +193,18 @@ export default function PlannerToolbar({
 
           {/* Import */}
           <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
+            <Upload size={16} />
           </TbBtn>
 
           {/* Export GPX */}
           <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
+            <Download size={16} />
           </TbBtn>
         </div>
 
         {/* Reverse route */}
         <TbBtn label="Reverse" disabled={waypoints.length < 2} onClick={onReverse}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-            <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-          </svg>
+          <ArrowRightLeft size={16} />
         </TbBtn>
 
         {/* Spacer */}
@@ -251,9 +229,7 @@ export default function PlannerToolbar({
           <div className="hidden sm:flex items-center">
             {SEP}
             <TbBtn label="Back" onClick={onBack}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m15 18-6-6 6-6"/>
-              </svg>
+              <ChevronLeft size={16} />
             </TbBtn>
           </div>
         )}

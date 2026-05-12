@@ -41,7 +41,7 @@ The Strava API returns more fields than the current types expose. Fields availab
 
 ### Icons
 
-Lucide is already a project dependency. Use inline SVG paths with `stroke="currentColor"` rather than Unicode characters or emoji. Never use Unicode symbols (↩ ↪ ⊗ etc.) as UI icons.
+Use Lucide React icons (`import { IconName } from 'lucide-react'`). Never use Unicode symbols (↩ ↪ ⊗ etc.) as UI icons. Inline SVG is acceptable only when no suitable Lucide icon exists.
 
 ### Design / Mockups
 
