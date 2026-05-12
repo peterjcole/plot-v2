@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ActivityData } from '@/lib/types';
 import { getActivityColor, getActivityCategory } from '@/lib/activity-categories';
 import ExportOptionsPopover from './ExportOptionsPopover';
@@ -226,8 +227,8 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
         </div>
       </div>
 
-      {/* Export popover — rendered via fixed positioning, outside panel flow */}
-      {showExportPopover && (
+      {/* Export popover — portalled to body to escape panel overflow/stacking context */}
+      {showExportPopover && createPortal(
         <ExportOptionsPopover
           activityId={String(activity.id)}
           osDark={osDark}
@@ -235,7 +236,8 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
           initialHillshade={exportHillshade}
           anchorRect={anchorRect}
           onClose={() => setShowExportPopover(false)}
-        />
+        />,
+        document.body,
       )}
     </div>
   );
