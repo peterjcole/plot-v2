@@ -140,6 +140,26 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const { theme, osDark, handleThemeChange } = useTheme();
   const { allActivities, isLoadingMore, hasMore, hoveredId, setHoveredId, handleLoadMore } = useActivityBrowse(activities);
   const { activityDetail, setActivityDetail, detailLoading } = useActivityDetail(selectedId);
+
+  // When the selected activity isn't in the paginated list (page 2+), inject a synthetic
+  // summary so MainMap can render its trace. Only used for MainMap — not BrowsePanel.
+  const activitiesForMap = useMemo(() => {
+    if (!activityDetail || !selectedId) return allActivities;
+    if (allActivities.some(a => String(a.id) === selectedId)) return allActivities;
+    const synthetic: ActivitySummary = {
+      id: Number(activityDetail.id),
+      name: activityDetail.name,
+      type: activityDetail.type ?? 'Ride',
+      startDate: activityDetail.stats.startDate,
+      distance: activityDetail.stats.distance,
+      movingTime: activityDetail.stats.movingTime,
+      elevationGain: activityDetail.stats.elevationGain,
+      photoCount: activityDetail.photos.length,
+      route: activityDetail.route,
+    };
+    return [synthetic, ...allActivities];
+  }, [allActivities, activityDetail, selectedId]);
+
   const { lightboxPhotos, lightboxOpen, lightboxIndex, handlePhotoClick, handleLightboxClose, handlePhotoMarkerClick } = useLightbox(activityDetail, selectedId);
   const { plannerHudHeight, setPlannerHudHeight, plannerHudDragging, handlePlannerHudTouchStart, handlePlannerHudTouchMove, handlePlannerHudTouchEnd } = usePlannerHud();
   const {
@@ -492,7 +512,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       <div className="absolute inset-0 overflow-hidden sm:relative sm:inset-auto sm:flex-1">
         <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(v => !v)} />
         <MainMap
-          activities={allActivities}
+          activities={activitiesForMap}
           highlightedId={hoveredId}
           selectedId={selectedId}
           showRecentActivities={layerState.showRecentActivities}
