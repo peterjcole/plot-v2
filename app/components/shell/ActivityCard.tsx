@@ -80,7 +80,7 @@ export default function ActivityCard({ activity, onClick, isSelected, isHovered,
       {/* Coloured left border */}
       <div style={{ width: 3, background: color, flexShrink: 0 }} />
 
-      <div style={{ flex: 1, padding: '9px 10px 9px 10px' }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '9px 10px 9px 10px' }}>
         {/* Name row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
           <TypeIcon type={activity.type} color={color} />
@@ -90,6 +90,7 @@ export default function ActivityCard({ activity, onClick, isSelected, isHovered,
             color: 'var(--ice)',
             fontFamily: 'var(--mono)',
             lineHeight: 1.3,
+            minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
