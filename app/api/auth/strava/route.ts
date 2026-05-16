@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'activity:read_all',
+    scope: 'read,activity:read_all',
     approval_prompt: 'auto',
     state,
   });

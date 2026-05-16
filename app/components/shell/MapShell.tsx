@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { X, Image as ImageIcon, Download } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Image as ImageIcon, Download, Upload } from 'lucide-react';
+import ImportRoutePopover from '@/app/components/shell/ImportRoutePopover';
 import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
 import { fromLonLat, transform } from 'ol/proj';
@@ -14,7 +16,7 @@ import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
-import { selectGpxWaypoints, downloadGpx } from '@/lib/gpx';
+import { selectGpxWaypoints, downloadGpx, parseGpx } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
@@ -136,6 +138,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [elevationData]);
 
   const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
+  const [mobileImportAnchor, setMobileImportAnchor] = useState<DOMRect | null>(null);
+  const mobileFileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Extracted hooks ───────────────────────────────────────────────────────
   const { theme, osDark, handleThemeChange } = useTheme();
@@ -401,6 +405,28 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     if (waypoints.length === 0) return;
     downloadGpx(waypoints, segments);
   }, [waypoints, segments]);
+
+  const handleMobileGpxImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (waypoints.length > 0 && !window.confirm('Replace the current route with the imported route?')) {
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const content = ev.target?.result;
+      if (typeof content !== 'string') return;
+      const trackPoints = parseGpx(content);
+      const { waypoints: viaPoints, segments: viaSegments } = selectGpxWaypoints(trackPoints, 2);
+      if (viaPoints.length >= 1) {
+        dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
+        handleFitToRoute(viaPoints);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, [waypoints.length, dispatch, handleFitToRoute]);
 
   const handleExportImage = useCallback(async () => {
     const map = mapInstanceRef.current;
@@ -758,6 +784,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 </div>
                 <div style={{ display: 'flex', gap: 10, padding: '0 16px 14px' }}>
                   <button
+                    onClick={(e) => setMobileImportAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())}
+                    style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: 'var(--p3)', color: 'var(--fog)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  >
+                    <Upload size={14} />
+                    Import
+                  </button>
+                  <button
                     onClick={handleExportImage}
                     disabled={isExportingImage || waypoints.length === 0}
                     style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: 'var(--p3)', color: waypoints.length === 0 ? 'var(--fog-dim)' : 'var(--fog)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
@@ -775,13 +808,29 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                     style={{ flex: 1, height: 40, borderRadius: 4, border: 'none', background: waypoints.length === 0 ? 'var(--p3)' : 'var(--ora)', color: waypoints.length === 0 ? 'var(--fog-dim)' : 'var(--p0)', font: '700 10px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: waypoints.length === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                   >
                     <Download size={14} />
-                    Export GPX
+                    Export
                   </button>
                 </div>
           </div>
           );
         })()}
       </div>{/* end sm:hidden mobile chrome */}
+
+      {/* Mobile GPX file input — triggers from ImportRoutePopover on mobile */}
+      <input type="file" accept=".gpx" style={{ display: 'none' }} ref={mobileFileInputRef} onChange={handleMobileGpxImport} />
+
+      {/* Mobile import route popover */}
+      {mobileImportAnchor && createPortal(
+        <ImportRoutePopover
+          anchorRect={mobileImportAnchor}
+          onClose={() => setMobileImportAnchor(null)}
+          dispatch={dispatch}
+          waypoints={waypoints}
+          onFitToRoute={handleFitToRoute}
+          fileInputRef={mobileFileInputRef}
+        />,
+        document.body,
+      )}
 
       {/* ── Shared overlays ──────────────────────────────────────────────── */}
       {segmentTap && mode === 'planner' && (

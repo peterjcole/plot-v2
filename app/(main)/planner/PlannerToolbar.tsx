@@ -1,11 +1,13 @@
 'use client';
 
-import { type ReactNode, useCallback, useMemo, useRef } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, ChevronLeft } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
+import ImportRoutePopover from '@/app/components/shell/ImportRoutePopover';
 
 interface PlannerToolbarProps {
   waypoints: Waypoint[];
@@ -41,7 +43,7 @@ interface TbBtnProps {
   label: string;
   disabled?: boolean;
   active?: boolean;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
   title?: string;
   className?: string;
@@ -90,6 +92,7 @@ export default function PlannerToolbar({
   onExportGpx,
 }: PlannerToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importAnchor, setImportAnchor] = useState<DOMRect | null>(null);
 
   const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
@@ -118,7 +121,7 @@ export default function PlannerToolbar({
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (waypoints.length > 0 && !window.confirm('Replace the current route with the imported GPX?')) {
+    if (waypoints.length > 0 && !window.confirm('Replace the current route with the imported route?')) {
       e.target.value = '';
       return;
     }
@@ -147,7 +150,7 @@ export default function PlannerToolbar({
     <>
       <input type="file" accept=".gpx" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
       <div
-        className="animate-panel-in fixed sm:absolute top-[68px] sm:top-0 left-[10px] sm:left-0 right-[10px] sm:right-0 h-[46px] sm:h-12 rounded-[10px] sm:rounded-none border sm:border-0 sm:border-b border-p3 z-20 sm:z-[5] flex items-center px-3 gap-0.5"
+        className="animate-panel-in fixed sm:absolute top-[68px] sm:top-0 left-[10px] sm:left-0 right-[10px] sm:right-0 h-[46px] sm:h-12 rounded-[10px] sm:rounded-none border sm:border-0 sm:border-b border-p3 z-20 sm:z-[5] flex items-center px-3 gap-0.5 sm:gap-2"
         style={{ background: 'var(--glass-lgt)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
       >
 
@@ -163,9 +166,11 @@ export default function PlannerToolbar({
         <div className="hidden sm:block">{SEP}</div>
 
         {/* Add-points toggle (mobile only) */}
-        <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints} className="sm:hidden">
-          <MapPinPlus size={16} />
-        </TbBtn>
+        <div className="contents sm:hidden">
+          <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
+            <MapPinPlus size={16} />
+          </TbBtn>
+        </div>
 
         {/* Snap toggle */}
         <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>
@@ -178,11 +183,11 @@ export default function PlannerToolbar({
         </TbBtn>
 
         {/* Desktop-only: Import + Export GPX */}
-        <div className="hidden sm:flex items-center">
+        <div className="hidden sm:flex items-center gap-2">
           {SEP}
 
           {/* Import */}
-          <TbBtn label="Import" onClick={() => fileInputRef.current?.click()}>
+          <TbBtn label="Import" onClick={(e) => setImportAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())}>
             <Upload size={16} />
           </TbBtn>
 
@@ -224,6 +229,18 @@ export default function PlannerToolbar({
           </div>
         )}
       </div>
+
+      {importAnchor && createPortal(
+        <ImportRoutePopover
+          anchorRect={importAnchor}
+          onClose={() => setImportAnchor(null)}
+          dispatch={dispatch}
+          waypoints={waypoints}
+          onFitToRoute={onFitToRoute}
+          fileInputRef={fileInputRef}
+        />,
+        document.body,
+      )}
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
