@@ -39,9 +39,10 @@ interface DetailPanelProps {
   osDark?: boolean;
   exportBaseMap?: 'os' | 'satellite';
   exportHillshade?: boolean;
+  hideHeader?: boolean;
 }
 
-export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true, exportBaseMap, exportHillshade }: DetailPanelProps) {
+export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true, exportBaseMap, exportHillshade, hideHeader }: DetailPanelProps) {
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
   const [showExportPopover, setShowExportPopover] = useState(false);
@@ -58,8 +59,8 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
+      {/* Header — hidden on mobile since the capsule shows back/name/type */}
+      {!hideHeader && <div style={{
         padding: '10px 12px 10px',
         borderBottom: '1px solid var(--fog-ghost)',
         flexShrink: 0,
@@ -88,7 +89,7 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 20px' }}>

@@ -44,15 +44,17 @@ interface TbBtnProps {
   onClick?: () => void;
   children: React.ReactNode;
   title?: string;
+  className?: string;
 }
-function TbBtn({ label, disabled, active, onClick, children, title }: TbBtnProps) {
+function TbBtn({ label, disabled, active, onClick, children, title, className }: TbBtnProps) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title ?? label}
+      className={`flex-1 sm:flex-none sm:w-10${className ? ` ${className}` : ''}`}
       style={{
-        width: 40, height: 36, borderRadius: 3,
+        height: 36, borderRadius: 3,
         background: 'transparent', border: 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
@@ -145,19 +147,9 @@ export default function PlannerToolbar({
     <>
       <input type="file" accept=".gpx" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
       <div
-        className="fixed sm:absolute top-0 left-0 right-0 h-[60px] sm:h-12 z-20 sm:z-[5] flex items-center px-3 gap-0.5"
-        style={{
-          background: 'var(--glass-hvy)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderBottom: '1px solid var(--p3)',
-        }}
+        className="animate-panel-in fixed sm:absolute top-[68px] sm:top-0 left-[10px] sm:left-0 right-[10px] sm:right-0 h-[46px] sm:h-12 rounded-[10px] sm:rounded-none border sm:border-0 sm:border-b border-p3 z-20 sm:z-[5] flex items-center px-3 gap-0.5"
+        style={{ background: 'var(--glass-lgt)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
       >
-        {/* Mobile-only: "plot" logo */}
-        <div className="flex items-center sm:hidden">
-          <span style={{ fontFamily: 'var(--display)', fontSize: 20, color: 'var(--ice)', padding: '0 4px 0 4px', flexShrink: 0, lineHeight: 1 }}>plot</span>
-          {SEP}
-        </div>
 
         {/* Undo */}
         <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
@@ -168,14 +160,12 @@ export default function PlannerToolbar({
           <Redo2 size={16} />
         </TbBtn>
 
-        {SEP}
+        <div className="hidden sm:block">{SEP}</div>
 
         {/* Add-points toggle (mobile only) */}
-        <div className="sm:hidden">
-          <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
-            <MapPinPlus size={16} />
-          </TbBtn>
-        </div>
+        <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints} className="sm:hidden">
+          <MapPinPlus size={16} />
+        </TbBtn>
 
         {/* Snap toggle */}
         <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>
@@ -207,8 +197,8 @@ export default function PlannerToolbar({
           <ArrowRightLeft size={16} />
         </TbBtn>
 
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
+        {/* Spacer — desktop only; hidden on mobile so flex-1 buttons distribute evenly */}
+        <div className="hidden sm:block sm:flex-1" />
 
         {/* Desktop-only: route info / hint */}
         <div className="hidden sm:flex items-center">

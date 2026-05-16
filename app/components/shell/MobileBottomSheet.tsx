@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const COLLAPSED = 130;
+const PEEK = 170;
 
 interface MobileBottomSheetProps {
   title?: string;
   count?: number;
-  forceExpanded?: boolean;
+  defaultSnap?: 'peek' | 'mid' | 'expanded';
+  hideHeader?: boolean;
+  showSearch?: boolean;
   style?: React.CSSProperties;
   children: React.ReactNode;
 }
@@ -15,30 +17,35 @@ interface MobileBottomSheetProps {
 export default function MobileBottomSheet({
   title = 'Activities',
   count,
-  forceExpanded,
+  defaultSnap = 'peek',
+  hideHeader,
+  showSearch = true,
   style: styleProp,
   children,
 }: MobileBottomSheetProps) {
+  const [snapMid, setSnapMid] = useState(420);
   const [snapExpanded, setSnapExpanded] = useState(520);
-  const [height, setHeight] = useState(COLLAPSED);
+  const [height, setHeight] = useState(PEEK);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
-  // Compute expanded snap point after mount; update on resize/orientation change
   useEffect(() => {
-    const update = () => setSnapExpanded(Math.round(window.innerHeight * 0.72));
+    const update = () => {
+      setSnapMid(Math.round(window.innerHeight * 0.5));
+      setSnapExpanded(Math.round(window.innerHeight * 0.72));
+    };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Auto-snap to expanded when parent forces it
+  // Sync to defaultSnap when the mode prop changes (intentionally excludes snapMid/snapExpanded)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- snapMid/snapExpanded intentionally excluded; only fire on mode change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceExpanded prop to height state
-    if (forceExpanded) setHeight((h) => Math.max(h, snapExpanded));
-  }, [forceExpanded, snapExpanded]);
+    setHeight(defaultSnap === 'expanded' ? snapExpanded : defaultSnap === 'mid' ? snapMid : PEEK);
+  }, [defaultSnap]);
 
-  const isExpanded = height > COLLAPSED + 20;
+  const isExpanded = height > PEEK + 20;
 
   function handleTouchStart(e: React.TouchEvent) {
     dragRef.current = { startY: e.touches[0].clientY, startHeight: height };
@@ -48,20 +55,25 @@ export default function MobileBottomSheet({
   function handleTouchMove(e: React.TouchEvent) {
     if (!dragRef.current) return;
     const delta = dragRef.current.startY - e.touches[0].clientY;
-    const next = Math.max(COLLAPSED, Math.min(window.innerHeight * 0.9, dragRef.current.startHeight + delta));
+    const next = Math.max(PEEK, Math.min(window.innerHeight * 0.9, dragRef.current.startHeight + delta));
     setHeight(next);
   }
 
   function handleTouchEnd() {
     if (!dragRef.current) return;
     setIsDragging(false);
-    const mid = (COLLAPSED + snapExpanded) / 2;
-    setHeight(height >= mid ? snapExpanded : COLLAPSED);
+    const snaps = [PEEK, snapMid, snapExpanded];
+    const nearest = snaps.reduce((a, b) => Math.abs(a - height) < Math.abs(b - height) ? a : b);
+    setHeight(nearest);
     dragRef.current = null;
   }
 
   function toggleExpand() {
-    setHeight((h) => (h > COLLAPSED + 20 ? COLLAPSED : snapExpanded));
+    setHeight(h => {
+      if (h <= PEEK + 20) return snapMid;
+      if (h <= snapMid + 20) return snapExpanded;
+      return PEEK;
+    });
   }
 
   const { transition: extraTransition, ...restStyleProp } = styleProp ?? {};
@@ -72,11 +84,12 @@ export default function MobileBottomSheet({
   return (
     <div style={{
       position: 'fixed',
-      bottom: 0, left: 0, right: 0,
+      bottom: 10, left: 10, right: 10,
       height,
       background: 'var(--p1)',
-      borderRadius: '16px 16px 0 0',
-      borderTop: '1px solid var(--p3)',
+      borderRadius: 16,
+      border: '1px solid var(--p3)',
+      boxShadow: '0 -4px 24px rgba(0,0,0,.35)',
       zIndex: 20,
       display: 'flex',
       flexDirection: 'column',
@@ -96,74 +109,79 @@ export default function MobileBottomSheet({
         aria-label={isExpanded ? 'Collapse' : 'Expand'}
       >
         <div style={{
-          width: 36, height: 4,
-          background: 'var(--p4)', borderRadius: 2,
+          width: 48, height: 6,
+          background: 'var(--p3)', borderRadius: 3,
           margin: '0 auto',
         }} />
       </div>
 
-      {/* Sheet header (always visible) */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onClick={() => !isExpanded && toggleExpand()}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '4px 16px 8px',
-          flexShrink: 0,
-          cursor: isExpanded ? 'default' : 'pointer',
-          userSelect: 'none',
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', flex: 1 }}>
-          {title}
-        </span>
-        {count !== undefined && (
-          <span style={{ fontSize: 10, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
-            {count} total
-          </span>
-        )}
-        <button
-          onTouchStart={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); if (!isExpanded) toggleExpand(); }}
+      {/* Sheet header — hidden in detail mode since capsule shows back/title/chip */}
+      {!hideHeader && (
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => !isExpanded && toggleExpand()}
           style={{
-            width: 28, height: 28, borderRadius: 4,
-            border: '1px solid var(--p3)', background: 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--fog-dim)', cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '4px 16px 8px',
+            flexShrink: 0,
+            cursor: isExpanded ? 'default' : 'pointer',
+            userSelect: 'none',
           }}
-          aria-label="Search"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-          </svg>
-        </button>
-      </div>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ice)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', flex: 1 }}>
+            {title}
+          </span>
+          {count !== undefined && (
+            <span style={{ fontSize: 10, color: 'var(--fog-dim)', fontFamily: 'var(--mono)' }}>
+              {count} total
+            </span>
+          )}
+          {showSearch && (
+            <button
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); if (!isExpanded) toggleExpand(); }}
+              style={{
+                width: 28, height: 28, borderRadius: 4,
+                border: '1px solid var(--p3)', background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--fog-dim)', cursor: 'pointer',
+              }}
+              aria-label="Search"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
-      {/* Scrollable content */}
+      {/* Scrollable content — gradient is absolute so it doesn't push content */}
       <div style={{
         flex: 1,
-        overflowY: isExpanded ? 'auto' : 'hidden',
-        overscrollBehavior: 'contain',
         position: 'relative',
+        overflow: 'hidden',
       }}>
-        {children}
-        {/* Gradient fade hinting at scrollable content below */}
+        <div style={{
+          height: '100%',
+          overflowY: isExpanded ? 'auto' : 'hidden',
+          overscrollBehavior: 'contain',
+        }}>
+          {children}
+        </div>
         {isExpanded && (
           <div
             aria-hidden="true"
             style={{
-              position: 'sticky',
-              bottom: 0,
-              left: 0,
-              right: 0,
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
               height: 48,
               background: 'linear-gradient(to bottom, transparent, var(--p1))',
               pointerEvents: 'none',
-              flexShrink: 0,
             }}
           />
         )}

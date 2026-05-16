@@ -22,6 +22,7 @@
     --fog-ghost: rgba(240, 248, 250, 0.08);
 
     /* Glass overlays */
+    --glass-lgt: rgba(7, 14, 20, 0.58);
     --glass: rgba(7, 14, 20, 0.82);
     --glass-hvy: rgba(7, 14, 20, 0.94);
 
@@ -45,6 +46,7 @@
     --fog-ghost: rgba(7, 54, 66, 0.12);
     --grn: #1F7A3A;
     --blu: #1E60A8;
+    --glass-lgt: rgba(238, 232, 213, 0.72);
     --glass: rgba(238, 232, 213, 0.93);
     --glass-hvy: rgba(238, 232, 213, 0.97);
 
@@ -67,11 +69,13 @@
   --color-fog: var(--fog);
   --color-fog-dim: var(--fog-dim);
   --color-fog-ghost: var(--fog-ghost);
+  --color-glass-lgt: var(--glass-lgt);
   --color-glass: var(--glass);
   --color-glass-hvy: var(--glass-hvy);
   --font-mono: var(--font-ibm-plex-mono);
   --font-logo: var(--font-ribeye-marrow);
   --animate-contour-ping: contour-ping 2.1s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+  --animate-panel-in: panel-in 0.22s ease forwards;
 }
 
 @keyframes contour-ping {

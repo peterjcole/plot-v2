@@ -79,6 +79,7 @@ interface MapShellProps {
 export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isOwner = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>(initialSelectedId ? 'detail' : initialMode);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [detailSnap, setDetailSnap] = useState<'mid' | 'expanded'>('mid');
   const [layerState, setLayerState] = useState<LayerState>(() => loadLayerState());
   const patchLayers = useCallback((patch: Partial<LayerState>) => {
     setLayerState(prev => {
@@ -290,11 +291,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleSelectActivity = useCallback((id: string) => {
     setSelectedId(id);
     setMode('detail');
-    // Fit map to this activity's route from the already-loaded summary
     const summary = allActivities.find(a => String(a.id) === id);
+    const hasPhotos = (summary?.photoCount ?? 0) > 0;
+    setDetailSnap(hasPhotos ? 'expanded' : 'mid');
     if (summary?.route?.length && mapInstanceRef.current) {
       const coords = summary.route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
-      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], duration: 500, maxZoom: 14 });
+      // Offset bottom padding to account for the open sheet, biasing the route toward the top of the map
+      const sheetHeight = Math.round(window.innerHeight * (hasPhotos ? 0.72 : 0.5));
+      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [100, 40, sheetHeight + 40, 40], duration: 500, maxZoom: 14 });
     }
   }, [allActivities]);
 
@@ -587,62 +591,18 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         <MobileHeader
           avatarInitials={avatarInitials}
           isLoggedIn={isLoggedIn}
-          theme={theme}
-          onThemeChange={handleThemeChange}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          mode={mode}
+          activityName={mode === 'detail' && activityDetail ? activityDetail.name : undefined}
+          activityType={mode === 'detail' && activityDetail ? activityDetail.type : undefined}
+          onBack={handleBack}
           onAbout={handleOpenAbout}
-          hidden={mode === 'planner'}
-          style={{
-            // Stay below PlannerToolbar (z-20) in planner mode so its background shows through;
-            // jump to z-30 in other modes. Background is always rendered so no fade-in flash.
-            zIndex: mode !== 'planner' ? 30 : 15,
-            pointerEvents: mode !== 'planner' ? 'auto' : 'none',
-          }}
         />
-
-      {/* Tab bar — always shown on mobile */}
-      <div style={{
-        position: 'fixed', top: 60, left: 0, right: 0, height: 32,
-        background: 'var(--glass-hvy)', backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex', borderBottom: '1px solid var(--p3)', zIndex: 18,
-        touchAction: 'none',
-      }}>
-        <button
-          onClick={handleExitPlanner}
-          style={{
-            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-            color: mode !== 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
-            transition: 'color 0.2s ease',
-          }}
-        >Activities</button>
-        <button
-          onClick={handleOpenPlanner}
-          style={{
-            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            font: '600 9px/1 var(--mono)', letterSpacing: '.14em', textTransform: 'uppercase',
-            color: mode === 'planner' ? 'var(--ora)' : 'var(--fog-dim)',
-            transition: 'color 0.2s ease',
-          }}
-        >Planner</button>
-        {/* Sliding active indicator */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: mode === 'planner' ? '50%' : '0',
-          width: '50%',
-          height: 2,
-          background: 'var(--ora)',
-          transition: 'left 0.22s ease',
-          pointerEvents: 'none',
-        }} />
-      </div>
 
 
       {/* Map chrome — bottom-left cluster (above the buttons) */}
-      <div style={{ position: 'fixed', bottom: 191, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'fixed', bottom: 201, left: 12, zIndex: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
         <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
         {mode !== 'planner' && <ScaleBar metersPerPixel={mapResolution} />}
       </div>
@@ -650,16 +610,16 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Conditional non-animated elements */}
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={139} fixed isOwner={isOwner} />
+          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
           <button
             onClick={handleOpenPlanner}
             style={{
               position: 'fixed',
               right: 16,
-              bottom: 139,
-              width: 48,
-              height: 48,
-              borderRadius: 6,
+              bottom: 149,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
               background: 'var(--ora)',
               border: 'none',
               color: 'var(--p0)',
@@ -668,6 +628,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               justifyContent: 'center',
               cursor: 'pointer',
               zIndex: 18,
+              boxShadow: '0 4px 14px rgba(224,112,32,.4)',
             }}
             aria-label="New route"
           >
@@ -679,14 +640,16 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
 
       {mode === 'planner' && (
-        <LayersPanel state={layerState} onChange={patchLayers} bottom={168} fixed forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
+        <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
       )}
 
       {/* Activities bottom sheet — always mounted, crossfades out when entering planner */}
       <MobileBottomSheet
         title={sheetTitle}
         count={sheetCount}
-        forceExpanded={mode === 'detail' || mode === 'about'}
+        defaultSnap={mode === 'about' ? 'expanded' : mode === 'detail' ? detailSnap : isLoggedIn ? 'expanded' : 'mid'}
+        hideHeader={mode === 'detail'}
+        showSearch={isLoggedIn}
         style={{
           opacity: mode !== 'planner' ? 1 : 0,
           pointerEvents: mode !== 'planner' ? 'auto' : 'none',
@@ -707,7 +670,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               {detailLoading ? 'Loading…' : 'No data'}
             </div>
           ) : (
-            <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
+            <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} hideHeader />
           )
         )}
         {mode === 'about' && (
@@ -735,10 +698,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         const distKm = (distance / 1000).toFixed(1);
         return (
           <div style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0,
+            position: 'fixed', bottom: 10, left: 10, right: 10,
             height: plannerHudHeight,
             background: 'var(--p1)',
-            borderTop: '1px solid var(--p3)', borderRadius: '16px 16px 0 0',
+            border: '1px solid var(--p3)', borderRadius: 16,
+            boxShadow: '0 -4px 24px rgba(0,0,0,.35)',
             zIndex: 20,
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
@@ -757,7 +721,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   style={{ flexShrink: 0, userSelect: 'none', cursor: 'grab' }}
                 >
                   <div style={{ padding: '10px 0 6px' }}>
-                    <div style={{ width: 36, height: 4, background: 'var(--p4)', borderRadius: 2, margin: '0 auto' }} />
+                    <div style={{ width: 48, height: 6, background: 'var(--p3)', borderRadius: 3, margin: '0 auto' }} />
                   </div>
                   {/* Stats inside drag zone so swiping on them also works */}
                   <div style={{ display: 'flex', padding: '0 20px 14px' }}>

@@ -77,6 +77,10 @@ interface LayersPanelProps {
   isOwner?: boolean;
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
+  triggerStyle?: React.CSSProperties;
+  /** When true, anchor to top-right instead of bottom-left. Card opens below the trigger. */
+  topRight?: boolean;
+  topOffset?: number;
 }
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -124,23 +128,45 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange, triggerStyle, topRight, topOffset = 80 }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
 
-  return (
-    <div style={{
-      position: fixed ? 'fixed' : 'absolute',
-      bottom, left: 12,
-      zIndex: 15,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-start',
-      gap: 8,
-    }}>
-      {/* Panel card */}
-      {open && (
+  const containerStyle: React.CSSProperties = topRight
+    ? { position: fixed ? 'fixed' : 'absolute', top: topOffset, right: 14, zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }
+    : { position: fixed ? 'fixed' : 'absolute', bottom, left: 12, zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 };
+
+  const triggerEl = (
+    /* Trigger button */
+    <button
+      onClick={() => setOpen((v) => !v)}
+      aria-label="Toggle layers panel"
+      aria-expanded={open}
+      style={{
+        width: 36, height: 36,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+        transition: 'border-color 0.15s, color 0.15s',
+        borderRadius: 8,
+        background: 'var(--glass)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        ...triggerStyle,
+        border: `1px solid ${open ? 'var(--ora)' : 'var(--p3)'}`,
+        color: open ? 'var(--ora)' : 'var(--fog-dim)',
+      }}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+        <polyline points="2 17 12 22 22 17"/>
+        <polyline points="2 12 12 17 22 12"/>
+      </svg>
+    </button>
+  );
+
+  const panelCard = open && (
         <div style={{
           width: 224,
           background: 'var(--glass-hvy)',
@@ -276,32 +302,12 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
             </>
           )}
         </div>
-      )}
+  );
 
-      {/* Trigger button */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Toggle layers panel"
-        aria-expanded={open}
-        style={{
-          width: 36, height: 36, borderRadius: 8,
-          background: 'var(--glass)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          border: `1px solid ${open ? 'var(--ora)' : 'var(--p3)'}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-          color: open ? 'var(--ora)' : 'var(--fog-dim)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-          transition: 'border-color 0.15s, color 0.15s',
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-          <polyline points="2 17 12 22 22 17"/>
-          <polyline points="2 12 12 17 22 12"/>
-        </svg>
-      </button>
+  return (
+    <div style={containerStyle}>
+      {topRight ? triggerEl : panelCard}
+      {topRight ? panelCard : triggerEl}
     </div>
   );
 }

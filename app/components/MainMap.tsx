@@ -1462,14 +1462,27 @@ export default function MainMap({
     padding: 0,
   });
 
+  const mobileCircleBtn = (disabled: boolean): React.CSSProperties => ({
+    width: 36, height: 36, borderRadius: '50%',
+    background: 'var(--glass-hvy)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid var(--p3)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: disabled ? 'default' : 'pointer',
+    color: disabled ? 'var(--fog-ghost)' : 'var(--fog)',
+    padding: 0,
+    flexShrink: 0,
+  });
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* Mobile: geolocate top-left (below header 60px + tab bar 32px) */}
-      {onGeolocate && (
-        <div className="absolute top-[100px] left-3 z-[12] sm:hidden">
-          <button onClick={onGeolocate} aria-label="Go to my location" title="Go to my location" style={zoomBtnStyle(false)}>
+      {/* Mobile: right-edge controls stack — locate · search · zoom+ · zoom− */}
+      <div className="absolute right-[14px] z-[12] flex flex-col gap-[6px] sm:hidden" style={{ top: '33%', transform: 'translateY(-50%)' }}>
+        {onGeolocate && (
+          <button onClick={onGeolocate} aria-label="Go to my location" title="Go to my location" style={mobileCircleBtn(false)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"/>
               <line x1="12" y1="2" x2="12" y2="6"/>
@@ -1478,18 +1491,14 @@ export default function MainMap({
               <line x1="18" y1="12" x2="22" y2="12"/>
             </svg>
           </button>
-        </div>
-      )}
-
-      {/* Mobile: search + zoom top-right */}
-      <div className="absolute top-[100px] right-4 z-[12] flex flex-col gap-1 sm:hidden">
-        {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} dropDown />}
-        <button onClick={handleZoomIn} disabled={currentZoom >= 12} aria-label="Zoom in" style={zoomBtnStyle(currentZoom >= 12)}>
+        )}
+        {onPlaceSelect && <PlaceSearch onSelect={onPlaceSelect} dropDown btnStyle={{ borderRadius: '50%' }} />}
+        <button onClick={handleZoomIn} disabled={currentZoom >= 12} aria-label="Zoom in" style={mobileCircleBtn(currentZoom >= 12)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
         </button>
-        <button onClick={handleZoomOut} disabled={currentZoom <= OS_ZOOM.min} aria-label="Zoom out" style={zoomBtnStyle(currentZoom <= OS_ZOOM.min)}>
+        <button onClick={handleZoomOut} disabled={currentZoom <= OS_ZOOM.min} aria-label="Zoom out" style={mobileCircleBtn(currentZoom <= OS_ZOOM.min)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>

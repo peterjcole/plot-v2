@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 
 export const PLANNER_HUD_COLLAPSED = 60;
-export const PLANNER_HUD_EXPANDED = 158;
+export const PLANNER_HUD_EXPANDED = 168;
 
 export function usePlannerHud() {
   const [plannerHudHeight, setPlannerHudHeight] = useState(PLANNER_HUD_EXPANDED);
