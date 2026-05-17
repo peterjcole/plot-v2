@@ -20,7 +20,6 @@
     "iron-session": "^8.0.4",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
-    "lightweight-charts": "^5.1.0",
     "lucide-react": "^0.564.0",
     "next": "16.1.6",
     "ol": "^10.7.0",

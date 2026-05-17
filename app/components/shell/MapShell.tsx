@@ -22,7 +22,6 @@ import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
 import PlannerPanel from './PlannerPanel';
-import { type ElevationHoverPoint } from '@/app/(main)/planner/ElevationChart';
 import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileBottomSheet from './MobileBottomSheet';
@@ -33,6 +32,7 @@ import MapLegend from './MapLegend';
 import PhotoLightbox from './PhotoLightbox';
 import WaypointPopover from '@/app/components/map/WaypointPopover';
 import AboutSection from './AboutSection';
+import ElevationChart, { type ElevationHoverPoint } from '@/app/(main)/planner/ElevationChart';
 import SplashOverlay from './SplashOverlay';
 import SidebarToggle from './SidebarToggle';
 import PhotoPopup from '@/app/(main)/planner/PhotoPopup';
@@ -706,21 +706,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
       {/* Planner HUD — always mounted, crossfades in when entering planner */}
       {(() => {
-        const pts = elevationData ?? [];
-        const totalD = pts.length > 1 ? pts[pts.length - 1].distance : 0;
-        const W = 358; const H = 34;
-        let sparklinePts = '';
-        let fillPath = '';
-        if (pts.length >= 2) {
-          const eles = pts.map(p => p.ele);
-          const minE = Math.min(...eles);
-          const maxE = Math.max(...eles);
-          const rangeE = maxE - minE || 1;
-          const toX = (d: number) => totalD ? (d / totalD) * W : 0;
-          const toY = (e: number) => H - 2 - ((e - minE) / rangeE) * (H - 4);
-          sparklinePts = pts.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
-          fillPath = `M0,${H} L${sparklinePts.split(' ').join(' L')} L${W},${H} Z`;
-        }
         const distKm = (distance / 1000).toFixed(1);
         return (
           <div style={{
@@ -769,18 +754,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   </div>
                 </div>{/* end drag zone */}
                 <div style={{ position: 'relative', padding: '0 16px 10px' }}>
-                  <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="mhud-elev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#E07020" stopOpacity="0.30" />
-                        <stop offset="100%" stopColor="#E07020" stopOpacity="0.02" />
-                      </linearGradient>
-                    </defs>
-                    {fillPath && <path d={fillPath} fill="url(#mhud-elev)" />}
-                    {sparklinePts && <polyline points={sparklinePts} fill="none" stroke="#E07020" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
-                  </svg>
-                  <div style={{ position: 'absolute', bottom: 13, left: 18, font: '400 7px/1 var(--mono)', color: 'var(--fog-dim)' }}>0</div>
-                  <div style={{ position: 'absolute', bottom: 13, right: 18, font: '400 7px/1 var(--mono)', color: 'var(--fog-dim)' }}>{distKm}km</div>
+                  <ElevationChart data={elevationData} onHover={handleElevationHover} height={34} />
+                  {elevationData && (
+                    <div style={{ position: 'absolute', bottom: 13, right: 18, font: '400 7px/1 var(--mono)', color: 'var(--fog-dim)', pointerEvents: 'none' }}>{distKm}km</div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 10, padding: '0 16px 14px' }}>
                   <button

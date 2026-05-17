@@ -71,24 +71,17 @@ export default function PlannerPanel({ distance, elevGain, waypoints, segments, 
             padding: 12,
             marginBottom: 12,
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: elevationData ? 12 : 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 12 }}>
               <StatCell label="Distance" value={fmtDist(distance)} />
               <StatCell label="Elevation" value={elevGain > 0 ? `+${Math.round(elevGain)} m` : '0 m'} />
               <StatCell label="Waypoints" value={String(waypoints.length)} />
               <StatCell label="Est. time" value={distance > 0 ? fmtTime(distance) : '—'} />
             </div>
 
-            {/* Elevation chart */}
-            {isLoadingElevation && (
-              <div style={{ fontSize: 9, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', marginTop: 8 }}>
-                Loading elevation…
-              </div>
-            )}
-            {elevationData && !isLoadingElevation && (
-              <div style={{ marginTop: 8, borderTop: '1px solid var(--fog-ghost)', paddingTop: 8 }}>
-                <ElevationChart data={elevationData} onHover={onElevationHover} />
-              </div>
-            )}
+            {/* Elevation chart — always rendered to avoid layout pop-in */}
+            <div style={{ marginTop: 8, borderTop: '1px solid var(--fog-ghost)', paddingTop: 8 }}>
+              <ElevationChart data={elevationData} isLoading={isLoadingElevation} onHover={onElevationHover} />
+            </div>
           </div>
         ) : (
           <p style={{ fontSize: 10, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', lineHeight: 1.7, marginBottom: 16 }}>

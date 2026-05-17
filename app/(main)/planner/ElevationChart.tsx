@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
-import { createChart, AreaSeries, type IChartApi } from 'lightweight-charts';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { ElevationPoint } from './useElevationProfile';
 
 export interface ElevationHoverPoint {
@@ -11,174 +10,158 @@ export interface ElevationHoverPoint {
   distance: number;
 }
 
+interface ActivePoint extends ElevationHoverPoint {
+  svgX: number; // in SVG viewBox coordinates (0–SVG_W)
+  svgY: number;
+  pillLeft: number; // clamped px left within the container div
+}
+
 interface ElevationChartProps {
   data: ElevationPoint[] | null;
   onHover?: (point: ElevationHoverPoint | null) => void;
+  height?: number;
+  isLoading?: boolean;
 }
 
-function resolveVar(varName: string, fallback: string): string {
-  if (typeof document === 'undefined') return fallback;
-  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  return value || fallback;
+const SVG_W = 358;
+const CHART_PAD_V = 10; // vertical breathing room so the line clears the min/max labels
+const PILL_W = 52;
+const PILL_PAD = 6;
+const DRAG_THRESHOLD = 5;
+
+function toSvgX(distance: number, totalD: number) {
+  return totalD ? (distance / totalD) * SVG_W : 0;
 }
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+function nearestPoint(
+  data: ElevationPoint[],
+  totalD: number,
+  clientX: number,
+  rect: DOMRect,
+  minE: number,
+  rangeE: number,
+  H: number,
+): ActivePoint {
+  const relX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+  const frac = relX / rect.width;
+  const targetDist = frac * totalD;
+  let lo = 0, hi = data.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (data[mid].distance < targetDist) lo = mid + 1; else hi = mid;
+  }
+  if (lo > 0 && Math.abs(data[lo - 1].distance - targetDist) < Math.abs(data[lo].distance - targetDist)) lo--;
+  const pt = data[lo];
+  const svgX = toSvgX(pt.distance, totalD);
+  const svgY = H - CHART_PAD_V - ((pt.ele - minE) / rangeE) * (H - CHART_PAD_V * 2);
+  const pillLeft = Math.max(PILL_PAD, Math.min(relX - PILL_W / 2, rect.width - PILL_W - PILL_PAD));
+  return { lat: pt.lat, lng: pt.lng, ele: pt.ele, distance: pt.distance, svgX, svgY, pillLeft };
 }
 
-export default function ElevationChart({ data, onHover }: ElevationChartProps) {
+export default function ElevationChart({ data, onHover, height = 64, isLoading = false }: ElevationChartProps) {
+  const H = height;
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
+  const [scrub, setScrub] = useState<ActivePoint | null>(null);
+  const [pinned, setPinned] = useState<ActivePoint | null>(null);
+  const dragRef = useRef<{ startX: number; moved: boolean } | null>(null);
+  const displayed = scrub ?? pinned;
+
   const onHoverRef = useRef(onHover);
-  onHoverRef.current = onHover;
-
-  const [tooltip, setTooltip] = useState<{ x: number; ele: number } | null>(null);
-
-  const { minEle, maxEle } = useMemo(() => {
-    if (!data || data.length < 2) return { minEle: 0, maxEle: 0 };
-    let min = Infinity, max = -Infinity;
-    for (const pt of data) {
-      if (pt.ele < min) min = pt.ele;
-      if (pt.ele > max) max = pt.ele;
-    }
-    return { minEle: Math.round(min), maxEle: Math.round(max) };
-  }, [data]);
-
-  const dataRef = useRef(data);
-  dataRef.current = data;
-
-  const handleCrosshairMove = useCallback(
-    (param: { time?: unknown; point?: { x: number; y: number } }) => {
-      const d = dataRef.current;
-      if (!param.time || !d) {
-        setTooltip(null);
-        onHoverRef.current?.(null);
-        return;
-      }
-      const index = param.time as number;
-      const pt = d[index];
-      if (!pt) {
-        setTooltip(null);
-        onHoverRef.current?.(null);
-        return;
-      }
-      setTooltip({ x: param.point?.x ?? 0, ele: pt.ele });
-      onHoverRef.current?.({ lat: pt.lat, lng: pt.lng, ele: pt.ele, distance: pt.distance });
-    },
-    []
-  );
+  useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    onHoverRef.current?.(displayed
+      ? { lat: displayed.lat, lng: displayed.lng, ele: displayed.ele, distance: displayed.distance }
+      : null);
+  }, [displayed]);
 
-    const accent = resolveVar('--ora', '#E07020');
-    const fogDim = resolveVar('--fog-dim', '#5A7A8A');
+  // Reset pinned when data changes (route updated)
+  useEffect(() => { setPinned(null); }, [data]);
 
-    const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: 64,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: fogDim,
-        attributionLogo: false,
-      },
-      grid: {
-        vertLines: { visible: false },
-        horzLines: { visible: false },
-      },
-      rightPriceScale: { visible: false },
-      timeScale: { visible: false, minBarSpacing: 0 },
-      crosshair: {
-        mode: 1, // Magnet — snaps to nearest data point
-        vertLine: {
-          color: hexToRgba(accent, 0.5),
-          width: 1,
-          visible: true,
-          labelVisible: false,
-        },
-        horzLine: { visible: false, labelVisible: false },
-      },
-      handleScale: false,
-      handleScroll: false,
-    });
+  const derived = useMemo(() => {
+    if (!data || data.length < 2) return null;
+    const eles = data.map(p => p.ele);
+    const minE = Math.min(...eles);
+    const maxE = Math.max(...eles);
+    const rangeE = maxE - minE || 1;
+    const totalD = data[data.length - 1].distance;
+    const toX = (d: number) => toSvgX(d, totalD);
+    const toY = (e: number) => H - CHART_PAD_V - ((e - minE) / rangeE) * (H - CHART_PAD_V * 2);
+    const sparklinePts = data.map(p => `${toX(p.distance).toFixed(1)},${toY(p.ele).toFixed(1)}`).join(' ');
+    const fillPath = `M0,${H} L${sparklinePts.split(' ').join(' L')} L${SVG_W},${H} Z`;
+    return { minE, maxE: Math.round(maxE), minELabel: Math.round(minE), rangeE, totalD, sparklinePts, fillPath };
+  }, [data, H]);
 
-    const series = chart.addSeries(AreaSeries, {
-      lineColor: accent,
-      topColor: hexToRgba(accent, 0.18),
-      bottomColor: hexToRgba(accent, 0.02),
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: true,
-      crosshairMarkerRadius: 3,
-      crosshairMarkerBackgroundColor: accent,
-      crosshairMarkerBorderColor: resolveVar('--p0', '#070E14'),
-      crosshairMarkerBorderWidth: 1.5,
-    });
+  const getPoint = useCallback((clientX: number): ActivePoint | null => {
+    if (!data || !derived || !containerRef.current) return null;
+    const rect = containerRef.current.getBoundingClientRect();
+    return nearestPoint(data, derived.totalD, clientX, rect, derived.minE, derived.rangeE, H);
+  }, [data, derived, H]);
 
-    chartRef.current = chart;
+  // ── Mouse handlers (desktop hover, no pin) ──────────────────────────────
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    setScrub(getPoint(e.clientX));
+  }, [getPoint]);
 
-    if (data && data.length >= 2) {
-      const seriesData = data.map((pt, i) => ({
-        time: i as unknown as import('lightweight-charts').UTCTimestamp,
-        value: pt.ele,
-      }));
-      series.setData(seriesData);
-      chart.timeScale().fitContent();
+  const handleMouseLeave = useCallback(() => {
+    setScrub(null);
+  }, []);
+
+  // ── Touch handlers (mobile tap-pin / drag-scrub) ─────────────────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    dragRef.current = { startX: touch.clientX, moved: false };
+    setScrub(getPoint(touch.clientX));
+  }, [getPoint]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    if (dragRef.current && Math.abs(touch.clientX - dragRef.current.startX) > DRAG_THRESHOLD) {
+      dragRef.current.moved = true;
     }
+    setScrub(getPoint(touch.clientX));
+  }, [getPoint]);
 
-    chart.subscribeCrosshairMove(handleCrosshairMove);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    const drag = dragRef.current;
+    dragRef.current = null;
+    setScrub(null);
+    if (drag && !drag.moved) {
+      const tapped = scrub;
+      setPinned(prev => {
+        if (!tapped) return prev;
+        if (prev && Math.abs(prev.svgX - tapped.svgX) < 8) return null;
+        return tapped;
+      });
+    }
+  }, [scrub]);
 
-    const ro = new ResizeObserver(() => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
-      }
-    });
-    ro.observe(containerRef.current);
-
-    return () => {
-      ro.disconnect();
-      chart.remove();
-      chartRef.current = null;
-      setTooltip(null);
-      onHoverRef.current?.(null);
-    };
-  }, [data, handleCrosshairMove]);
-
-  if (!data || data.length < 2) return null;
+  const handleTouchCancel = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    dragRef.current = null;
+    setScrub(null);
+  }, []);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: 64 }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-
-      {/* Min/max elevation labels */}
-      <span style={{
-        position: 'absolute', top: 0, right: 2,
-        fontSize: 8, lineHeight: 1, color: 'var(--fog-dim)',
-        fontFamily: 'var(--mono)', pointerEvents: 'none',
-        letterSpacing: '0.04em',
-      }}>
-        {maxEle}m
-      </span>
-      <span style={{
-        position: 'absolute', bottom: 0, right: 2,
-        fontSize: 8, lineHeight: 1, color: 'var(--fog-dim)',
-        fontFamily: 'var(--mono)', pointerEvents: 'none',
-        letterSpacing: '0.04em',
-      }}>
-        {minEle}m
-      </span>
-
-      {/* Hover tooltip */}
-      {tooltip && (
+    <div
+      ref={containerRef}
+      style={{ position: 'relative', width: '100%', height: H }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
+    >
+      {/* Hover pill — two-line, clamped, above the chart */}
+      {displayed && (
         <div style={{
           position: 'absolute',
-          top: -20,
-          left: tooltip.x,
-          transform: 'translateX(-50%)',
+          top: -32,
+          left: displayed.pillLeft,
           fontSize: 9,
           fontFamily: 'var(--mono)',
           fontWeight: 700,
@@ -190,9 +173,89 @@ export default function ElevationChart({ data, onHover }: ElevationChartProps) {
           pointerEvents: 'none',
           whiteSpace: 'nowrap',
           letterSpacing: '0.04em',
+          lineHeight: 1.4,
+          textAlign: 'center',
+          zIndex: 20,
         }}>
-          {Math.round(tooltip.ele)}m
+          <div>{(displayed.distance / 1000).toFixed(1)}&nbsp;km</div>
+          <div style={{ color: 'var(--fog-dim)' }}>{Math.round(displayed.ele)}&nbsp;m</div>
         </div>
+      )}
+
+      {/* Loading placeholder */}
+      {isLoading && !derived && (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          fontSize: 8, color: 'var(--fog-ghost)', fontFamily: 'var(--mono)', letterSpacing: '0.06em',
+        }}>
+          Loading elevation…
+        </div>
+      )}
+
+      <svg
+        width="100%" height={H}
+        viewBox={`0 0 ${SVG_W} ${H}`}
+        preserveAspectRatio="none"
+        style={{ display: 'block' }}
+      >
+        <defs>
+          <linearGradient id="elev-chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#E07020" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#E07020" stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {derived && (
+          <>
+            <path d={derived.fillPath} fill="url(#elev-chart-fill)" />
+            <polyline
+              points={derived.sparklinePts}
+              fill="none" stroke="#E07020" strokeWidth="1.5"
+              strokeLinecap="round" strokeLinejoin="round"
+            />
+          </>
+        )}
+        {displayed && (
+          <line
+            x1={displayed.svgX} x2={displayed.svgX} y1={0} y2={H}
+            stroke="rgba(224,112,32,0.5)" strokeWidth={1} strokeDasharray="2 2"
+          />
+        )}
+      </svg>
+
+      {/* Crosshair dot — outside SVG so it stays circular under preserveAspectRatio="none" */}
+      {displayed && (
+        <div style={{
+          position: 'absolute',
+          left: `${(displayed.svgX / SVG_W) * 100}%`,
+          top: displayed.svgY,
+          transform: 'translate(-50%, -50%)',
+          width: 7, height: 7,
+          borderRadius: '50%',
+          background: '#E07020',
+          border: '1.5px solid rgba(7,14,20,0.8)',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }} />
+      )}
+
+      {/* Min / max labels */}
+      {derived && (
+        <>
+          <span style={{
+            position: 'absolute', top: 0, left: 2,
+            fontSize: 8, lineHeight: 1, color: 'var(--fog-dim)',
+            fontFamily: 'var(--mono)', pointerEvents: 'none', letterSpacing: '0.04em',
+          }}>
+            {derived.maxE}m
+          </span>
+          <span style={{
+            position: 'absolute', bottom: 0, left: 2,
+            fontSize: 8, lineHeight: 1, color: 'var(--fog-dim)',
+            fontFamily: 'var(--mono)', pointerEvents: 'none', letterSpacing: '0.04em',
+          }}>
+            {derived.minELabel}m
+          </span>
+        </>
       )}
     </div>
   );
