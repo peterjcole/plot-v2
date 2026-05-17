@@ -134,8 +134,8 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
 
   const containerStyle: React.CSSProperties = topRight
-    ? { position: fixed ? 'fixed' : 'absolute', top: topOffset, right: 14, zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }
-    : { position: fixed ? 'fixed' : 'absolute', bottom, left: 12, zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 };
+    ? { position: fixed ? 'fixed' : 'absolute', top: topOffset, right: 14, zIndex: fixed ? 25 : 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }
+    : { position: fixed ? 'fixed' : 'absolute', bottom, left: 12, zIndex: fixed ? 25 : 15, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 };
 
   const triggerEl = (
     /* Trigger button */

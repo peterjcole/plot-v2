@@ -165,12 +165,10 @@ export default function PlannerToolbar({
 
         <div className="hidden sm:block">{SEP}</div>
 
-        {/* Add-points toggle (mobile only) */}
-        <div className="contents sm:hidden">
-          <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
-            <MapPinPlus size={16} />
-          </TbBtn>
-        </div>
+        {/* Add-points toggle */}
+        <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
+          <MapPinPlus size={16} />
+        </TbBtn>
 
         {/* Snap toggle */}
         <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>

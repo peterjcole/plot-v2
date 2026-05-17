@@ -639,7 +639,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Conditional non-animated elements */}
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
           <button
             onClick={handleOpenPlanner}
             style={{
