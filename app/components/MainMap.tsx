@@ -260,6 +260,18 @@ export default function MainMap({
   // Zoom state for zoom buttons
   const [currentZoom, setCurrentZoom] = useState(OS_ZOOM.default);
 
+  // Tile generation counter — used to cache-bust the personal heatmap layer after a regen
+  const [tilesGeneration, setTilesGeneration] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/tiles/meta')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { generation?: number } | null) => {
+        if (data?.generation != null) setTilesGeneration(data.generation);
+      })
+      .catch(() => {});
+  }, []);
+
   // Elevation hover marker ref
   const elevHoverSourceRef = useRef<VectorSource | null>(null);
 
@@ -870,7 +882,7 @@ export default function MainMap({
     const layer = new OlVectorTileLayer({
       source: new OlVectorTileSource({
         format: new MVT(),
-        url: '/api/tiles/{z}/{x}/{y}',
+        url: tilesGeneration != null ? `/api/tiles/{z}/{x}/{y}?v=${tilesGeneration}` : '/api/tiles/{z}/{x}/{y}',
         maxZoom: 14,
       }),
       style: new Style({
@@ -891,7 +903,7 @@ export default function MainMap({
         personalHeatmapLayerRef.current = null;
       }
     };
-  }, [showPersonalHeatmap]);
+  }, [showPersonalHeatmap, tilesGeneration]);
 
   // Global heatmap tile layer
   useEffect(() => {
