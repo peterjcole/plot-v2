@@ -56,6 +56,7 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
   const [hillshade, setHillshade] = useState(initialHillshade);
   const [showDescription, setShowDescription] = useState(false);
   const [includeLogo, setIncludeLogo] = useState(true);
+  const [hideStartEnd, setHideStartEnd] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -92,6 +93,7 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
     if (hillshade) params.set('hillshadeEnabled', 'true');
     if (showDescription) params.set('showDescription', 'true');
     if (includeLogo) params.set('includeLogo', 'true');
+    if (hideStartEnd) params.set('hideStartEnd', 'true');
     return `/api/activity-printout?${params.toString()}`;
   }
 
@@ -196,6 +198,7 @@ export default function ExportOptionsPopover({ activityId, osDark, initialBaseMa
         <Toggle label="Include images" checked={includeImages} onToggle={() => setIncludeImages(v => !v)} />
         <Toggle label="Include description" checked={showDescription} onToggle={() => setShowDescription(v => !v)} />
         <Toggle label="Include logo" checked={includeLogo} onToggle={() => setIncludeLogo(v => !v)} />
+        <Toggle label="Hide start/end" checked={hideStartEnd} onToggle={() => setHideStartEnd(v => !v)} />
       </div>
 
       {/* Divider */}

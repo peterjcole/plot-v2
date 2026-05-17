@@ -8,6 +8,7 @@ import 'proj4leaflet';
 import { ActivityData } from '@/lib/types';
 import { OS_PROJECTION, OS_DEFAULT_CENTER, OS_TILE_URL, OS_DARK_TILE_URL, SATELLITE_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, type BaseMap } from '@/lib/map-config';
 import { getActivityColor } from '@/lib/activity-categories';
+import { trimRouteEnds } from '@/lib/route-trim';
 import PhotoOverlay from './PhotoOverlay';
 import TextOverlay from './TextOverlay';
 
@@ -80,6 +81,7 @@ interface ActivityMapProps {
   hideDetails?: boolean;
   hideDescription?: boolean;
   hillshadeEnabled?: boolean;
+  hideStartEnd?: boolean;
   /** When set, positions the map with setView instead of fitBounds */
   centerZoom?: { center: [number, number]; zoom: number };
 }
@@ -293,12 +295,13 @@ function TileLoadHandler() {
   return null;
 }
 
-export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hideDetails = false, hideDescription = false, hillshadeEnabled = false, centerZoom }: ActivityMapProps) {
+export default function ActivityMap({ activity, width, height, paddingRight = 0, onPinClick, baseMap = 'os', osDark = false, hidePhotos = false, hideDetails = false, hideDescription = false, hillshadeEnabled = false, hideStartEnd = false, centerZoom }: ActivityMapProps) {
   const extraBottomPadding = hideDetails ? 0 : 60;
 
-  const route = activity.route.filter(
+  const finiteRoute = activity.route.filter(
     ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng)
   );
+  const route = hideStartEnd ? trimRouteEnds(finiteRoute, 250) : finiteRoute;
 
   const center: [number, number] = route.length > 0
     ? route[Math.floor(route.length / 2)]

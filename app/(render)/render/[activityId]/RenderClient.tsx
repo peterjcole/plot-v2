@@ -87,6 +87,7 @@ interface RenderClientProps {
   hillshadeEnabled?: boolean;
   hideDetails?: boolean;
   showDescription?: boolean;
+  hideStartEnd?: boolean;
 }
 
 export default function RenderClient({
@@ -97,6 +98,7 @@ export default function RenderClient({
   includeLogo,
   hillshadeEnabled,
   showDescription = false,
+  hideStartEnd = false,
 }: RenderClientProps) {
   const TOTAL_W = 1200;
   const TOTAL_H = 760;
@@ -147,6 +149,7 @@ export default function RenderClient({
           osDark={osDark}
           hillshadeEnabled={hillshadeEnabled}
           hideDetails={true}
+          hideStartEnd={hideStartEnd}
         />
       </div>
 

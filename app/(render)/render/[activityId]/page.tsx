@@ -13,6 +13,7 @@ interface RenderPageProps {
     includeLogo?: string;
     hillshadeEnabled?: string;
     showDescription?: string;
+    hideStartEnd?: string;
     // Legacy params kept for backward compat
     hidePhotos?: string;
     hideDetails?: string;
@@ -25,7 +26,7 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
     token, photos, orientation, baseMap, osDark: osDarkParam,
     photoCount: photoCountParam,
     includeLogo, hillshadeEnabled: hillshadeEnabledParam,
-    showDescription,
+    showDescription, hideStartEnd,
   } = await searchParams;
 
   if (!token && activityId !== 'mock') {
@@ -50,6 +51,7 @@ export default async function RenderPage({ params, searchParams }: RenderPagePro
         includeLogo={includeLogo === 'true'}
         hillshadeEnabled={hillshadeEnabledParam === 'true'}
         showDescription={showDescription === 'true'}
+        hideStartEnd={hideStartEnd === 'true'}
       />
     </div>
   );
