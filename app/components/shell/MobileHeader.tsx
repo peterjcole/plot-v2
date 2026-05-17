@@ -48,7 +48,7 @@ export default function MobileHeader({
   useLayoutEffect(() => {
     const ref = activeTab === 'activities' ? activitiesRef : plannerRef;
     if (ref.current) setPill({ left: ref.current.offsetLeft, width: ref.current.offsetWidth });
-  }, [activeTab, mounted]);
+  }, [activeTab, mounted, mode]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration guard
   useEffect(() => setMounted(true), []);
