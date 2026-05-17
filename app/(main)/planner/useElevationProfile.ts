@@ -2,26 +2,9 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
+import { type ElevationPoint, haversineDistance, smoothElevation, downsampleToChartPoints } from '@/lib/elevation';
 
-export interface ElevationPoint {
-  distance: number; // cumulative distance in meters
-  ele: number;
-  lat: number;
-  lng: number;
-}
-
-function haversineDistance(a: Waypoint, b: Waypoint): number {
-  const R = 6371000;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const sinLat = Math.sin(dLat / 2);
-  const sinLng = Math.sin(dLng / 2);
-  const h =
-    sinLat * sinLat +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
-  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
+export type { ElevationPoint };
 
 /** Interpolate points along a straight line between two waypoints at ~50m intervals. */
 function interpolateSegment(a: Waypoint, b: Waypoint): Waypoint[] {
@@ -64,18 +47,6 @@ function buildPolyline(
   }
 
   return coords.length >= 2 ? coords : null;
-}
-
-function smoothElevation(points: ElevationPoint[], windowSize: number): ElevationPoint[] {
-  if (points.length < windowSize * 2) return points;
-  const half = Math.floor(windowSize / 2);
-  return points.map((pt, i) => {
-    const start = Math.max(0, i - half);
-    const end = Math.min(points.length - 1, i + half);
-    let sum = 0;
-    for (let j = start; j <= end; j++) sum += points[j].ele;
-    return { ...pt, ele: sum / (end - start + 1) };
-  });
 }
 
 export function useElevationProfile(
@@ -160,23 +131,9 @@ export function useElevationProfile(
               return { distance: cumDist, ele: c.ele, lat: c.lat, lng: c.lng };
             });
 
-            // Smooth with a window proportional to data density, then downsample
-            // for the chart. Smoothing at full resolution removes SRTM noise;
-            // downsampling keeps the chart performant.
-            const window = Math.max(5, Math.round(points.length / 40));
-            const smoothed = smoothElevation(points, window);
-            const maxChartPoints = 200;
-            const step = smoothed.length > maxChartPoints
-              ? smoothed.length / maxChartPoints
-              : 1;
-            const downsampled: ElevationPoint[] = [];
-            for (let k = 0; k < smoothed.length; k = Math.round(k + step)) {
-              downsampled.push(smoothed[k]);
-            }
-            // Always include last point
-            if (downsampled[downsampled.length - 1] !== smoothed[smoothed.length - 1]) {
-              downsampled.push(smoothed[smoothed.length - 1]);
-            }
+            const windowSize = Math.max(5, Math.round(points.length / 40));
+            const smoothed = smoothElevation(points, windowSize);
+            const downsampled = downsampleToChartPoints(smoothed);
 
             setElevationData(downsampled);
             setSettledKey(polylineKey);

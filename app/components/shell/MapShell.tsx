@@ -508,7 +508,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   {detailLoading ? 'Loading…' : 'No data'}
                 </div>
               ) : (
-                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} />
+                <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} onElevationHover={handleElevationHover} />
               )}
             </div>
           )}
@@ -696,7 +696,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
               {detailLoading ? 'Loading…' : 'No data'}
             </div>
           ) : (
-            <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} hideHeader />
+            <DetailPanel activity={activityDetail} onBack={handleBack} onOpenPlanner={handleOpenInPlanner} onPhotoClick={handlePhotoClick} osDark={osDark} exportBaseMap={layerState.baseLayer === 'satellite' ? 'satellite' : 'os'} exportHillshade={layerState.showHillshade} hideHeader onElevationHover={handleElevationHover} />
           )
         )}
         {mode === 'about' && (

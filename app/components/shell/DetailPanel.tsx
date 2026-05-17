@@ -1,10 +1,12 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ActivityData } from '@/lib/types';
 import { getActivityColor, getActivityCategory } from '@/lib/activity-categories';
 import ExportOptionsPopover from './ExportOptionsPopover';
+import ElevationChart, { type ElevationHoverPoint } from '@/app/(main)/planner/ElevationChart';
+import { useActivityElevationProfile } from './hooks/useActivityElevationProfile';
 
 function fmt(meters: number): string { return (meters / 1000).toFixed(2) + ' km'; }
 function fmtTime(s: number): string {
@@ -40,14 +42,19 @@ interface DetailPanelProps {
   exportBaseMap?: 'os' | 'satellite';
   exportHillshade?: boolean;
   hideHeader?: boolean;
+  onElevationHover?: (point: ElevationHoverPoint | null) => void;
 }
 
-export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true, exportBaseMap, exportHillshade, hideHeader }: DetailPanelProps) {
+export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoClick, osDark = true, exportBaseMap, exportHillshade, hideHeader, onElevationHover }: DetailPanelProps) {
   const color = getActivityColor(getActivityCategory(activity.type ?? ''));
   const { stats } = activity;
   const [showExportPopover, setShowExportPopover] = useState(false);
   const [anchorRect, setAnchorRect] = useState({ x: 0, y: 0 });
   const imageButtonRef = useRef<HTMLButtonElement>(null);
+  const { elevationData, isLoading: elevationLoading } = useActivityElevationProfile(activity.route);
+
+  // Clear map marker when the panel unmounts or navigation away
+  useEffect(() => () => { onElevationHover?.(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleImageButtonClick() {
     if (imageButtonRef.current) {
@@ -149,6 +156,9 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
             <StatCell label="Avg HR" value={stats.avgHeartrate ? `${Math.round(stats.avgHeartrate)} bpm` : undefined} />
             <StatCell label="High Point" value={stats.elevHigh ? fmtElev(stats.elevHigh) : undefined} />
             <StatCell label="Calories" value={stats.calories ? `${stats.calories} kcal` : undefined} />
+          </div>
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--fog-ghost)', paddingTop: 12 }}>
+            <ElevationChart data={elevationData} isLoading={elevationLoading} onHover={onElevationHover} height={34} />
           </div>
         </div>
 
