@@ -300,9 +300,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setDetailSnap(hasPhotos ? 'expanded' : 'mid');
     if (summary?.route?.length && mapInstanceRef.current) {
       const coords = summary.route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
-      // Offset bottom padding to account for the open sheet, biasing the route toward the top of the map
-      const sheetHeight = Math.round(window.innerHeight * (hasPhotos ? 0.72 : 0.5));
-      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [100, 40, sheetHeight + 40, 40], duration: 500, maxZoom: 14 });
+      const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+      // On mobile, offset bottom padding to account for the open bottom sheet
+      const padding = isDesktop
+        ? [60, 60, 60, 60]
+        : [100, 40, Math.round(window.innerHeight * (hasPhotos ? 0.72 : 0.5)) + 40, 40];
+      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding, duration: 500, maxZoom: 14 });
     }
   }, [allActivities]);
 
