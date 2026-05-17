@@ -182,7 +182,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     handleWaypointClick, handleSegmentTap, handleSegmentInsert,
     handleWaypointPopoverClose, handleEditWaypoint,
     handleWaypointDelete, handleToggleSnapIn, handleToggleSnapOut,
-  } = useWaypointInteraction(waypoints, segments, dispatch, mapInstanceRef);
+  } = useWaypointInteraction(waypoints, segments, dispatch, mapInstanceRef, snapEnabled);
 
   const photosImportTriggeredRef = useRef(false);
 

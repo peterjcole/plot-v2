@@ -14,6 +14,7 @@ export function useWaypointInteraction(
   segments: RouteSegment[],
   dispatch: React.Dispatch<RouteAction>,
   mapInstanceRef: RefObject<Map | null>,
+  snapEnabled: boolean,
 ) {
   const [waypointPopover, setWaypointPopover] = useState<WaypointClickInfo | null>(null);
   const [segmentTap, setSegmentTap] = useState<SegmentTapInfo | null>(null);
@@ -22,6 +23,8 @@ export function useWaypointInteraction(
   waypointsRef.current = waypoints;
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
+  const snapEnabledRef = useRef(snapEnabled);
+  snapEnabledRef.current = snapEnabled;
 
   const handleWaypointClick = useCallback((info: WaypointClickInfo) => setWaypointPopover(info), []);
   const handleSegmentTap = useCallback((info: SegmentTapInfo) => setSegmentTap(info), []);
@@ -29,7 +32,7 @@ export function useWaypointInteraction(
   const handleSegmentInsert = useCallback(() => {
     const tap = segmentTap;
     if (!tap) return;
-    dispatch({ type: 'INSERT_WAYPOINT', index: tap.segmentIndex, waypoint: tap.waypoint, snap: false });
+    dispatch({ type: 'INSERT_WAYPOINT', index: tap.segmentIndex, waypoint: tap.waypoint, snap: snapEnabledRef.current });
     setSegmentTap(null);
   }, [segmentTap, dispatch]);
 

@@ -526,7 +526,6 @@ export default function MainMap({
     });
 
     let dragInsertSegIdx: number | null = null;
-    let dragInsertSnapped = false;
     let dragInsertFeature: Feature | null = null;
     let dragInsertMoved = false;
 
@@ -546,7 +545,6 @@ export default function MainMap({
       if (!routeFeature) return;
 
       dragInsertSegIdx = routeFeature.get('segmentIndex') as number;
-      dragInsertSnapped = routeFeature.get('snapped') as boolean;
       dragInsertMoved = false;
 
       const coord = map.getCoordinateFromPixel(pixel);
@@ -582,12 +580,16 @@ export default function MainMap({
         dragInsertFeature = null;
       }
       const segIdx = dragInsertSegIdx;
-      const isSnapped = dragInsertSnapped;
       const moved = dragInsertMoved;
       dragInsertSegIdx = null;
       if (!moved || !coord) return;
       const [lng, lat] = toLonLat(coord, OS_PROJECTION.code);
-      plannerPropsRef.current?.dispatch({ type: 'INSERT_WAYPOINT', index: segIdx + 1, waypoint: { lat, lng }, snap: isSnapped });
+      plannerPropsRef.current?.dispatch({
+        type: 'INSERT_WAYPOINT',
+        index: segIdx + 1,
+        waypoint: { lat, lng },
+        snap: plannerPropsRef.current?.snapEnabled ?? false,
+      });
     };
 
     viewport.addEventListener('pointerdown', onPointerDown);
