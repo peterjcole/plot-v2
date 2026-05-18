@@ -179,23 +179,53 @@ export default function DetailPanel({ activity, onBack, onOpenPlanner, onPhotoCl
 
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {onOpenPlanner && (
-            <button
-              onClick={onOpenPlanner}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {onOpenPlanner && (
+              <button
+                onClick={onOpenPlanner}
+                style={{
+                  flex: 1, padding: '9px 12px',
+                  background: 'var(--ora)', border: 'none', borderRadius: 4,
+                  color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
+                  fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                Open in Planner
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+              </button>
+            )}
+            <a
+              href={`https://www.strava.com/activities/${activity.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open in Strava"
+              title="Open in Strava"
               style={{
-                width: '100%', padding: '9px 12px',
-                background: 'var(--ora)', border: 'none', borderRadius: 4,
-                color: 'var(--p0)', fontFamily: 'var(--mono)', fontSize: 11,
-                fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                flexShrink: 0,
+                width: 36, height: 36,
+                border: '1px solid var(--p3)', borderRadius: 4,
+                color: 'var(--fog)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                textDecoration: 'none',
+                transition: 'border-color 120ms, color 120ms',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--ora)';
+                e.currentTarget.style.color = 'var(--ora)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--p3)';
+                e.currentTarget.style.color = 'var(--fog)';
               }}
             >
-              Open in Planner
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
               </svg>
-            </button>
-          )}
+            </a>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <a
               href={`/api/activity-gpx/${activity.id}`}
