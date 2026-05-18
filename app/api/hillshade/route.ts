@@ -1,23 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { fetchTerrElev } from '@/lib/dem';
 
 const SIZE = 256;
-
-async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Array | null> {
-  try {
-    const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`);
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const { data } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const elev = new Float32Array(SIZE * SIZE);
-    for (let i = 0; i < SIZE * SIZE; i++) {
-      elev[i] = data[i * 4] * 256 + data[i * 4 + 1] + data[i * 4 + 2] / 256 - 32768;
-    }
-    return elev;
-  } catch {
-    return null;
-  }
-}
 
 const emptyPng = async () => {
   const buf = await sharp({

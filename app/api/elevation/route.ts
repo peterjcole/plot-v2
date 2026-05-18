@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchTerrElev, lngLatToTerrPx, sampleElevation } from '@/lib/dem';
 
 const MAX_COORDS = 2000;
+const TERR_Z = 13; // ≈11 m/px at UK latitudes — better than ORS SRTM ~30 m
+const TILE_SIZE = 256;
 
 /** Downsample a coordinate array to at most `max` points, always keeping first and last. */
 function downsample(coords: [number, number][], max: number): [number, number][] {
@@ -15,73 +18,47 @@ function downsample(coords: [number, number][], max: number): [number, number][]
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ORS_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { coordinates: [], error: 'Elevation service not configured' },
-      { status: 503 }
-    );
-  }
-
   let body: { coordinates: [number, number][] };
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { coordinates: [], error: 'Invalid JSON body' },
-      { status: 400 }
-    );
+    return NextResponse.json({ coordinates: [], error: 'Invalid JSON body' }, { status: 400 });
   }
 
   if (!Array.isArray(body.coordinates) || body.coordinates.length < 2) {
-    return NextResponse.json(
-      { coordinates: [], error: 'Need at least 2 coordinates' },
-      { status: 400 }
-    );
+    return NextResponse.json({ coordinates: [], error: 'Need at least 2 coordinates' }, { status: 400 });
   }
 
   try {
     const sampled = downsample(body.coordinates, MAX_COORDS);
-    const res = await fetch(
-      'https://api.openrouteservice.org/elevation/line',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: apiKey,
-        },
-        body: JSON.stringify({
-          format_in: 'polyline',
-          format_out: 'polyline',
-          geometry: sampled,
-        }),
-      }
+    const terrN = 1 << TERR_Z;
+
+    // Collect the distinct set of DEM tiles the polyline crosses, including bilinear neighbours
+    const tileSet = new Set<string>();
+    for (const [lng, lat] of sampled) {
+      const [px, py] = lngLatToTerrPx(lng, lat, terrN);
+      const tx = Math.floor(px / TILE_SIZE);
+      const ty = Math.floor(py / TILE_SIZE);
+      tileSet.add(`${tx},${ty}`);
+      tileSet.add(`${tx + 1},${ty}`);
+      tileSet.add(`${tx},${ty + 1}`);
+      tileSet.add(`${tx + 1},${ty + 1}`);
+    }
+
+    // Fetch all needed tiles in parallel (fetchTerrElev is module-level cache-backed)
+    const tileEntries = await Promise.all(
+      [...tileSet].map(async (k) => {
+        const [x, y] = k.split(',').map(Number);
+        const data = await fetchTerrElev(TERR_Z, x, y);
+        return [`${TERR_Z}/${x}/${y}`, data] as [string, Float32Array | null];
+      })
     );
+    const tiles = new Map<string, Float32Array | null>(tileEntries);
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('ORS Elevation API error:', res.status, text);
-      return NextResponse.json(
-        { coordinates: [], error: 'Elevation service error' },
-        { status: 502 }
-      );
-    }
-
-    const data = await res.json();
-    const coords = data.geometry;
-
-    if (!Array.isArray(coords)) {
-      return NextResponse.json(
-        { coordinates: [], error: 'Unexpected response format' },
-        { status: 502 }
-      );
-    }
-
-    // ORS returns [lng, lat, ele]
-    const coordinates = coords.map((c: number[]) => ({
-      lat: c[1],
-      lng: c[0],
-      ele: c[2] ?? 0,
+    const coordinates = sampled.map(([lng, lat]) => ({
+      lat,
+      lng,
+      ele: sampleElevation(lng, lat, TERR_Z, tiles),
     }));
 
     return NextResponse.json(
@@ -89,10 +66,7 @@ export async function POST(request: NextRequest) {
       { headers: { 'Cache-Control': 'public, max-age=3600' } }
     );
   } catch (err) {
-    console.error('ORS elevation fetch error:', err);
-    return NextResponse.json(
-      { coordinates: [], error: 'Elevation service unavailable' },
-      { status: 502 }
-    );
+    console.error('Elevation DEM fetch error:', err);
+    return NextResponse.json({ coordinates: [], error: 'Elevation service unavailable' }, { status: 502 });
   }
 }

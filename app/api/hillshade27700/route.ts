@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import proj4 from 'proj4';
 import { OS_PROJECTION } from '@/lib/map-config';
+import { fetchTerrElev, lngLatToTerrPx } from '@/lib/dem';
 
 // Register projections once
 proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
@@ -17,29 +18,6 @@ const SUN_ALT = 35 * (Math.PI / 180);
 const Lx = Math.sin(SUN_AZ) * Math.cos(SUN_ALT);
 const Ly = Math.cos(SUN_AZ) * Math.cos(SUN_ALT);
 const Lz = Math.sin(SUN_ALT);
-
-async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Array | null> {
-  try {
-    const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`);
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    const { data } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const elev = new Float32Array(DEM_SIZE * DEM_SIZE);
-    for (let i = 0; i < DEM_SIZE * DEM_SIZE; i++) {
-      elev[i] = data[i * 4] * 256 + data[i * 4 + 1] + data[i * 4 + 2] / 256 - 32768;
-    }
-    return elev;
-  } catch {
-    return null;
-  }
-}
-
-function lngLatToTerrPx(lng: number, lat: number, terrN: number): [number, number] {
-  const latRad = lat * (Math.PI / 180);
-  const px = ((lng + 180) / 360) * terrN * DEM_SIZE;
-  const py = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * terrN * DEM_SIZE;
-  return [px, py];
-}
 
 const emptyPng = async (size: number) => {
   const buf = await sharp({
