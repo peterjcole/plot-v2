@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { type PanelMode } from '@/app/components/shell/MapShell';
 import { getActivityColor } from '@/lib/activity-categories';
@@ -41,14 +41,6 @@ export default function MobileHeader({
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const activitiesRef = useRef<HTMLButtonElement>(null);
-  const plannerRef = useRef<HTMLButtonElement>(null);
-  const [pill, setPill] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
-
-  useLayoutEffect(() => {
-    const ref = activeTab === 'activities' ? activitiesRef : plannerRef;
-    if (ref.current) setPill({ left: ref.current.offsetLeft, width: ref.current.offsetWidth });
-  }, [activeTab, mounted, mode]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration guard
   useEffect(() => setMounted(true), []);
@@ -139,23 +131,20 @@ export default function MobileHeader({
 
           <div style={{ width: 1, height: 22, background: 'var(--p3)', margin: '0 12px', flexShrink: 0 }} />
 
-          {/* Tab pills — content-sized with sliding orange indicator */}
+          {/* Tab pills — fixed-width with sliding orange indicator */}
           <div style={{ position: 'relative', display: 'flex', gap: 3, alignItems: 'center', flex: 1 }}>
-            {pill.width > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: 0, height: '100%',
-                left: pill.left, width: pill.width,
-                background: 'var(--ora)', borderRadius: 999,
-                transition: 'left 0.22s cubic-bezier(.4,0,.2,1), width 0.22s cubic-bezier(.4,0,.2,1)',
-                pointerEvents: 'none',
-              }} />
-            )}
+            <div style={{
+              position: 'absolute',
+              top: 0, height: '100%',
+              left: activeTab === 'activities' ? 0 : 78, width: 75,
+              background: 'var(--ora)', borderRadius: 999,
+              transition: 'left 0.22s cubic-bezier(.4,0,.2,1)',
+              pointerEvents: 'none',
+            }} />
             <button
-              ref={activitiesRef}
               onClick={() => onTabChange?.('activities')}
               style={{
-                height: 26, padding: '0 9px', borderRadius: 999,
+                width: 75, height: 26, borderRadius: 999,
                 background: 'transparent', border: 'none',
                 font: '600 8px/1 var(--mono)', letterSpacing: '.11em', textTransform: 'uppercase',
                 color: activeTab === 'activities' ? '#fff' : 'var(--fog-dim)',
@@ -166,10 +155,9 @@ export default function MobileHeader({
               Activities
             </button>
             <button
-              ref={plannerRef}
               onClick={() => onTabChange?.('planner')}
               style={{
-                height: 26, padding: '0 9px', borderRadius: 999,
+                width: 75, height: 26, borderRadius: 999,
                 background: 'transparent', border: 'none',
                 font: '600 8px/1 var(--mono)', letterSpacing: '.11em', textTransform: 'uppercase',
                 color: activeTab === 'planner' ? '#fff' : 'var(--fog-dim)',
@@ -182,13 +170,6 @@ export default function MobileHeader({
           </div>
 
           <div style={{ width: 1, height: 22, background: 'var(--p3)', margin: '0 8px', flexShrink: 0 }} />
-
-          {/* Sync dot */}
-          <div style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: '#40B060', boxShadow: '0 0 6px #40B060',
-            flexShrink: 0, marginRight: 10,
-          }} />
 
           {/* Avatar + dropdown */}
           {mounted && (
