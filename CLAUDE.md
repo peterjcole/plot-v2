@@ -39,6 +39,10 @@ This is a Next.js 16 app (App Router, TypeScript, Tailwind v4). The current code
 
 The Strava API returns more fields than the current types expose. Fields available from `GET /activities/{id}` not yet in `ActivityStats`: `elev_high`, `elev_low`, `average_heartrate`, `max_heartrate`, `average_cadence`, `calories`, `gear.name`. Photos come from `GET /activities/{id}/photos?size=600` — each has `urls`, `location[lat, lng]`, `caption`.
 
+### Code style
+
+Refactoring to eliminate duplication is encouraged, even as part of a bug fix. If fixing a bug reveals that two call sites share identical logic, extracting a shared helper is the right move — don't leave duplicated code just because the primary goal was a bug fix.
+
 ### Icons
 
 Use Lucide React icons (`import { IconName } from 'lucide-react'`). Never use Unicode symbols (↩ ↪ ⊗ etc.) as UI icons. Inline SVG is acceptable only when no suitable Lucide icon exists.

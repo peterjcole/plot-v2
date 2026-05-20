@@ -68,6 +68,15 @@ function computeGridNorthBearing(center: number[]): number {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+// Padding for fitting a route's bounding extent into the visible map area.
+// On mobile, the bottom sheet covers ~50% (no photos) or ~72% (with photos) of the
+// viewport, so the bottom padding must reserve that space to keep the route visible.
+function getRouteFitPadding(hasPhotos: boolean): number[] {
+  const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+  if (isDesktop) return [60, 60, 60, 60];
+  return [100, 40, Math.round(window.innerHeight * (hasPhotos ? 0.72 : 0.5)) + 40, 40];
+}
+
 interface MapShellProps {
   activities: ActivitySummary[];
   avatarInitials: string;
@@ -286,8 +295,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     const route = activityDetail.route;
     if (!route?.length) return;
     initialFitDoneRef.current = true;
+    const hasPhotos = activityDetail.photos.length > 0;
+    setDetailSnap(hasPhotos ? 'expanded' : 'mid');
     const coords = route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
-    mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 14 });
+    mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: getRouteFitPadding(hasPhotos), maxZoom: 14 });
   // initialSelectedId is intentionally omitted from deps — it's a stable SSR prop that never
   // changes after mount. Adding it would cause a spurious re-run on every render.
   }, [mapReady, activityDetail]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -300,12 +311,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setDetailSnap(hasPhotos ? 'expanded' : 'mid');
     if (summary?.route?.length && mapInstanceRef.current) {
       const coords = summary.route.map(([lat, lng]) => fromLonLat([lng, lat], OS_PROJECTION.code));
-      const isDesktop = window.matchMedia('(min-width: 640px)').matches;
-      // On mobile, offset bottom padding to account for the open bottom sheet
-      const padding = isDesktop
-        ? [60, 60, 60, 60]
-        : [100, 40, Math.round(window.innerHeight * (hasPhotos ? 0.72 : 0.5)) + 40, 40];
-      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding, duration: 500, maxZoom: 14 });
+      mapInstanceRef.current.getView().fit(boundingExtent(coords), { padding: getRouteFitPadding(hasPhotos), duration: 500, maxZoom: 14 });
     }
   }, [allActivities]);
 
