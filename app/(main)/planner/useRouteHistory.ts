@@ -150,8 +150,7 @@ function applyAction(state: RouteState, action: RouteAction): RouteState | null 
       const waypoints = [...state.waypoints].reverse();
       const segments = [...state.segments].reverse().map(seg => ({
         ...seg,
-        coordinates: [],
-        distance: undefined,
+        coordinates: [...seg.coordinates].reverse(),
       }));
       return { waypoints, segments };
     }
