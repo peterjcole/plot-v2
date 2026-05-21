@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { ArrowUp } from 'lucide-react';
 import { ActivityData } from '@/lib/types';
 import { type BaseMap } from '@/lib/map-config';
+import { fmtKm, fmtElev, fmtTime, fmtPace, fmtDate } from '@/lib/format-stats';
 
 const ActivityMap = dynamic(() => import('@/app/components/ActivityMap'), { ssr: false });
 
@@ -21,27 +22,6 @@ function getPhotoLayout(photoCount: number, firstIsLandscape: boolean): PhotoLay
   if (photoCount === 1) return { mapWidth: 720, photoColWidth: 480 };
   if (photoCount === 2) return { mapWidth: 680, photoColWidth: 520 };
   return { mapWidth: 640, photoColWidth: 560 };
-}
-
-// Stats formatting
-function fmtKm(m: number): string { return (m / 1000).toFixed(2); }
-function fmtElev(m: number): string { return String(Math.round(m)); }
-function fmtTime(s: number): string {
-  const h = Math.floor(s / 3600);
-  const min = Math.floor((s % 3600) / 60);
-  const sec = Math.floor(s % 60);
-  if (h > 0) return `${h}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  return `${min}:${String(sec).padStart(2, '0')}`;
-}
-function fmtPace(distM: number, timeSec: number): string {
-  if (!distM) return '—';
-  const secsPerKm = timeSec / (distM / 1000);
-  const m = Math.floor(secsPerKm / 60);
-  const s = Math.round(secsPerKm % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 interface StatCellProps { label: string; value: string; unit?: ReactNode; isDark: boolean }

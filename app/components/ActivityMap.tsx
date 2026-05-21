@@ -325,7 +325,7 @@ export default function ActivityMap({ activity, width, height, paddingRight = 0,
 
   const isDark = isSatellite || osDark;
   const routeColor = getActivityColor(activity.type ?? '');
-  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.65)' : 'rgba(7,14,20,0.60)';
+  const routeOutlineColor = isDark ? 'rgba(7,14,20,0.65)' : 'rgba(7,14,20,0.82)';
   const routeOpacity = 0.68;
 
   return (

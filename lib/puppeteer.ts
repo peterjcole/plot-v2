@@ -5,9 +5,10 @@ let cachedBrowser: Browser | null = null;
 const isDev = process.env.NODE_ENV === 'development';
 
 export async function getBrowser(): Promise<Browser> {
-  if (cachedBrowser) {
+  if (cachedBrowser?.isConnected()) {
     return cachedBrowser;
   }
+  cachedBrowser = null;
 
   if (isDev) {
     const puppeteer = await import('puppeteer');
