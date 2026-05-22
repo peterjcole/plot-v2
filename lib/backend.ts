@@ -58,22 +58,3 @@ export async function getRecentActivityFromBackend(minDistanceMeters: number): P
   };
 }
 
-export async function getRecentActivityId(minDistanceMeters: number): Promise<string> {
-  const { url, token, athleteId } = getBackendConfig();
-
-  const res = await fetch(`${url}/activities/recent?minDistance=${minDistanceMeters}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'X-Athlete-Id': athleteId,
-    },
-  });
-
-  if (res.status === 404) return '';
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`Backend /activities/recent failed (${res.status}): ${text}`);
-  }
-
-  const data: Pick<RecentActivityResponse, 'id'> = await res.json();
-  return String(data.id);
-}

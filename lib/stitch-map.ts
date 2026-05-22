@@ -22,6 +22,8 @@ export interface StitchOptions {
   renderZoom: number;
   origin: string;
   bypassSecret?: string;
+  /** Output format — defaults to 'jpeg' for backwards compat */
+  outputFormat?: 'jpeg' | 'png';
 }
 
 function osLatLngToPixel(lat: number, lng: number, zoom: number): [number, number] {
@@ -69,11 +71,15 @@ function buildSvg(
   routePixels: [number, number][],
   routeColor: string,
   outlineColor: string,
-  routeOpacity: number,
-  arrowOpacity: number,
   width: number,
   height: number,
 ): string {
+  // Match OL selected route (MainMap.tsx): inner 11px, casing 16px, both at full opacity,
+  // wrapped in a group at 0.68 opacity so the double-stroke composites as a solid unit
+  // before transparency — keeps the route colour saturated (no background bleed-through).
+  const INNER_W = 11;
+  const OUTER_W = 16;
+  const ROUTE_OPACITY = 0.68;
   // Filter out any NaN/Infinity pixel values — a single NaN in <polyline points>
   // causes librsvg to silently drop the entire polyline.
   const validPixels = routePixels.map(
@@ -105,7 +111,7 @@ function buildSvg(
         if (!isFinite(ax) || !isFinite(ay)) { nextTarget += 2000; continue; }
         arrows.push(
           `<g transform="translate(${ax.toFixed(1)},${ay.toFixed(1)}) rotate(${deg.toFixed(1)})">` +
-            `<path d="M14,7 L0,-7 L-14,7" fill="none" stroke="${routeColor}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="${arrowOpacity}"/>` +
+            `<path d="M14,7 L0,-7 L-14,7" fill="none" stroke="${outlineColor}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
             `</g>`,
         );
         nextTarget += 2000;
@@ -134,7 +140,7 @@ function buildSvg(
 
   const startMarker =
     `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}" ` +
-    `fill="${routeColor}" stroke="white" stroke-width="4" opacity="0.85"/>`;
+    `fill="${routeColor}" stroke="white" stroke-width="${(r * 0.25).toFixed(1)}" opacity="0.75"/>`;
 
   // Checkerboard end marker (matches ActivityMap)
   const endMarker = [
@@ -151,11 +157,16 @@ function buildSvg(
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
     defs,
-    // Double-stroke casing: wide outline stroke first (behind), then narrow colour stroke on top.
-    // This avoids feMorphology (which is O(pixels) and requires ¼-scale rendering at export sizes).
-    `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="24" stroke-opacity="0.88" stroke-linecap="round" stroke-linejoin="round"/>`,
-    `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="14" stroke-opacity="${routeOpacity}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    // Group opacity: both strokes are fully opaque inside the group so the double-stroke
+    // composites as a solid unit before the group-level transparency is applied.
+    // This matches OL's layer-opacity approach (MainMap.tsx:398) — avoids the
+    // per-stroke opacity path where a semi-transparent orange mixes with the background
+    // and desaturates to brown.
+    `<g opacity="${ROUTE_OPACITY}">`,
+    `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="${OUTER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="${INNER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
     ...arrows,
+    `</g>`,
     startMarker,
     endMarker,
     `</svg>`,
@@ -167,11 +178,9 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
 
   const isSatellite = baseMap === 'satellite';
   const isTopo = useTopo === true && !isSatellite;
-  const isDark = isSatellite || osDark;
   const routeColor = opts.activityType ? getActivityColor(opts.activityType) : '#E07020';
-  const outlineColor = isDark ? 'rgba(7,14,20,0.95)' : 'rgba(255,255,255,0.7)';
-  const routeOpacity = 0.85;
-  const arrowOpacity = routeOpacity;
+  // Match OL selected route (MainMap.tsx:1188) — fully opaque casing; group opacity handles translucency
+  const outlineColor = 'rgba(7,14,20,1)';
 
   const latLngToPixel = (lat: number, lng: number): [number, number] =>
     (isSatellite || isTopo)
@@ -307,11 +316,12 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     .raw()
     .toBuffer({ resolveWithObject: true });
 
+  const outputFormat = opts.outputFormat ?? 'jpeg';
+
   const hasRoute = route.length >= 2;
   if (!hasRoute) {
-    return sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    const base = sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } });
+    return outputFormat === 'png' ? base.png().toBuffer() : base.jpeg({ quality: 90 }).toBuffer();
   }
 
   // Convert route coordinates to image pixel positions
@@ -335,8 +345,6 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     routePixels,
     routeColor,
     outlineColor,
-    routeOpacity,
-    arrowOpacity,
     width,
     height,
   );
@@ -344,8 +352,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   // Render SVG at full resolution. Double-stroke casing (no feMorphology) keeps this fast.
   const svgOverlay = await sharp(Buffer.from(svgStr)).toBuffer();
 
-  return sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
-    .composite([{ input: svgOverlay }])
-    .jpeg({ quality: 90 })
-    .toBuffer();
+  const final = sharp(croppedRaw, { raw: { width, height, channels: stitchedInfo.channels } })
+    .composite([{ input: svgOverlay }]);
+  return outputFormat === 'png' ? final.png().toBuffer() : final.jpeg({ quality: 90 }).toBuffer();
 }

@@ -1,5 +1,51 @@
 export type ExportMode = 'explorer' | 'landranger' | 'satellite';
 
+// Padding fraction: route bbox must fit within this fraction of the canvas
+const FIT_PADDING = 0.85;
+
+/**
+ * Given a fixed output canvas and a route bounding box, return the largest
+ * renderZoom at which the route still fits inside the canvas (with padding).
+ * Mirrors the projection logic in stitch-map.ts / calculateRenderDimensions.
+ */
+export function fitZoomForFrame(opts: {
+  width: number;
+  height: number;
+  bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number };
+  isSatellite: boolean;
+  isTopo: boolean;
+}): number {
+  const { width, height, bbox, isSatellite, isTopo } = opts;
+  const { minLat, maxLat, minLng, maxLng } = bbox;
+  const avgLat = (maxLat + minLat) / 2;
+  const avgLatRad = (avgLat * Math.PI) / 180;
+
+  const availW = width * FIT_PADDING;
+  const availH = height * FIT_PADDING;
+
+  if (isSatellite || isTopo) {
+    // Web Mercator — pixel size depends on latitude
+    const circumference = 40_075_016.686;
+    const widthM = (maxLng - minLng) * 111320 * Math.cos(avgLatRad);
+    const heightM = (maxLat - minLat) * 111320;
+    const maxZoom = isSatellite ? 18 : 15;
+    for (let z = maxZoom; z >= 0; z--) {
+      const res = (circumference * Math.cos(avgLatRad)) / (256 * Math.pow(2, z));
+      if (widthM / res <= availW && heightM / res <= availH) return z;
+    }
+    return 0;
+  }
+
+  // EPSG:27700 OS — fixed resolutions per zoom
+  const widthM = (maxLng - minLng) * 111320 * Math.cos(avgLatRad);
+  const heightM = (maxLat - minLat) * 111320;
+  for (let z = 9; z >= 0; z--) {
+    const res = OS_RESOLUTIONS[z];
+    if (widthM / res <= availW && heightM / res <= availH) return z;
+  }
+  return 0;
+}
+
 // EPSG:27700 resolutions (meters/pixel) indexed by zoom level 0–9
 const OS_RESOLUTIONS = [896, 448, 224, 112, 56, 28, 14, 7, 3.5, 1.75];
 
