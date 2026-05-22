@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
     );
     const useTopo = baseMap === 'os' && !isGB;
 
-    const renderZoom = fitZoomForFrame({ width, height, bbox, isSatellite, isTopo: useTopo, padding: 0.70 });
+    const renderZoom = fitZoomForFrame({ width, height, bbox, isSatellite, isTopo: useTopo, padding: 0.82 });
 
     // Shift center southward so the route sits in the upper portion of the canvas,
     // keeping the bottom clear for the HUD panel (~320px tall at bottom-left).
