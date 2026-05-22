@@ -1,12 +1,12 @@
 export type ExportMode = 'explorer' | 'landranger' | 'satellite';
 
-// Padding fraction: route bbox must fit within this fraction of the canvas
-const FIT_PADDING = 0.85;
-
 /**
  * Given a fixed output canvas and a route bounding box, return the largest
  * renderZoom at which the route still fits inside the canvas (with padding).
  * Mirrors the projection logic in stitch-map.ts / calculateRenderDimensions.
+ *
+ * @param padding Fraction of canvas the route bbox may occupy (default 0.85).
+ *   Lower values zoom out further and show more surrounding map context.
  */
 export function fitZoomForFrame(opts: {
   width: number;
@@ -14,8 +14,10 @@ export function fitZoomForFrame(opts: {
   bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   isSatellite: boolean;
   isTopo: boolean;
+  padding?: number;
 }): number {
   const { width, height, bbox, isSatellite, isTopo } = opts;
+  const FIT_PADDING = opts.padding ?? 0.85;
   const { minLat, maxLat, minLng, maxLng } = bbox;
   const avgLat = (maxLat + minLat) / 2;
   const avgLatRad = (avgLat * Math.PI) / 180;

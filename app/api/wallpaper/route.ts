@@ -7,6 +7,7 @@ import { stitchMapImage } from '@/lib/stitch-map';
 import { fitZoomForFrame } from '@/lib/render-dimensions';
 import { buildWallpaperHud } from '@/lib/wallpaper-hud';
 import { trimRouteEnds } from '@/lib/route-trim';
+import { OS_PROJECTION } from '@/lib/map-config';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -124,7 +125,21 @@ export async function GET(request: NextRequest) {
     );
     const useTopo = baseMap === 'os' && !isGB;
 
-    const renderZoom = fitZoomForFrame({ width, height, bbox, isSatellite, isTopo: useTopo });
+    const renderZoom = fitZoomForFrame({ width, height, bbox, isSatellite, isTopo: useTopo, padding: 0.70 });
+
+    // Shift center southward so the route sits in the upper portion of the canvas,
+    // keeping the bottom clear for the HUD panel (~320px tall at bottom-left).
+    const HUD_CLEAR_PX = 160;
+    const latShift = (() => {
+      if (isSatellite || useTopo) {
+        const circ = 40_075_016.686;
+        const res = (circ * Math.cos((center[0] * Math.PI) / 180)) / (256 * Math.pow(2, renderZoom));
+        return (HUD_CLEAR_PX * res) / 111320;
+      }
+      const res = OS_PROJECTION.resolutions[renderZoom] ?? 7;
+      return (HUD_CLEAR_PX * res) / 111320;
+    })();
+    const framedCenter: [number, number] = [center[0] - latShift, center[1]];
 
     const origin = request.nextUrl.origin;
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
@@ -137,7 +152,7 @@ export async function GET(request: NextRequest) {
     // Stitch the base map + route overlay
     const mapBuffer = await stitchMapImage({
       route: renderRoute,
-      center,
+      center: framedCenter,
       exportMode: 'explorer',
       baseMap,
       osDark,
