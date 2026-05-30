@@ -111,6 +111,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [compassBearing, setCompassBearing] = useState(0);
   const [mapResolution, setMapResolution] = useState(10);
   const [loadedActivityId, setLoadedActivityId] = useState<string | null>(null);
+  const [explorerStats, setExplorerStats] = useState<{ yardSize: number; tileCount: number } | null>(null);
 
   // Sidebar
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -573,6 +574,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           heatmapSport={layerState.heatmapSport}
           heatmapColor={layerState.heatmapColor}
           showExplorer={layerState.showExplorer}
+          onExplorerStats={setExplorerStats}
           showOwnerPhotos={isOwner && layerState.showPhotos}
           onPhotoClick={handleOwnerPhotoClick}
           onClusterPhotosClick={handleOwnerClusterPhotosClick}
@@ -587,7 +589,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
         {/* Desktop chrome — layers, compass, scale, legend (hidden on mobile) */}
         <div className="hidden sm:block">
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} />
         </div>
         <div className="hidden sm:flex absolute bottom-[68px] left-3 z-[14] items-center gap-2">
           <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
@@ -645,7 +647,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Conditional non-animated elements */}
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
           <button
             onClick={handleOpenPlanner}
             style={{
@@ -675,7 +677,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
 
       {mode === 'planner' && (
-        <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+        <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
       )}
 
       {/* Activities bottom sheet — always mounted, crossfades out when entering planner */}

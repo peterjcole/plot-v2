@@ -82,6 +82,7 @@ interface MainMapProps {
   heatmapSport?: string;
   heatmapColor?: string;
   showExplorer?: boolean;
+  onExplorerStats?: (stats: { yardSize: number; tileCount: number } | null) => void;
   showOwnerPhotos?: boolean;
   onPhotoClick?: (photo: PhotoItem, screenX: number, screenY: number) => void;
   onClusterPhotosClick?: (photos: PhotoItem[], screenX: number, screenY: number) => void;
@@ -224,6 +225,7 @@ export default function MainMap({
   heatmapSport = 'all',
   heatmapColor = 'hot',
   showExplorer = false,
+  onExplorerStats,
   showOwnerPhotos = false,
   onPhotoClick,
   onClusterPhotosClick,
@@ -253,6 +255,9 @@ export default function MainMap({
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const explorerTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerSquareTilesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerYardLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const explorerYardPerimeterLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const explorerSquareLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const explorerGridLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const fittedRef = useRef(false);
@@ -963,7 +968,7 @@ export default function MainMap({
     return { x, y };
   }, []);
 
-  // Explorer: visited tiles + max square layers
+  // Explorer: visited tiles (non-yard + yard) + max square layers
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -972,12 +977,27 @@ export default function MainMap({
       map.removeLayer(explorerTilesLayerRef.current);
       explorerTilesLayerRef.current = null;
     }
+    if (explorerSquareTilesLayerRef.current) {
+      map.removeLayer(explorerSquareTilesLayerRef.current);
+      explorerSquareTilesLayerRef.current = null;
+    }
+    if (explorerYardLayerRef.current) {
+      map.removeLayer(explorerYardLayerRef.current);
+      explorerYardLayerRef.current = null;
+    }
+    if (explorerYardPerimeterLayerRef.current) {
+      map.removeLayer(explorerYardPerimeterLayerRef.current);
+      explorerYardPerimeterLayerRef.current = null;
+    }
     if (explorerSquareLayerRef.current) {
       map.removeLayer(explorerSquareLayerRef.current);
       explorerSquareLayerRef.current = null;
     }
 
-    if (!showExplorer) return;
+    if (!showExplorer) {
+      onExplorerStats?.(null);
+      return;
+    }
 
     let cancelled = false;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -985,7 +1005,12 @@ export default function MainMap({
     const fetchExplorerData = (retriesLeft: number) => {
       fetch('/api/explorer?filter=all')
         .then((res) => res.ok ? res.json() : null)
-        .then((data: { status?: string; tiles?: [number, number][]; maxSquare?: { x: number; y: number; size: number } | null } | null) => {
+        .then((data: {
+          status?: string;
+          tiles?: [number, number][];
+          maxSquare?: { x: number; y: number; size: number } | null;
+          maxYard?: { tiles: [number, number][]; size: number } | null;
+        } | null) => {
           if (cancelled || !data) return;
 
           if (data.status === 'computing') {
@@ -997,27 +1022,108 @@ export default function MainMap({
 
           if (!data.tiles) return;
 
-          const tilesSource = new VectorSource();
+          // Build yard tile key set for O(1) membership — only if yard data present
+          const yardKeys = new Set<string>();
+          if (data.maxYard?.tiles) {
+            for (const [x, y] of data.maxYard.tiles) {
+              yardKeys.add(`${x},${y}`);
+            }
+          }
+
+          const sq = data.maxSquare ?? null;
+
+          // Split visited tiles into three fill layers
+          const greySource = new VectorSource();    // visited, not yard, not in sq
+          const khakiSource = new VectorSource();   // inside max-sq bounds, not yard
+          const oliveSource = new VectorSource();   // yard (interior) tiles
+
           for (const [x, y] of data.tiles) {
             const coords = tileToPolygonCoords(x, y, 14);
             const feature = new Feature({ geometry: new Polygon([coords]) });
-            tilesSource.addFeature(feature);
+            if (yardKeys.has(`${x},${y}`)) {
+              oliveSource.addFeature(feature);
+            } else if (sq && x >= sq.x && x < sq.x + sq.size && y >= sq.y && y < sq.y + sq.size) {
+              khakiSource.addFeature(feature);
+            } else {
+              greySource.addFeature(feature);
+            }
           }
 
-          const tilesLayer = new VectorLayer({
-            source: tilesSource,
+          const greyLayer = new VectorLayer({
+            source: greySource,
             style: new Style({
-              fill: new Fill({ color: 'rgba(46, 204, 113, 0.25)' }),
-              stroke: new Stroke({ color: 'rgba(46, 204, 113, 0.5)', width: 0.5 }),
+              fill: new Fill({ color: 'rgba(140, 140, 140, 0.32)' }),
+              stroke: new Stroke({ color: 'rgba(140, 140, 140, 0.65)', width: 0.75 }),
             }),
-            zIndex: 3.5,
+            zIndex: 3.50,
           });
 
-          map.addLayer(tilesLayer);
-          explorerTilesLayerRef.current = tilesLayer;
+          const khakiLayer = new VectorLayer({
+            source: khakiSource,
+            style: new Style({
+              fill: new Fill({ color: 'rgba(185, 165, 100, 0.28)' }),
+              stroke: new Stroke({ color: 'rgba(185, 165, 100, 0.50)', width: 0.5 }),
+            }),
+            zIndex: 3.51,
+          });
 
-          if (data.maxSquare) {
-            const { x, y, size } = data.maxSquare;
+          const oliveLayer = new VectorLayer({
+            source: oliveSource,
+            style: new Style({
+              fill: new Fill({ color: 'rgba(108, 140, 35, 0.38)' }),
+              stroke: new Stroke({ color: 'rgba(108, 140, 35, 0.75)', width: 0.5 }),
+            }),
+            zIndex: 3.55,
+          });
+
+          map.addLayer(greyLayer);
+          map.addLayer(khakiLayer);
+          map.addLayer(oliveLayer);
+          explorerTilesLayerRef.current = greyLayer;
+          explorerSquareTilesLayerRef.current = khakiLayer;
+          explorerYardLayerRef.current = oliveLayer;
+
+          // Yard perimeter outline — trace boundary edges of the yard blob
+          if (yardKeys.size > 0) {
+            const perimeterSource = new VectorSource();
+            for (const [x, y] of data.maxYard!.tiles) {
+              const corners = tileToPolygonCoords(x, y, 14);
+              // corners: [TL, TR, BR, BL, TL]
+              const edges: [number, number][] = [
+                [0, 1], // N: TL→TR
+                [1, 2], // E: TR→BR
+                [2, 3], // S: BR→BL
+                [3, 0], // W: BL→TL
+              ];
+              const neighbours = [
+                `${x},${y - 1}`, // N
+                `${x + 1},${y}`, // E
+                `${x},${y + 1}`, // S
+                `${x - 1},${y}`, // W
+              ];
+              for (let i = 0; i < 4; i++) {
+                if (!yardKeys.has(neighbours[i])) {
+                  const [a, b] = edges[i];
+                  perimeterSource.addFeature(
+                    new Feature({ geometry: new LineString([corners[a], corners[b]]) }),
+                  );
+                }
+              }
+            }
+            const perimeterLayer = new VectorLayer({
+              source: perimeterSource,
+              style: new Style({
+                stroke: new Stroke({ color: 'rgba(90, 120, 20, 0.95)', width: 2.5 }),
+              }),
+              zIndex: 3.57,
+            });
+            map.addLayer(perimeterLayer);
+            explorerYardPerimeterLayerRef.current = perimeterLayer;
+          }
+
+          // Max square — neutral outline: dark halo + ivory line, reads on both basemaps
+          if (sq) {
+            const { x, y, size } = sq;
             const squareCoords = [
               fromLonLat([(x / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
               fromLonLat([((x + size) / (1 << 14)) * 360 - 180, (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / (1 << 14)))) * 180) / Math.PI], OS_PROJECTION.code),
@@ -1031,16 +1137,22 @@ export default function MainMap({
 
             const squareLayer = new VectorLayer({
               source: squareSource,
-              style: new Style({
-                fill: new Fill({ color: 'rgba(231, 76, 60, 0.08)' }),
-                stroke: new Stroke({ color: 'rgba(231, 76, 60, 0.9)', width: 3 }),
-              }),
+              style: [
+                new Style({ stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.45)', width: 5.5 }) }),
+                new Style({ stroke: new Stroke({ color: 'rgba(255, 250, 220, 0.90)', width: 2.5 }) }),
+              ],
               zIndex: 3.6,
             });
 
             map.addLayer(squareLayer);
             explorerSquareLayerRef.current = squareLayer;
           }
+
+          // Surface yard + total counts to parent (e.g. for LayersPanel display)
+          onExplorerStats?.({
+            yardSize: data.maxYard?.size ?? 0,
+            tileCount: data.tiles.length,
+          });
         })
         .catch(() => { /* silently fail */ });
     };
@@ -1054,12 +1166,24 @@ export default function MainMap({
         map.removeLayer(explorerTilesLayerRef.current);
         explorerTilesLayerRef.current = null;
       }
+      if (explorerSquareTilesLayerRef.current) {
+        map.removeLayer(explorerSquareTilesLayerRef.current);
+        explorerSquareTilesLayerRef.current = null;
+      }
+      if (explorerYardLayerRef.current) {
+        map.removeLayer(explorerYardLayerRef.current);
+        explorerYardLayerRef.current = null;
+      }
+      if (explorerYardPerimeterLayerRef.current) {
+        map.removeLayer(explorerYardPerimeterLayerRef.current);
+        explorerYardPerimeterLayerRef.current = null;
+      }
       if (explorerSquareLayerRef.current) {
         map.removeLayer(explorerSquareLayerRef.current);
         explorerSquareLayerRef.current = null;
       }
     };
-  }, [showExplorer, tileToPolygonCoords]);
+  }, [showExplorer, tileToPolygonCoords, onExplorerStats]);
 
   // Explorer: z14 grid overlay (unclaimed tile outlines)
   useEffect(() => {

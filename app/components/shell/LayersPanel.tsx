@@ -81,6 +81,8 @@ interface LayersPanelProps {
   /** When true, anchor to top-right instead of bottom-left. Card opens below the trigger. */
   topRight?: boolean;
   topOffset?: number;
+  /** Yard + total tile counts, surfaced from the explorer layer once loaded. */
+  explorerStats?: { yardSize: number; tileCount: number } | null;
 }
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -128,7 +130,7 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange, triggerStyle, topRight, topOffset = 80 }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange, triggerStyle, topRight, topOffset = 80, explorerStats }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
@@ -239,6 +241,16 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
           <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} hidden={!isOwner} />
           <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} hidden={!isOwner} />
           <Row label="Explorer tiles" on={state.showExplorer} onChange={(v) => onChange({ showExplorer: v })} hidden={!isOwner} />
+          {isOwner && state.showExplorer && explorerStats && (
+            <div style={{ paddingLeft: 0, paddingBottom: 2, display: 'flex', gap: 10 }}>
+              <span style={{ font: '400 9px/1 var(--mono)', color: 'rgba(108,140,35,0.95)', letterSpacing: '0.03em' }}>
+                yard {explorerStats.yardSize.toLocaleString()}
+              </span>
+              <span style={{ font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)', letterSpacing: '0.03em' }}>
+                visited {explorerStats.tileCount.toLocaleString()}
+              </span>
+            </div>
+          )}
 
           {!isOwner && <Divider />}
           {isOwner && <Divider />}
