@@ -74,7 +74,7 @@ interface LayersPanelProps {
   bottom?: number;
   fixed?: boolean;
   forceOpen?: boolean;
-  isOwner?: boolean;
+  isPremium?: boolean;
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
   triggerStyle?: React.CSSProperties;
@@ -130,7 +130,7 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--fog-ghost)', margin: '8px 0' }} />;
 }
 
-export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isOwner = false, theme, onThemeChange, triggerStyle, topRight, topOffset = 80, explorerStats }: LayersPanelProps) {
+export default function LayersPanel({ state, onChange, bottom = 16, fixed = false, forceOpen, isPremium = false, theme, onThemeChange, triggerStyle, topRight, topOffset = 80, explorerStats }: LayersPanelProps) {
   const [open, setOpen] = useState(false);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing forceOpen prop to open state
   useEffect(() => { if (forceOpen !== undefined) setOpen(forceOpen); }, [forceOpen]);
@@ -238,10 +238,10 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
           <Divider />
 
           {/* Personal */}
-          <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} hidden={!isOwner} />
-          <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} hidden={!isOwner} />
-          <Row label="Explorer tiles" on={state.showExplorer} onChange={(v) => onChange({ showExplorer: v })} hidden={!isOwner} />
-          {isOwner && state.showExplorer && explorerStats && (
+          <Row label="My photos" on={state.showPhotos} onChange={(v) => onChange({ showPhotos: v })} hidden={!isPremium} />
+          <Row label="Personal heatmap" on={state.showPersonalHeatmap} onChange={(v) => onChange({ showPersonalHeatmap: v })} hidden={!isPremium} />
+          <Row label="Explorer tiles" on={state.showExplorer} onChange={(v) => onChange({ showExplorer: v })} hidden={!isPremium} />
+          {isPremium && state.showExplorer && explorerStats && (
             <div style={{ paddingLeft: 0, paddingBottom: 2, display: 'flex', gap: 10 }}>
               <span style={{ font: '400 9px/1 var(--mono)', color: 'rgba(108,140,35,0.95)', letterSpacing: '0.03em' }}>
                 yard {explorerStats.yardSize.toLocaleString()}
@@ -252,13 +252,13 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
             </div>
           )}
 
-          {!isOwner && <Divider />}
-          {isOwner && <Divider />}
+          {!isPremium && <Divider />}
+          {isPremium && <Divider />}
 
-          {/* POIs — owner only */}
-          <Row label="Points of interest" on={state.showPOIs} onChange={(v) => onChange({ showPOIs: v })} hidden={!isOwner} />
+          {/* POIs — premium only */}
+          <Row label="Points of interest" on={state.showPOIs} onChange={(v) => onChange({ showPOIs: v })} hidden={!isPremium} />
 
-          {isOwner && <Divider />}
+          {isPremium && <Divider />}
 
           {/* Global heatmap — always shown */}
           <Row label="Global heatmap" on={state.showGlobalHeatmap} onChange={(v) => onChange({ showGlobalHeatmap: v })} />

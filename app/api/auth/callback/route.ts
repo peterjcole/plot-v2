@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { bootstrapPremiumAccess, type StravaTokenResponse } from '@/lib/backend';
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code');
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const data = await tokenRes.json();
+  const data: StravaTokenResponse = await tokenRes.json();
 
   session.accessToken = data.access_token;
   session.refreshToken = data.refresh_token;
@@ -48,6 +49,9 @@ export async function GET(request: NextRequest) {
     firstname: data.athlete.firstname,
     lastname: data.athlete.lastname,
   };
+  // Best-effort: onboards the athlete into the backend and resolves premium
+  // feature access once, cached in the session for the rest of this login.
+  session.entitlements = { premium: await bootstrapPremiumAccess(data) };
   await session.save();
 
   return NextResponse.redirect(new URL('/', request.nextUrl.origin));

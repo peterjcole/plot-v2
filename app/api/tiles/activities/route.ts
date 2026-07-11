@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
+import { getPremiumBackendConfig } from '@/lib/backend';
 
 export async function GET(request: NextRequest) {
   const session = await getSession();
-  const tilesAthleteId = process.env.TILES_ATHLETE_ID;
-  const tilesBackendUrl = process.env.TILES_BACKEND_URL;
-  const tilesBearerToken = process.env.TILES_BEARER_TOKEN;
+  const backend = getPremiumBackendConfig(session);
 
-  if (!tilesAthleteId || !tilesBackendUrl || !tilesBearerToken) {
-    return new NextResponse(null, { status: 404 });
-  }
-
-  if (String(session.athlete?.id) !== tilesAthleteId) {
+  if (!backend) {
     return new NextResponse(null, { status: 404 });
   }
 
@@ -24,10 +19,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${tilesBackendUrl}/tiles/activities?lat=${lat}&lng=${lng}`, {
+    const res = await fetch(`${backend.url}/tiles/activities?lat=${lat}&lng=${lng}`, {
       headers: {
-        Authorization: `Bearer ${tilesBearerToken}`,
-        'X-Athlete-Id': String(session.athlete!.id),
+        Authorization: `Bearer ${backend.token}`,
+        'X-Athlete-Id': backend.athleteId,
       },
     });
 

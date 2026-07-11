@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getAthleteActivities, StravaApiError } from '@/lib/strava';
+import { hasPremium } from '@/lib/entitlements';
 import MapShell, { type PanelMode } from '@/app/components/shell/MapShell';
 import { ActivitySummary } from '@/lib/types';
 
@@ -38,15 +39,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
     ? `${session.athlete.firstname?.[0] ?? ''}${session.athlete.lastname?.[0] ?? ''}`
     : '?';
 
-  const tilesAthleteId = process.env.TILES_ATHLETE_ID;
-  const isOwner = !!tilesAthleteId && !!session.athlete && String(session.athlete.id) === tilesAthleteId;
+  const isPremium = hasPremium(session);
 
   return (
     <MapShell
       activities={activities}
       avatarInitials={avatarInitials}
       isLoggedIn={isLoggedIn}
-      isOwner={isOwner}
+      isPremium={isPremium}
       initialMode={initialMode}
       initialSelectedId={initialSelectedId}
       authError={authError}
