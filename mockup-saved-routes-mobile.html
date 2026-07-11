@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>plot — mockup — saved routes — mobile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Ribeye+Marrow&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --p0: #070E14;
+      --p1: #0E2830;
+      --p2: #163840;
+      --p3: #1E4858;
+      --p4: #2A5860;
+      --ora: #E07020;
+      --grn: #40B060;
+      --blu: #4080C0;
+      --ice: #F0F8FA;
+      --fog: rgba(240,248,250,0.72);
+      --fog-dim: rgba(240,248,250,0.45);
+      --fog-ghost: rgba(240,248,250,0.08);
+      --glass-lgt: rgba(7,14,20,0.58);
+      --glass:     rgba(7,14,20,0.82);
+      --glass-hvy: rgba(7,14,20,0.94);
+      --mono: 'IBM Plex Mono', monospace;
+      --display: 'Ribeye Marrow', cursive;
+    }
+
+    body { background: #040A0F; color: var(--ice); font-family: var(--mono); min-height: 100vh; }
+
+    /* PAGE CHROME */
+    .page-header { padding: 48px 56px 32px; border-bottom: 1px solid var(--fog-ghost); display: flex; align-items: baseline; gap: 24px; }
+    .page-wordmark { font-family: var(--display); font-size: 28px; color: var(--ice); letter-spacing: .02em; }
+    .page-title { font: 600 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); }
+    .page-tag { margin-left: auto; font: 400 10px/1 var(--mono); color: var(--p4); letter-spacing: .1em; }
+    .section-header { padding: 40px 56px 20px; }
+    .section-label { font: 600 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ora); margin-bottom: 6px; }
+    .section-desc { font: 400 12px/1.5 var(--mono); color: var(--fog-dim); max-width: 640px; }
+    .frames-row { display: flex; gap: 32px; padding: 0 56px 56px; overflow-x: auto; align-items: flex-start; }
+    .frame-wrap { flex-shrink: 0; width: 390px; }
+    .frame-label { font: 600 9px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--fog-dim); margin-bottom: 10px; }
+    .frame-note { font: 400 9px/1.5 var(--mono); color: var(--p4); letter-spacing: .02em; margin-top: 10px; }
+    .frame-border { border: 1px solid var(--p3); border-radius: 4px; overflow: hidden; }
+
+    /* Note: mobile chrome below is copied 1:1 from the real components —
+       MobileHeader.tsx (floating pill capsule), PlannerToolbar.tsx (floating
+       toolbar pill), and the planner HUD block in MapShell.tsx (floating card).
+       This is NOT mockup-h.html's mobile design — that mockup predates a
+       rebuild to this floating-capsule language and is out of date. */
+
+    .mob-frame { width: 390px; height: 844px; position: relative; overflow: hidden; background: var(--p0); }
+    .mob-map { position: absolute; inset: 0; background-image: url('osmapdark.jpg'); background-size: cover; background-position: center; }
+
+    /* Header capsule — MobileHeader.tsx */
+    .mob-header { position: absolute; top: 10px; left: 10px; right: 10px; height: 48px; background: var(--glass-hvy); backdrop-filter: blur(16px); border: 1px solid var(--p3); border-radius: 999px; box-shadow: 0 2px 12px rgba(0,0,0,.22); display: flex; align-items: center; padding: 0 14px 0 16px; z-index: 30; }
+    .mob-header-word { font-family: var(--display); font-size: 20px; color: var(--ice); line-height: 1; flex-shrink: 0; margin-right: 2px; }
+    .mob-header-sep { width: 1px; height: 22px; background: var(--p3); margin: 0 12px; flex-shrink: 0; }
+    .mob-tabs { position: relative; display: flex; gap: 3px; align-items: center; flex: 1; }
+    .mob-tab-indicator { position: absolute; top: 0; height: 100%; width: 75px; background: var(--ora); border-radius: 999px; }
+    .mob-tab { width: 75px; height: 26px; border-radius: 999px; background: transparent; border: none; font: 600 8px/1 var(--mono); letter-spacing: .11em; text-transform: uppercase; cursor: pointer; position: relative; z-index: 1; }
+    .mob-tab.active { color: #fff; }
+    .mob-tab:not(.active) { color: var(--fog-dim); }
+    .mob-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--ora); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+
+    /* Toolbar pill — PlannerToolbar.tsx mobile */
+    .mob-toolbar { position: absolute; top: 68px; left: 10px; right: 10px; height: 46px; border-radius: 10px; border: 1px solid var(--p3); z-index: 20; display: flex; align-items: center; padding: 0 12px; gap: 2px; background: var(--glass-lgt); backdrop-filter: blur(16px); }
+    .mob-tb-btn { flex: 1; height: 36px; border-radius: 3px; background: transparent; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--fog); }
+    .mob-tb-btn.active { color: var(--ora); }
+    .mob-tb-btn.disabled { opacity: .28; }
+    .mob-tb-btn span { font: 600 9px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: inherit; }
+
+    /* Circular floating buttons — Compass / LayersPanel trigger */
+    .mob-circle-btn { position: absolute; width: 44px; height: 44px; border-radius: 50%; background: var(--glass-hvy); backdrop-filter: blur(12px); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--fog-dim); box-shadow: 0 2px 8px rgba(0,0,0,.3); z-index: 14; }
+
+    /* Planner HUD — floating card, MapShell.tsx */
+    .mob-hud { position: absolute; bottom: 10px; left: 10px; right: 10px; background: var(--p1); border: 1px solid var(--p3); border-radius: 16px; box-shadow: 0 -4px 24px rgba(0,0,0,.35); z-index: 20; display: flex; flex-direction: column; overflow: hidden; }
+    .mob-hud-handle-zone { flex-shrink: 0; padding: 10px 0 0; }
+    .mob-hud-handle { width: 48px; height: 6px; background: var(--p3); border-radius: 3px; margin: 0 auto; }
+
+    /* NEW: route identity — sits between the handle and the stats row */
+    .mob-hud-route { display: flex; align-items: center; gap: 8px; padding: 10px 16px 8px; cursor: pointer; }
+    .mob-hud-route-glyph { width: 20px; height: 20px; border-radius: 4px; background: var(--p2); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--ora); flex-shrink: 0; }
+    .mob-hud-route-body { flex: 1; min-width: 0; }
+    .mob-hud-route-name { font: 700 12px/1.3 var(--mono); color: var(--ice); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mob-hud-route-name.untitled { color: var(--fog-dim); }
+    .mob-hud-route-sub { display: flex; align-items: center; justify-content: space-between; margin-top: 3px; gap: 8px; }
+    .mob-hud-route-loc { font: 400 9px/1 var(--mono); color: var(--fog-dim); letter-spacing: .03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mob-hud-route-chevron { color: var(--fog-dim); flex-shrink: 0; }
+
+    .autosave-chip { display: flex; align-items: center; gap: 5px; font: 500 8px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fog-dim); flex-shrink: 0; }
+    .autosave-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--grn); box-shadow: 0 0 4px var(--grn); flex-shrink: 0; }
+    .autosave-dot.saving { background: var(--fog-dim); box-shadow: none; animation: pulse-dot 1s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+    .mob-hud-divider { height: 1px; background: var(--fog-ghost); margin: 0 16px; }
+    .mob-hud-stats { display: flex; padding: 10px 20px 14px; }
+    .mob-hud-stat { flex: 1; display: flex; flex-direction: column; gap: 3px; border-right: 1px solid var(--fog-ghost); padding-right: 16px; }
+    .mob-hud-stat:not(:first-child) { padding-left: 16px; }
+    .mob-hud-stat:last-child { border-right: none; }
+    .mob-hud-val { font: 700 18px/1 var(--mono); color: var(--ora); }
+    .mob-hud-lbl { font: 400 8px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fog-dim); }
+    .mob-hud-actions { display: flex; gap: 10px; padding: 0 16px 16px; }
+    .mob-hud-btn { flex: 1; height: 40px; border-radius: 4px; border: none; font: 700 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .mob-hud-btn.neutral { background: var(--p3); color: var(--fog); }
+    .mob-hud-btn.primary { background: var(--ora); color: var(--p0); }
+    .mob-hud-btn.disabled { background: var(--p3); color: var(--fog-dim); }
+
+    /* Inline rename — replaces the name line */
+    .mob-route-name-input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1px solid var(--ora); outline: none; font: 700 12px/1.3 var(--mono); color: var(--ice); letter-spacing: .02em; padding: 0 0 2px; }
+    .mob-rename-confirm { width: 22px; height: 22px; border-radius: 50%; background: var(--ora); border: none; display: flex; align-items: center; justify-content: center; color: var(--p0); flex-shrink: 0; }
+
+    /* My Routes sheet — floating card, tall */
+    .mob-routes-sheet { position: absolute; bottom: 10px; left: 10px; right: 10px; height: 610px; background: var(--p1); border: 1px solid var(--p3); border-radius: 16px; box-shadow: 0 -4px 24px rgba(0,0,0,.4); z-index: 40; display: flex; flex-direction: column; overflow: hidden; }
+    .mob-routes-hdr { display: flex; align-items: center; gap: 8px; padding: 14px 16px 12px; flex-shrink: 0; border-bottom: 1px solid var(--fog-ghost); }
+    .mob-routes-title { font: 700 13px/1 var(--mono); color: var(--ice); letter-spacing: .06em; flex: 1; }
+    .mob-routes-count { font: 400 10px/1 var(--mono); color: var(--fog-dim); }
+    .mob-routes-close { width: 28px; height: 28px; border-radius: 4px; border: 1px solid var(--p3); background: transparent; display: flex; align-items: center; justify-content: center; color: var(--fog-dim); flex-shrink: 0; }
+    .mob-routes-list { flex: 1; overflow-y: auto; }
+    .mob-route-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--fog-ghost); }
+    .mob-route-item.current { background: rgba(224,112,32,0.06); }
+    .route-item-glyph { width: 30px; height: 30px; border-radius: 6px; background: var(--p2); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--ora); flex-shrink: 0; }
+    .route-item-glyph.untitled { color: var(--fog-dim); }
+    .mob-route-item-info { flex: 1; min-width: 0; }
+    .mob-route-item-name { font: 600 12px/1.3 var(--mono); color: var(--ice); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mob-route-item-name.untitled { color: var(--fog-dim); }
+    .mob-route-item-meta { font: 400 9px/1 var(--mono); color: var(--fog-dim); margin-top: 4px; letter-spacing: .03em; }
+    .mob-route-item-check { width: 15px; height: 15px; color: var(--ora); flex-shrink: 0; }
+    .mob-route-item-overflow { width: 30px; height: 30px; border-radius: 4px; background: transparent; border: none; display: flex; align-items: center; justify-content: center; color: var(--fog-dim); flex-shrink: 0; }
+    .mob-routes-new { display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; flex-shrink: 0; border-top: 1px solid var(--fog-ghost); color: var(--ora); font: 700 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+
+    /* Route actions sheet — compact */
+    .mob-actions-sheet { position: absolute; bottom: 10px; left: 10px; right: 10px; background: var(--p1); border: 1px solid var(--p3); border-radius: 16px; box-shadow: 0 -4px 24px rgba(0,0,0,.4); z-index: 40; overflow: hidden; }
+    .mob-actions-hdr { padding: 14px 16px 10px; border-bottom: 1px solid var(--fog-ghost); }
+    .mob-actions-hdr-lbl { font: 500 8px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--fog-dim); margin-bottom: 4px; }
+    .mob-actions-hdr-name { font: 700 13px/1.3 var(--mono); color: var(--ice); }
+    .mob-action-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+    .mob-action-row.danger { color: rgba(220,80,80,0.9); }
+    .mob-action-row:not(.danger) { color: var(--fog); }
+    .mob-action-row span { font: 600 11px/1 var(--mono); letter-spacing: .04em; }
+
+    .storyboard-caption { font: 500 8px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--p4); display: flex; align-items: center; gap: 4px; margin: 10px 0 8px 16px; }
+    .confirm-card-inline { margin: 0 16px 14px; background: var(--p2); border: 1px solid rgba(200,60,60,0.35); border-radius: 8px; padding: 12px; }
+    .confirm-card-title { font: 500 10.5px/1.5 var(--mono); color: var(--fog); letter-spacing: .02em; margin-bottom: 10px; }
+    .confirm-card-title strong { color: var(--ice); font-weight: 600; }
+    .confirm-card-actions { display: flex; gap: 8px; }
+    .confirm-btn { flex: 1; height: 32px; border-radius: 4px; font: 600 9px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; justify-content: center; }
+    .confirm-btn.cancel { background: transparent; border: 1px solid var(--p3); color: var(--fog-dim); }
+    .confirm-btn.delete { background: rgba(200,60,60,0.85); border: none; color: var(--ice); }
+
+    .scrim { position: absolute; inset: 0; background: rgba(4,8,12,0.55); z-index: 35; }
+
+    .ico    { width: 16px; height: 16px; display: block; flex-shrink: 0; }
+    .ico-sm { width: 14px; height: 14px; display: block; flex-shrink: 0; }
+    .ico-xs { width: 12px; height: 12px; display: block; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-wordmark">plot</div>
+  <div class="page-title">Mockup — Saved Routes · Mobile Flows</div>
+  <div class="page-tag">Premium · 2026</div>
+</div>
+
+<div class="section-header">
+  <div class="section-label">Mobile</div>
+  <div class="section-desc">Chrome below (header pill, toolbar pill, planner HUD card) is copied 1:1 from the shipped components (MobileHeader.tsx, PlannerToolbar.tsx, the HUD block in MapShell.tsx) — floating capsules over a full-bleed map, not the edge-to-edge sheets mockup-h.html showed. The route identity row is a new addition inserted into the HUD, between the drag handle and the stats row.</div>
+</div>
+
+<div class="frames-row">
+
+<!-- ════════════════════════════════════════
+     FRAME 01 · PLANNER HUD WITH ROUTE IDENTITY
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">01 — Planner HUD · Route Identity</div>
+  <div class="frame-border"><div class="mob-frame">
+
+    <div class="mob-map">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
+        <polyline points="118,620 140,590 165,558 188,524 208,490 222,454 230,416 234,378 232,340 226,304" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="118,620 140,590 165,558 188,524 208,490 222,454 230,416 234,378 232,340 226,304" fill="none" stroke="rgba(7,14,20,0.55)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="118" cy="620" r="10" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="118" y="620" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">A</text>
+        <circle cx="230" cy="416" r="8" fill="#0E2830" stroke="#E07020" stroke-width="2"/>
+        <text x="230" y="416" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="7" font-family="IBM Plex Mono" font-weight="700">B</text>
+        <circle cx="226" cy="304" r="9" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="226" y="304" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">C</text>
+      </svg>
+    </div>
+
+    <div class="mob-header">
+      <div class="mob-header-word">plot</div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-tabs">
+        <div class="mob-tab-indicator" style="left:78px;"></div>
+        <button class="mob-tab">Activities</button>
+        <button class="mob-tab active" style="left:78px;">Planner</button>
+      </div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-avatar">PC</div>
+    </div>
+
+    <div class="mob-toolbar">
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+      <button class="mob-tb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+      <button class="mob-tb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Add</span></button>
+      <button class="mob-tb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Snap</span></button>
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Clear</span></button>
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3L21 7L17 11"/><path d="M3 7h18"/><path d="M7 21L3 17L7 13"/><path d="M21 17H3"/></svg><span>Rev.</span></button>
+    </div>
+
+    <div class="mob-circle-btn" style="top:126px;right:16px;"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+    <div class="mob-circle-btn" style="bottom:201px;left:12px;"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+
+    <!-- Planner HUD -->
+    <div class="mob-hud" style="height:262px;">
+      <div class="mob-hud-handle-zone"><div class="mob-hud-handle"></div></div>
+
+      <div class="mob-hud-route">
+        <div class="mob-hud-route-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="mob-hud-route-body">
+          <div class="mob-hud-route-name">Pentland Skyline</div>
+          <div class="mob-hud-route-sub">
+            <div class="mob-hud-route-loc">Pentland Hills · Edinburgh</div>
+            <div class="autosave-chip"><div class="autosave-dot"></div>Saved</div>
+          </div>
+        </div>
+        <svg class="ico-sm mob-hud-route-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="mob-hud-divider"></div>
+
+      <div class="mob-hud-stats">
+        <div class="mob-hud-stat"><div class="mob-hud-val">8.6</div><div class="mob-hud-lbl">km</div></div>
+        <div class="mob-hud-stat"><div class="mob-hud-val">380</div><div class="mob-hud-lbl">m elev</div></div>
+        <div class="mob-hud-stat"><div class="mob-hud-val">3</div><div class="mob-hud-lbl">waypts</div></div>
+      </div>
+      <div style="position:relative;padding:0 16px 10px;">
+        <svg width="100%" height="34" viewBox="0 0 358 34" preserveAspectRatio="none">
+          <defs><linearGradient id="ev1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E07020" stop-opacity="0.30"/><stop offset="100%" stop-color="#E07020" stop-opacity="0.02"/></linearGradient></defs>
+          <path d="M0,34 L0,28 C24,26 42,22 62,15 C82,8 96,5 120,4 C144,3 158,9 178,16 C196,22 212,25 234,24 C256,23 276,18 300,12 C320,7 340,8 358,10 L358,34 Z" fill="url(#ev1)"/>
+          <path d="M0,28 C24,26 42,22 62,15 C82,8 96,5 120,4 C144,3 158,9 178,16 C196,22 212,25 234,24 C256,23 276,18 300,12 C320,7 340,8 358,10" fill="none" stroke="#E07020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="mob-hud-actions">
+        <button class="mob-hud-btn neutral"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
+        <button class="mob-hud-btn neutral"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image</button>
+        <button class="mob-hud-btn primary"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+      </div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">The identity row sits above the existing stats row inside the same floating HUD card — no extra chrome added to the screen. Tapping it (or its chevron) opens the My Routes sheet. Collapsing the HUD keeps this row visible; only stats/elevation/actions hide.</div>
+</div><!-- /frame 01 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 02 · MY ROUTES SHEET
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">02 — My Routes Sheet</div>
+  <div class="frame-border"><div class="mob-frame">
+
+    <div class="mob-map" style="opacity:0.5;"></div>
+    <div class="scrim"></div>
+
+    <div class="mob-header" style="opacity:0.4;">
+      <div class="mob-header-word">plot</div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-tabs"><div class="mob-tab-indicator" style="left:78px;"></div><button class="mob-tab">Activities</button><button class="mob-tab active" style="left:78px;">Planner</button></div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-avatar">PC</div>
+    </div>
+
+    <div class="mob-routes-sheet">
+      <div class="mob-routes-hdr">
+        <div class="mob-routes-title">My Routes</div>
+        <div class="mob-routes-count">5 total</div>
+        <button class="mob-routes-close"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="mob-routes-list">
+        <div class="mob-route-item current">
+          <svg class="ico-sm mob-route-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <div class="route-item-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+          <div class="mob-route-item-info"><div class="mob-route-item-name">Pentland Skyline</div><div class="mob-route-item-meta">8.6 km · Just now</div></div>
+        </div>
+        <div class="mob-route-item">
+          <div style="width:15px;flex-shrink:0;"></div>
+          <div class="route-item-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+          <div class="mob-route-item-info"><div class="mob-route-item-name">Ridgeline Loop</div><div class="mob-route-item-meta">18.7 km · 2d ago</div></div>
+          <button class="mob-route-item-overflow"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+        </div>
+        <div class="mob-route-item">
+          <div style="width:15px;flex-shrink:0;"></div>
+          <div class="route-item-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+          <div class="mob-route-item-info"><div class="mob-route-item-name">Coastal Loop AM</div><div class="mob-route-item-meta">9.2 km · 6d ago</div></div>
+          <button class="mob-route-item-overflow"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+        </div>
+        <div class="mob-route-item">
+          <div style="width:15px;flex-shrink:0;"></div>
+          <div class="route-item-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+          <div class="mob-route-item-info"><div class="mob-route-item-name">Forth Bridge Out-and-Back</div><div class="mob-route-item-meta">24.1 km · 2w ago</div></div>
+          <button class="mob-route-item-overflow"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+        </div>
+        <div class="mob-route-item">
+          <div style="width:15px;flex-shrink:0;"></div>
+          <div class="route-item-glyph untitled"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+          <div class="mob-route-item-info"><div class="mob-route-item-name untitled">Untitled route</div><div class="mob-route-item-meta">3.1 km · 4h ago</div></div>
+          <button class="mob-route-item-overflow"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+        </div>
+      </div>
+      <div class="mob-routes-new"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Route</div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Same floating-card language as the existing activities/detail bottom sheet — tall snap, drag-free here since it's a picker rather than the persistent map sheet. Tapping a row loads that route into the editor and closes the sheet.</div>
+</div><!-- /frame 02 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 03 · INLINE RENAME
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">03 — Inline Rename</div>
+  <div class="frame-border"><div class="mob-frame">
+
+    <div class="mob-map">
+      <svg style="position:absolute;inset:0;width:100%;height:100%;" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice">
+        <polyline points="118,620 140,590 165,558 188,524 208,490 222,454 230,416 234,378 232,340 226,304" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="118,620 140,590 165,558 188,524 208,490 222,454 230,416 234,378 232,340 226,304" fill="none" stroke="rgba(7,14,20,0.55)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div class="mob-header">
+      <div class="mob-header-word">plot</div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-tabs"><div class="mob-tab-indicator" style="left:78px;"></div><button class="mob-tab">Activities</button><button class="mob-tab active" style="left:78px;">Planner</button></div>
+      <div class="mob-header-sep"></div>
+      <div class="mob-avatar">PC</div>
+    </div>
+
+    <div class="mob-toolbar">
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+      <button class="mob-tb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+      <button class="mob-tb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span>Add</span></button>
+      <button class="mob-tb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Snap</span></button>
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Clear</span></button>
+      <button class="mob-tb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3L21 7L17 11"/><path d="M3 7h18"/><path d="M7 21L3 17L7 13"/><path d="M21 17H3"/></svg><span>Rev.</span></button>
+    </div>
+
+    <div class="mob-hud" style="height:262px;">
+      <div class="mob-hud-handle-zone"><div class="mob-hud-handle"></div></div>
+
+      <div class="mob-hud-route">
+        <div class="mob-hud-route-glyph untitled"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <input class="mob-route-name-input" value="Untitled route" style="background:rgba(224,112,32,0.12);">
+        <button class="mob-rename-confirm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>
+      </div>
+      <div style="padding:0 16px 8px;font:400 8.5px/1.4 var(--mono);color:var(--fog-dim);letter-spacing:.03em;">Tap ✓ to save · tap elsewhere to cancel</div>
+      <div class="mob-hud-divider"></div>
+
+      <div class="mob-hud-stats">
+        <div class="mob-hud-stat"><div class="mob-hud-val">2.1</div><div class="mob-hud-lbl">km</div></div>
+        <div class="mob-hud-stat"><div class="mob-hud-val">40</div><div class="mob-hud-lbl">m elev</div></div>
+        <div class="mob-hud-stat"><div class="mob-hud-val">2</div><div class="mob-hud-lbl">waypts</div></div>
+      </div>
+      <div class="mob-hud-actions">
+        <button class="mob-hud-btn neutral"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
+        <button class="mob-hud-btn neutral"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image</button>
+        <button class="mob-hud-btn primary"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+      </div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Tapping the route name (untitled or not) turns it into a focused input in place — no sheet, no modal. A small checkmark button confirms since there's no desktop-style Enter key to rely on.</div>
+</div><!-- /frame 03 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 04 · ROUTE ACTIONS SHEET
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">04 — Route Actions · Delete Confirm</div>
+  <div class="frame-border"><div class="mob-frame">
+
+    <div class="mob-map" style="opacity:0.4;"></div>
+    <div class="scrim"></div>
+
+    <div class="mob-routes-sheet" style="height:340px;opacity:0.35;">
+      <div class="mob-routes-hdr"><div class="mob-routes-title">My Routes</div><div class="mob-routes-count">5 total</div></div>
+    </div>
+
+    <!-- Compact actions sheet, overlaid above -->
+    <div class="mob-actions-sheet">
+      <div class="mob-hud-handle-zone"><div class="mob-hud-handle"></div></div>
+      <div class="mob-actions-hdr">
+        <div class="mob-actions-hdr-lbl">Route Actions</div>
+        <div class="mob-actions-hdr-name">Coastal Loop AM</div>
+      </div>
+      <div class="mob-action-row"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg><span>Rename</span></div>
+      <div class="mob-action-row"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Duplicate</span></div>
+      <div class="mob-action-row danger"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Delete</span></div>
+
+      <div class="storyboard-caption"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>tapping Delete expands to</div>
+      <div class="confirm-card-inline">
+        <div class="confirm-card-title">Delete <strong>"Coastal Loop AM"</strong>? This can't be undone.</div>
+        <div class="confirm-card-actions">
+          <button class="confirm-btn cancel">Cancel</button>
+          <button class="confirm-btn delete">Delete</button>
+        </div>
+      </div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Reached from a route row's overflow button in the My Routes sheet. Delete expands in place into the same confirm pattern used on desktop — never a silent destructive tap.</div>
+</div><!-- /frame 04 -->
+
+</div><!-- /frames-row -->
+
+</body>
+</html>
