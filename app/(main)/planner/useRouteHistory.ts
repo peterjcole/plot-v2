@@ -1,226 +1,112 @@
 'use client';
 
-import { useReducer } from 'react';
-import { Waypoint, RouteSegment } from '@/lib/types';
+import { useCallback, useReducer } from 'react';
+import {
+  type RouteState,
+  type RouteContentAction,
+  applyAction,
+  replayAll,
+  EMPTY_ROUTE_STATE,
+} from '@/lib/route-actions';
 
-export interface RouteState {
-  waypoints: Waypoint[];
-  segments: RouteSegment[];
-}
+export type { RouteState, RouteContentAction } from '@/lib/route-actions';
 
 export type RouteAction =
-  | { type: 'ADD_WAYPOINT'; waypoint: Waypoint; snap?: boolean }
-  | { type: 'INSERT_WAYPOINT'; index: number; waypoint: Waypoint; snap?: boolean }
-  | { type: 'MOVE_WAYPOINT'; index: number; waypoint: Waypoint }
-  | { type: 'REMOVE_WAYPOINT'; index: number }
-  | { type: 'CLEAR' }
+  | RouteContentAction
   | { type: 'UNDO' }
-  | { type: 'REDO' }
-  | { type: 'LOAD'; waypoints: Waypoint[]; segments?: RouteSegment[] }
-  | { type: 'UPDATE_SEGMENT'; index: number; coordinates: Waypoint[]; distance?: number }
-  | { type: 'TOGGLE_SEGMENT_SNAP'; index: number }
-  | { type: 'REVERSE' };
+  | { type: 'REDO' };
+
+type InternalAction =
+  | RouteAction
+  | { type: 'RESTORE'; actions: RouteContentAction[]; cursor: number };
 
 interface HistoryState {
-  past: RouteState[];
-  present: RouteState;
-  future: RouteState[];
+  actions: RouteContentAction[];
+  cursor: number; // present = presentByCursor[cursor]
+  // presentByCursor[i] = route state after actions[0, i) — computed incrementally as
+  // actions are appended (or fully, once, on RESTORE/LOAD) so undo/redo is an O(1)
+  // array lookup instead of a replay. Never persisted — rebuilt from `actions` on hydration.
+  presentByCursor: RouteState[];
 }
 
-function applyAction(state: RouteState, action: RouteAction): RouteState | null {
-  switch (action.type) {
-    case 'ADD_WAYPOINT': {
-      const newSegments = [...state.segments];
-      if (state.waypoints.length > 0) {
-        newSegments.push({
-          snapped: action.snap ?? false,
-          coordinates: [],
-        });
-      }
-      return {
-        waypoints: [...state.waypoints, action.waypoint],
-        segments: newSegments,
-      };
-    }
-    case 'INSERT_WAYPOINT': {
-      const { index, waypoint } = action;
-      const newWaypoints = [
-        ...state.waypoints.slice(0, index),
-        waypoint,
-        ...state.waypoints.slice(index),
-      ];
-
-      const newSegments = [...state.segments];
-      if (state.waypoints.length < 2) {
-        // Was 0 or 1 waypoint, inserting makes it 2 — add a segment
-        if (newWaypoints.length >= 2) {
-          newSegments.push({
-            snapped: action.snap ?? false,
-            coordinates: [],
-          });
-        }
-      } else {
-        // Split the segment at (index - 1) into two
-        const segIdx = Math.max(0, index - 1);
-        const original = newSegments[segIdx];
-        const inheritSnap = action.snap ?? original?.snapped ?? false;
-        newSegments.splice(segIdx, 1,
-          { snapped: inheritSnap, coordinates: [] },
-          { snapped: inheritSnap, coordinates: [] },
-        );
-      }
-
-      return { waypoints: newWaypoints, segments: newSegments };
-    }
-    case 'MOVE_WAYPOINT': {
-      const newWaypoints = state.waypoints.map((wp, i) =>
-        i === action.index ? action.waypoint : wp
-      );
-      const newSegments = state.segments.map((seg, i) => {
-        // Clear coordinates of adjacent segments (before and after moved waypoint)
-        if (i === action.index - 1 || i === action.index) {
-          return { ...seg, coordinates: [], distance: undefined };
-        }
-        return seg;
-      });
-      return { waypoints: newWaypoints, segments: newSegments };
-    }
-    case 'REMOVE_WAYPOINT': {
-      const { index } = action;
-      const newWaypoints = state.waypoints.filter((_, i) => i !== index);
-      const newSegments = [...state.segments];
-
-      if (state.waypoints.length <= 2) {
-        // Removing takes us to 0 or 1 waypoint — no segments
-        return { waypoints: newWaypoints, segments: [] };
-      }
-
-      if (index === 0) {
-        // Remove first segment
-        newSegments.splice(0, 1);
-      } else if (index === state.waypoints.length - 1) {
-        // Remove last segment
-        newSegments.splice(newSegments.length - 1, 1);
-      } else {
-        // Merge segments[index-1] and segments[index] into one
-        const before = newSegments[index - 1];
-        const after = newSegments[index];
-        const merged: RouteSegment = {
-          snapped: before.snapped || after.snapped,
-          coordinates: [],
-        };
-        newSegments.splice(index - 1, 2, merged);
-      }
-
-      return { waypoints: newWaypoints, segments: newSegments };
-    }
-    case 'CLEAR':
-      if (state.waypoints.length === 0) return null;
-      return { waypoints: [], segments: [] };
-    case 'UPDATE_SEGMENT': {
-      if (action.index < 0 || action.index >= state.segments.length) return null;
-      const newSegments = state.segments.map((seg, i) => {
-        if (i === action.index) {
-          return {
-            ...seg,
-            coordinates: action.coordinates,
-            distance: action.distance,
-          };
-        }
-        return seg;
-      });
-      return { waypoints: state.waypoints, segments: newSegments };
-    }
-    case 'TOGGLE_SEGMENT_SNAP': {
-      if (action.index < 0 || action.index >= state.segments.length) return null;
-      const newSegments = state.segments.map((seg, i) => {
-        if (i === action.index) {
-          return {
-            snapped: !seg.snapped,
-            coordinates: [],
-            distance: undefined,
-          };
-        }
-        return seg;
-      });
-      return { waypoints: state.waypoints, segments: newSegments };
-    }
-    case 'REVERSE': {
-      if (state.waypoints.length < 2) return null;
-      const waypoints = [...state.waypoints].reverse();
-      const segments = [...state.segments].reverse().map(seg => ({
-        ...seg,
-        coordinates: [...seg.coordinates].reverse(),
-      }));
-      return { waypoints, segments };
-    }
-    default:
-      return null;
-  }
+export interface RouteHistoryInit {
+  actions: RouteContentAction[];
+  cursor: number;
 }
 
-function historyReducer(state: HistoryState, action: RouteAction): HistoryState {
+function initHistoryState(init?: RouteHistoryInit): HistoryState {
+  const actions = init?.actions ?? [];
+  const cursor = init?.cursor ?? 0;
+  return { actions, cursor, presentByCursor: replayAll(actions) };
+}
+
+function historyReducer(state: HistoryState, action: InternalAction): HistoryState {
   switch (action.type) {
+    case 'RESTORE':
+      return { actions: action.actions, cursor: action.cursor, presentByCursor: replayAll(action.actions) };
     case 'UNDO': {
-      if (state.past.length === 0) return state;
-      const previous = state.past[state.past.length - 1];
-      return {
-        past: state.past.slice(0, -1),
-        present: previous,
-        future: [state.present, ...state.future],
-      };
+      if (state.cursor === 0) return state;
+      let cursor = state.cursor - 1;
+      // An UPDATE_SEGMENT is an async side-effect of the action right before it (routing
+      // fetch resolving) — skip back over any trailing run of them so one Undo press
+      // removes the whole user gesture, not just its routed-coordinate patch.
+      while (cursor > 0 && state.actions[cursor].type === 'UPDATE_SEGMENT') cursor -= 1;
+      return { ...state, cursor };
     }
     case 'REDO': {
-      if (state.future.length === 0) return state;
-      const next = state.future[0];
-      return {
-        past: [...state.past, state.present],
-        present: next,
-        future: state.future.slice(1),
-      };
+      if (state.cursor >= state.actions.length) return state;
+      let cursor = state.cursor + 1;
+      while (cursor < state.actions.length && state.actions[cursor].type === 'UPDATE_SEGMENT') cursor += 1;
+      return { ...state, cursor };
     }
-    case 'LOAD': {
-      return {
-        past: [],
-        present: {
-          waypoints: action.waypoints,
-          segments: action.segments ?? [],
-        },
-        future: [],
-      };
-    }
-    case 'UPDATE_SEGMENT': {
-      // UPDATE_SEGMENT should NOT create undo history — it's an async side-effect
-      const newPresent = applyAction(state.present, action);
-      if (!newPresent) return state;
-      return { ...state, present: newPresent };
-    }
+    case 'LOAD':
+      // GPX import / "Open in Planner" / legacy-format migration — resets history to a
+      // single seed action rather than appending, matching today's replace-in-place UX.
+      return { actions: [action], cursor: 1, presentByCursor: replayAll([action]) };
     default: {
-      const newPresent = applyAction(state.present, action);
-      if (!newPresent) return state;
-      return {
-        past: [...state.past, state.present],
-        present: newPresent,
-        future: [],
-      };
+      // Any other content action (including UPDATE_SEGMENT): discard redo tail if the
+      // user was mid-undo, append, and advance the cursor to the new tip.
+      const actions = state.cursor < state.actions.length
+        ? [...state.actions.slice(0, state.cursor), action]
+        : [...state.actions, action];
+      const basePresent = state.presentByCursor[state.cursor] ?? EMPTY_ROUTE_STATE;
+      const nextPresent = applyAction(basePresent, action) ?? basePresent;
+      const presentByCursor = [...state.presentByCursor.slice(0, state.cursor + 1), nextPresent];
+      return { actions, cursor: actions.length, presentByCursor };
     }
   }
 }
 
-const initialState: HistoryState = {
-  past: [],
-  present: { waypoints: [], segments: [] },
-  future: [],
-};
+export function useRouteHistory(init?: RouteHistoryInit) {
+  const [state, rawDispatch] = useReducer(historyReducer, init, initHistoryState);
 
-export function useRouteHistory() {
-  const [state, dispatch] = useReducer(historyReducer, initialState);
+  const present = state.presentByCursor[state.cursor] ?? EMPTY_ROUTE_STATE;
+
+  const dispatch = useCallback((action: RouteAction) => {
+    if (action.type === 'UNDO' || action.type === 'REDO' || action.type === 'LOAD') {
+      rawDispatch(action);
+      return;
+    }
+    // No-op guard, mirroring the old applyAction null-return convention — skip recording
+    // history entries that wouldn't change anything (e.g. CLEAR on an empty route).
+    if (!applyAction(present, action)) return;
+    rawDispatch(action);
+  }, [present]);
+
+  // Used to hydrate a route asynchronously (premium: after GET /api/routes/:id resolves).
+  // Synchronous hydration (localStorage) can instead pass `init` directly.
+  const restore = useCallback((history: RouteHistoryInit) => {
+    rawDispatch({ type: 'RESTORE', actions: history.actions, cursor: history.cursor });
+  }, []);
 
   return {
-    waypoints: state.present.waypoints,
-    segments: state.present.segments,
-    canUndo: state.past.length > 0,
-    canRedo: state.future.length > 0,
+    waypoints: present.waypoints,
+    segments: present.segments,
+    canUndo: state.cursor > 0,
+    canRedo: state.cursor < state.actions.length,
     dispatch,
+    restore,
+    actions: state.actions,
+    cursor: state.cursor,
   };
 }

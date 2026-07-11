@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>plot — mockup — saved routes — desktop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Ribeye+Marrow&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --p0: #070E14;
+      --p1: #0E2830;
+      --p2: #163840;
+      --p3: #1E4858;
+      --p4: #2A5860;
+      --ora: #E07020;
+      --grn: #40B060;
+      --blu: #4080C0;
+      --ice: #F0F8FA;
+      --fog: rgba(240,248,250,0.72);
+      --fog-dim: rgba(240,248,250,0.45);
+      --fog-ghost: rgba(240,248,250,0.08);
+      --mono: 'IBM Plex Mono', monospace;
+      --display: 'Ribeye Marrow', cursive;
+      --panel-w: 300px;
+    }
+
+    body { background: #040A0F; color: var(--ice); font-family: var(--mono); min-height: 100vh; }
+
+    /* PAGE CHROME (from mockup-h) */
+    .page-header { padding: 48px 56px 32px; border-bottom: 1px solid var(--fog-ghost); display: flex; align-items: baseline; gap: 24px; }
+    .page-wordmark { font-family: var(--display); font-size: 28px; color: var(--ice); letter-spacing: .02em; }
+    .page-title { font: 600 11px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); }
+    .page-tag { margin-left: auto; font: 400 10px/1 var(--mono); color: var(--p4); letter-spacing: .1em; }
+    .section-header { padding: 40px 56px 20px; }
+    .section-label { font: 600 10px/1 var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--ora); margin-bottom: 6px; }
+    .section-desc { font: 400 12px/1.5 var(--mono); color: var(--fog-dim); max-width: 640px; }
+    .frames-row { display: flex; gap: 32px; padding: 0 56px 56px; overflow-x: auto; align-items: flex-start; }
+    .frame-wrap { flex-shrink: 0; }
+    .frame-label { font: 600 9px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--fog-dim); margin-bottom: 10px; }
+    .frame-note { font: 400 9px/1.5 var(--mono); color: var(--p4); letter-spacing: .02em; margin-top: 10px; max-width: 300px; }
+    .frame-border { border: 1px solid var(--p3); border-radius: 4px; overflow: hidden; }
+
+    /* DESKTOP FRAME (from mockup-h) */
+    .desk-frame { width: 1200px; height: 760px; display: flex; position: relative; overflow: hidden; background: var(--p0); }
+
+    /* PANEL (from mockup-h) */
+    .panel { width: var(--panel-w); height: 100%; background: var(--p1); border-right: 1px solid var(--p3); display: flex; flex-direction: column; flex-shrink: 0; position: relative; z-index: 10; }
+    .status-bar { height: 28px; background: var(--p0); display: flex; align-items: center; padding: 0 12px; gap: 8px; border-bottom: 1px solid var(--fog-ghost); flex-shrink: 0; }
+    .status-time { font: 600 10px/1 var(--mono); letter-spacing: .08em; color: var(--fog); }
+    .status-sep { flex: 1; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--grn); box-shadow: 0 0 4px var(--grn); }
+    .status-synced { font: 400 9px/1 var(--mono); letter-spacing: .06em; color: var(--fog-dim); }
+    .status-avatar { width: 18px; height: 18px; border-radius: 50%; background: var(--p3); border: 1px solid var(--p4); display: flex; align-items: center; justify-content: center; font: 700 7px/1 var(--mono); color: var(--fog); }
+    .panel-hdr { height: 52px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--fog-ghost); flex-shrink: 0; gap: 10px; }
+    .wordmark { font-family: var(--display); font-size: 22px; color: var(--ice); letter-spacing: .02em; flex: 1; }
+    .tab-bar { height: 36px; display: flex; border-bottom: 1px solid var(--fog-ghost); flex-shrink: 0; }
+    .tab { flex: 1; display: flex; align-items: center; justify-content: center; font: 600 9px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--fog-dim); border-bottom: 2px solid transparent; cursor: pointer; }
+    .tab.active { color: var(--ora); border-bottom-color: var(--ora); }
+
+    /* MAP AREA (from mockup-h) */
+    .map-area { flex: 1; position: relative; overflow: hidden; background: var(--p0); }
+    .map-bg { position: absolute; inset: 0; background-image: url('osmapdark.jpg'); background-size: cover; background-position: center; }
+    .map-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .map-compass { position: absolute; bottom: 24px; left: 20px; width: 36px; height: 36px; }
+    .heatmap-overlay { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 40% at 55% 45%, rgba(224,112,32,0.14) 0%, transparent 70%); pointer-events: none; }
+    .layers-btn { position: absolute; bottom: 16px; left: 12px; z-index: 12; width: 44px; height: 44px; border-radius: 8px; background: rgba(7,14,20,0.88); backdrop-filter: blur(8px); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--fog-dim); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+
+    /* PLANNER TOOLBAR (from mockup-h) */
+    .planner-toolbar { position: absolute; top: 0; left: 0; right: 0; height: 44px; background: rgba(7,14,20,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--p3); display: flex; align-items: center; padding: 0 12px; gap: 2px; z-index: 5; }
+    .ptb-sep { width: 1px; height: 24px; background: var(--p3); margin: 0 6px; }
+    .ptb-btn { width: 36px; height: 32px; border-radius: 3px; background: transparent; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--fog-dim); }
+    .ptb-btn.active { color: var(--ora); }
+    .ptb-btn.disabled { opacity: 0.28; cursor: not-allowed; }
+    .ptb-btn span { font: 600 7px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: inherit; }
+    .ptb-spacer { flex: 1; }
+    .ptb-route-info { font: 600 10px/1 var(--mono); color: var(--fog); letter-spacing: .06em; padding: 0 12px; white-space: nowrap; }
+    .ptb-route-info em { font-style: normal; color: var(--fog-dim); }
+    .ptb-hint { font: 400 10px/1 var(--mono); color: var(--fog-dim); letter-spacing: .04em; padding: 0 12px; white-space: nowrap; }
+
+    /* ROUTE HUD (from mockup-h) */
+    .route-hud { margin: 10px 12px 8px; padding: 12px; background: var(--p2); border: 1px solid var(--p3); border-radius: 4px; }
+    .route-hud-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+    .route-hud-stat .val { font: 700 16px/1 var(--mono); color: var(--ice); letter-spacing: .02em; }
+    .route-hud-stat .lbl { font: 400 8px/1.4 var(--mono); color: var(--fog-dim); letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
+
+    .planner-section-lbl { font: 600 8px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); margin-bottom: 10px; }
+    .planner-new-route-wrap { padding: 14px 14px 0; flex-shrink: 0; }
+    .planner-new-btn { width: 100%; height: 40px; background: var(--ora); border: none; border-radius: 4px; font: 700 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--p0); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .detail-btn-secondary { height: 32px; background: transparent; border: 1px solid var(--p3); border-radius: 4px; font: 500 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--fog-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+    /* ══════════════════════════════════════════
+       NEW: ROUTE IDENTITY / SAVED-ROUTES LIBRARY
+    ══════════════════════════════════════════ */
+
+    /* Trigger row — sits directly under the tab bar, always visible in Planner mode */
+    .route-switcher { height: 44px; display: flex; align-items: center; gap: 9px; padding: 0 14px; cursor: pointer; border-bottom: 1px solid var(--fog-ghost); flex-shrink: 0; position: relative; }
+    .route-switcher:hover { background: rgba(240,248,250,0.02); }
+    .route-switcher.open { background: var(--p2); }
+    .route-switcher-glyph { width: 22px; height: 22px; border-radius: 4px; background: var(--p2); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--ora); flex-shrink: 0; }
+    .route-switcher-body { flex: 1; min-width: 0; }
+    .route-switcher-name { font: 600 11px/1.3 var(--mono); color: var(--ice); letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .route-switcher-name.untitled { color: var(--fog-dim); }
+    .route-switcher-label { font: 600 8px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); }
+    .route-switcher-chevron { color: var(--fog-dim); flex-shrink: 0; transition: transform .15s; }
+    .route-switcher.open .route-switcher-chevron { color: var(--ora); transform: rotate(180deg); }
+
+    /* Identity subline — location + autosave state */
+    .route-identity-sub { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 0; gap: 8px; }
+    .route-location { font: 400 9px/1 var(--mono); color: var(--fog-dim); letter-spacing: .04em; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .autosave-chip { display: flex; align-items: center; gap: 5px; font: 500 8px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--fog-dim); flex-shrink: 0; }
+    .autosave-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--grn); box-shadow: 0 0 4px var(--grn); flex-shrink: 0; }
+    .autosave-dot.saving { background: var(--fog-dim); box-shadow: none; animation: pulse-dot 1s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+    /* Inline rename input — replaces .route-switcher-name in place */
+    .route-name-input { flex: 1; min-width: 0; background: transparent; border: none; border-bottom: 1px solid var(--ora); outline: none; font: 600 11px/1.3 var(--mono); color: var(--ice); letter-spacing: .02em; padding: 0 0 3px; }
+    .rename-hint { font: 400 8px/1 var(--mono); color: var(--fog-dim); letter-spacing: .04em; padding: 6px 14px 0; }
+
+    /* Flyout — dropdown list of saved routes */
+    .route-flyout { position: absolute; top: 44px; left: 8px; right: 8px; background: rgba(7,14,20,0.97); backdrop-filter: blur(14px); border: 1px solid var(--p3); border-radius: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.55); z-index: 40; overflow: hidden; }
+    .route-flyout-hdr { padding: 10px 12px 8px; font: 600 8px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--fog-dim); }
+    .route-flyout-list { max-height: 320px; overflow-y: auto; }
+    .route-flyout-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; position: relative; }
+    .route-flyout-item:hover { background: var(--p2); }
+    .route-flyout-item.current { background: rgba(224,112,32,0.07); }
+    .route-item-check { width: 13px; height: 13px; color: var(--ora); flex-shrink: 0; }
+    .route-item-check-ghost { width: 13px; height: 13px; flex-shrink: 0; }
+    .route-item-glyph { width: 26px; height: 26px; border-radius: 4px; background: var(--p2); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--ora); flex-shrink: 0; }
+    .route-item-glyph.untitled { color: var(--fog-dim); }
+    .route-item-info { flex: 1; min-width: 0; }
+    .route-item-name { font: 600 10px/1.3 var(--mono); color: var(--ice); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .route-item-name.untitled { color: var(--fog-dim); }
+    .route-item-meta { font: 400 8px/1 var(--mono); color: var(--fog-dim); margin-top: 3px; letter-spacing: .03em; }
+    .route-item-overflow-btn { width: 22px; height: 22px; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: var(--fog-dim); background: transparent; border: none; cursor: pointer; flex-shrink: 0; }
+    .route-item-overflow-btn:hover { background: var(--p3); color: var(--fog); }
+    .route-flyout-new { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-top: 1px solid var(--fog-ghost); cursor: pointer; color: var(--ora); font: 600 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .route-flyout-new:hover { background: rgba(224,112,32,0.06); }
+    .route-flyout-empty { padding: 28px 20px 24px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+    .route-flyout-empty-icon { width: 34px; height: 34px; border-radius: 50%; background: var(--p2); border: 1px solid var(--p3); display: flex; align-items: center; justify-content: center; color: var(--fog-dim); }
+    .route-flyout-empty-title { font: 600 10px/1.4 var(--mono); color: var(--fog); letter-spacing: .02em; }
+    .route-flyout-empty-sub { font: 400 9px/1.5 var(--mono); color: var(--fog-dim); letter-spacing: .02em; max-width: 200px; }
+
+    /* Context menu — rename / duplicate / delete */
+    .ctx-menu { position: absolute; background: rgba(7,14,20,0.97); backdrop-filter: blur(12px); border: 1px solid var(--p3); border-radius: 5px; padding: 4px; min-width: 138px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.55); }
+    .ctx-menu-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 3px; font: 500 9.5px/1 var(--mono); color: var(--fog); letter-spacing: .03em; cursor: pointer; }
+    .ctx-menu-item:hover { background: var(--p2); }
+    .ctx-menu-item.danger { color: rgba(220,80,80,0.85); }
+    .ctx-menu-sep { height: 1px; background: var(--fog-ghost); margin: 4px 2px; }
+
+    /* Delete confirm popover */
+    .confirm-card { position: absolute; background: rgba(7,14,20,0.97); backdrop-filter: blur(12px); border: 1px solid rgba(200,60,60,0.35); border-radius: 5px; padding: 12px; width: 208px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,0.55); }
+    .confirm-card-title { font: 500 10px/1.5 var(--mono); color: var(--fog); letter-spacing: .02em; margin-bottom: 10px; }
+    .confirm-card-title strong { color: var(--ice); font-weight: 600; }
+    .confirm-card-actions { display: flex; gap: 6px; }
+    .confirm-btn { flex: 1; height: 26px; border-radius: 3px; font: 600 8.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .confirm-btn.cancel { background: transparent; border: 1px solid var(--p3); color: var(--fog-dim); }
+    .confirm-btn.delete { background: rgba(200,60,60,0.85); border: none; color: var(--ice); }
+
+    .storyboard-caption { position: absolute; font: 500 8px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--p4); white-space: nowrap; }
+    .storyboard-caption svg { display: inline; vertical-align: middle; margin-right: 3px; }
+
+    .ico    { width: 16px; height: 16px; display: block; flex-shrink: 0; }
+    .ico-sm { width: 14px; height: 14px; display: block; flex-shrink: 0; }
+    .ico-xs { width: 12px; height: 12px; display: block; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-wordmark">plot</div>
+  <div class="page-title">Mockup — Saved Routes · Desktop Flows</div>
+  <div class="page-tag">Premium · 2026</div>
+</div>
+
+<div class="section-header">
+  <div class="section-label">Desktop</div>
+  <div class="section-desc">A "My Routes" switcher lives directly under the Planner tab. New routes autosave as "Untitled route" the moment you place the first waypoint — naming is optional, never blocking. Everything below the switcher (stats, waypoints, GPX/Image export) is the existing planner panel, unchanged.</div>
+</div>
+
+<div class="frames-row">
+
+<!-- ════════════════════════════════════════
+     FRAME 01 · NAMED SAVED ROUTE (resting state)
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">01 — Saved Route · Resting</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar">
+        <span class="status-time">10:14</span><span class="status-sep"></span>
+        <div class="status-dot"></div><span class="status-synced">synced</span>
+        <div class="status-avatar">PC</div>
+      </div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <!-- Route switcher -->
+      <div class="route-switcher">
+        <div class="route-switcher-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="route-switcher-body"><div class="route-switcher-name">Pentland Skyline</div></div>
+        <svg class="ico-sm route-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="route-identity-sub">
+        <div class="route-location"><svg class="ico-xs" style="flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Pentland Hills · Edinburgh</div>
+        <div class="autosave-chip"><div class="autosave-dot"></div>Saved</div>
+      </div>
+
+      <!-- Stats + elevation (existing route-hud, unchanged) -->
+      <div class="route-hud">
+        <div class="route-hud-grid">
+          <div class="route-hud-stat"><div class="val">12.4</div><div class="lbl">km</div></div>
+          <div class="route-hud-stat"><div class="val">580</div><div class="lbl">m elev</div></div>
+          <div class="route-hud-stat"><div class="val">3</div><div class="lbl">waypoints</div></div>
+          <div class="route-hud-stat"><div class="val">~4h</div><div class="lbl">est. time</div></div>
+        </div>
+        <div style="position:relative;height:44px;margin-top:10px;border-radius:3px;overflow:hidden;background:var(--p1);border:1px solid var(--p3);">
+          <svg width="100%" height="44" viewBox="0 0 248 44" preserveAspectRatio="none">
+            <defs><linearGradient id="ev01" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#E07020" stop-opacity="0.35"/><stop offset="100%" stop-color="#E07020" stop-opacity="0.02"/></linearGradient></defs>
+            <path d="M0,44 L0,36 C20,34 38,30 56,22 C74,14 86,10 108,8 C130,6 144,12 162,20 C178,27 192,30 210,26 C226,22 238,18 248,16 L248,44 Z" fill="url(#ev01)"/>
+            <path d="M0,36 C20,34 38,30 56,22 C74,14 86,10 108,8 C130,6 144,12 162,20 C178,27 192,30 210,26 C226,22 238,18 248,16" fill="none" stroke="#E07020" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Waypoints -->
+      <div style="padding:4px 14px 4px;flex-shrink:0;"><div class="planner-section-lbl">Waypoints</div></div>
+      <div style="overflow-y:auto;flex:1;padding:0 14px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fog-ghost);">
+          <div style="width:20px;height:20px;border-radius:50%;background:#0E2830;border:2px solid var(--ora);display:flex;align-items:center;justify-content:center;font:700 7px/1 var(--mono);color:var(--ora);flex-shrink:0;">A</div>
+          <div style="flex:1;"><div style="font:600 10px/1 var(--mono);color:var(--fog);letter-spacing:.03em;">Start</div><div style="font:400 8px/1 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:2px;">55.8765° N · 3.1920° W</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fog-ghost);">
+          <div style="width:20px;height:20px;border-radius:50%;background:#0E2830;border:2px solid var(--ora);display:flex;align-items:center;justify-content:center;font:700 7px/1 var(--mono);color:var(--ora);flex-shrink:0;">B</div>
+          <div style="flex:1;"><div style="font:600 10px/1 var(--mono);color:var(--fog);letter-spacing:.03em;">Summit Approach</div><div style="font:400 8px/1 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:2px;">442 m · 4.2 km from start</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fog-ghost);">
+          <div style="width:20px;height:20px;border-radius:50%;background:#0E2830;border:2px solid var(--ora);display:flex;align-items:center;justify-content:center;font:700 7px/1 var(--mono);color:var(--ora);flex-shrink:0;">C</div>
+          <div style="flex:1;"><div style="font:600 10px/1 var(--mono);color:var(--fog);letter-spacing:.03em;">Ridgeline View</div><div style="font:400 8px/1 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:2px;">578 m · 8.2 km from start</div></div>
+        </div>
+      </div>
+
+      <!-- Footer — matches PlannerPanel.tsx exactly -->
+      <div style="padding:10px 14px 14px;flex-shrink:0;display:flex;gap:8px;">
+        <button style="flex:1;padding:9px 10px;background:var(--p3);border:1px solid var(--fog-ghost);border-radius:4px;color:var(--fog);font:600 10px/1 var(--mono);letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:5px;"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>GPX</button>
+        <button style="flex:1;padding:9px 10px;background:var(--ora);border:none;border-radius:4px;color:var(--p0);font:600 10px/1 var(--mono);letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:5px;"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image</button>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+      <div class="heatmap-overlay"></div>
+      <div class="planner-toolbar">
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+        <button class="ptb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+        <div class="ptb-sep"></div>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Clear</span></button>
+        <div class="ptb-sep"></div>
+        <button class="ptb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Snap</span></button>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Import</span></button>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Export</span></button>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>Image</span></button>
+        <div class="ptb-spacer"></div>
+        <div class="ptb-route-info">12.4 km · <em>580 m ↑</em></div>
+        <div class="ptb-sep"></div>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg><span>Locate</span></button>
+      </div>
+      <svg class="map-svg" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid slice">
+        <polyline points="200,560 240,530 278,502 308,472 332,440 350,408 362,374 368,338 370,302 368,268 362,238 352,210" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="200,560 240,530 278,502 308,472 332,440 350,408 362,374 368,338 370,302 368,268 362,238 352,210" fill="none" stroke="rgba(7,14,20,0.55)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="200" cy="560" r="10" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="200" y="560" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">A</text>
+        <circle cx="368" cy="338" r="8" fill="#0E2830" stroke="#E07020" stroke-width="2"/>
+        <text x="368" y="338" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="7" font-family="IBM Plex Mono" font-weight="700">B</text>
+        <circle cx="352" cy="210" r="9" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="352" y="210" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">C</text>
+      </svg>
+      <div class="map-compass"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="rgba(7,14,20,0.78)" stroke="#1E4858" stroke-width="1"/><polygon points="18,4 21,18 18,15 15,18" fill="#E07020"/><polygon points="18,32 21,18 18,21 15,18" fill="rgba(240,248,250,0.32)"/><text x="18" y="10.5" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="5" font-family="IBM Plex Mono" font-weight="700">N</text></svg></div>
+      <div class="layers-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Route header replaces the old "Route in Progress" label — name, location, and an autosave chip sit above the unchanged stats card.</div>
+</div><!-- /frame 01 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 02 · MY ROUTES FLYOUT OPEN
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">02 — My Routes · Flyout Open</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar"><span class="status-time">10:15</span><span class="status-sep"></span><div class="status-dot"></div><span class="status-synced">synced</span><div class="status-avatar">PC</div></div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <div class="route-switcher open">
+        <div class="route-switcher-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="route-switcher-body"><div class="route-switcher-name">Pentland Skyline</div></div>
+        <svg class="ico-sm route-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+
+        <div class="route-flyout">
+          <div class="route-flyout-hdr">My Routes · 5</div>
+          <div class="route-flyout-list">
+            <div class="route-flyout-item current">
+              <svg class="ico-xs route-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Pentland Skyline</div><div class="route-item-meta">12.4 km · Just now</div></div>
+            </div>
+            <div class="route-flyout-item">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Ridgeline Loop</div><div class="route-item-meta">18.7 km · 2d ago</div></div>
+              <button class="route-item-overflow-btn"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+            </div>
+            <div class="route-flyout-item">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Coastal Loop AM</div><div class="route-item-meta">9.2 km · 6d ago</div></div>
+              <button class="route-item-overflow-btn"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+            </div>
+            <div class="route-flyout-item">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Forth Bridge Out-and-Back</div><div class="route-item-meta">24.1 km · 2w ago</div></div>
+              <button class="route-item-overflow-btn"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+            </div>
+            <div class="route-flyout-item">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph untitled"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name untitled">Untitled route</div><div class="route-item-meta">3.1 km · 4h ago</div></div>
+              <button class="route-item-overflow-btn"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+            </div>
+          </div>
+          <div class="route-flyout-new"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New route</div>
+        </div>
+      </div>
+
+      <div class="route-identity-sub" style="opacity:0.3;"><div class="route-location">Pentland Hills · Edinburgh</div><div class="autosave-chip"><div class="autosave-dot"></div>Saved</div></div>
+      <div class="route-hud" style="opacity:0.3;">
+        <div class="route-hud-grid">
+          <div class="route-hud-stat"><div class="val">12.4</div><div class="lbl">km</div></div>
+          <div class="route-hud-stat"><div class="val">580</div><div class="lbl">m elev</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+      <div class="planner-toolbar">
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+        <button class="ptb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+        <div class="ptb-spacer"></div>
+        <div class="ptb-route-info">12.4 km · <em>580 m ↑</em></div>
+      </div>
+      <svg class="map-svg" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid slice">
+        <polyline points="200,560 240,530 278,502 308,472 332,440 350,408 362,374 368,338 370,302 368,268 362,238 352,210" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="map-compass"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="rgba(7,14,20,0.78)" stroke="#1E4858" stroke-width="1"/><polygon points="18,4 21,18 18,15 15,18" fill="#E07020"/><polygon points="18,32 21,18 18,21 15,18" fill="rgba(240,248,250,0.32)"/><text x="18" y="10.5" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="5" font-family="IBM Plex Mono" font-weight="700">N</text></svg></div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Compact rows: name + distance + relative last-edited. Checkmark marks the route currently loaded. "Untitled route" reads dimmer to signal it hasn't been named yet.</div>
+</div><!-- /frame 02 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 03 · UNTITLED ROUTE (autosave-first)
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">03 — Untitled Route · Autosaving</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar"><span class="status-time">14:02</span><span class="status-sep"></span><div class="status-dot"></div><span class="status-synced">synced</span><div class="status-avatar">PC</div></div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <div class="route-switcher">
+        <div class="route-switcher-glyph untitled"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="route-switcher-body"><div class="route-switcher-name untitled">Untitled route <svg class="ico-xs" style="display:inline;vertical-align:-1px;margin-left:3px;color:var(--fog-dim);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></div></div>
+        <svg class="ico-sm route-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="route-identity-sub">
+        <div class="route-location">Locating…</div>
+        <div class="autosave-chip"><div class="autosave-dot saving"></div>Saving…</div>
+      </div>
+
+      <div class="route-hud">
+        <div class="route-hud-grid">
+          <div class="route-hud-stat"><div class="val">2.1</div><div class="lbl">km</div></div>
+          <div class="route-hud-stat"><div class="val">40</div><div class="lbl">m elev</div></div>
+          <div class="route-hud-stat"><div class="val">2</div><div class="lbl">waypoints</div></div>
+          <div class="route-hud-stat"><div class="val">~15m</div><div class="lbl">est. time</div></div>
+        </div>
+      </div>
+
+      <div style="padding:4px 14px 4px;flex-shrink:0;"><div class="planner-section-lbl">Waypoints</div></div>
+      <div style="overflow-y:auto;flex:1;padding:0 14px;">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fog-ghost);">
+          <div style="width:20px;height:20px;border-radius:50%;background:#0E2830;border:2px solid var(--ora);display:flex;align-items:center;justify-content:center;font:700 7px/1 var(--mono);color:var(--ora);flex-shrink:0;">A</div>
+          <div style="flex:1;"><div style="font:600 10px/1 var(--mono);color:var(--fog);letter-spacing:.03em;">Start</div><div style="font:400 8px/1 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:2px;">55.9210° N · 3.1740° W</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--fog-ghost);background:rgba(224,112,32,0.05);border-radius:3px;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#0E2830;border:2px solid var(--ora);display:flex;align-items:center;justify-content:center;font:700 7px/1 var(--mono);color:var(--ora);flex-shrink:0;">B</div>
+          <div style="flex:1;"><div style="font:600 10px/1 var(--mono);color:var(--ice);letter-spacing:.03em;">Waypoint 2</div><div style="font:400 8px/1 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:2px;">2.1 km from start · <span style="color:var(--ora)">selected</span></div></div>
+        </div>
+      </div>
+
+      <div style="padding:10px 14px 14px;flex-shrink:0;display:flex;gap:8px;">
+        <button style="flex:1;padding:9px 10px;background:var(--p3);border:1px solid var(--fog-ghost);border-radius:4px;color:var(--fog);font:600 10px/1 var(--mono);letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:5px;"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>GPX</button>
+        <button style="flex:1;padding:9px 10px;background:var(--ora);border:none;border-radius:4px;color:var(--p0);font:600 10px/1 var(--mono);letter-spacing:.04em;display:flex;align-items:center;justify-content:center;gap:5px;"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Image</button>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+      <div class="planner-toolbar">
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+        <button class="ptb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+        <div class="ptb-sep"></div>
+        <button class="ptb-btn"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Clear</span></button>
+        <div class="ptb-sep"></div>
+        <button class="ptb-btn active"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span>Snap</span></button>
+        <div class="ptb-spacer"></div>
+        <div class="ptb-route-info">2.1 km · <em>40 m ↑</em></div>
+      </div>
+      <svg class="map-svg" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid slice">
+        <polyline points="420,540 460,470" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="420,540 460,470" fill="none" stroke="rgba(7,14,20,0.55)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="420" cy="540" r="10" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="420" y="540" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">A</text>
+        <circle cx="460" cy="470" r="16" fill="rgba(224,112,32,0.10)" stroke="#E07020" stroke-width="1" stroke-dasharray="3 2"/>
+        <circle cx="460" cy="470" r="9" fill="#0E2830" stroke="#E07020" stroke-width="2.5"/>
+        <text x="460" y="470" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="8" font-family="IBM Plex Mono" font-weight="700">B</text>
+      </svg>
+      <div class="map-compass"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="rgba(7,14,20,0.78)" stroke="#1E4858" stroke-width="1"/><polygon points="18,4 21,18 18,15 15,18" fill="#E07020"/><polygon points="18,32 21,18 18,21 15,18" fill="rgba(240,248,250,0.32)"/><text x="18" y="10.5" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="5" font-family="IBM Plex Mono" font-weight="700">N</text></svg></div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">First waypoint silently creates "Untitled route" and it's already in the library — no save dialog, no interruption. The dim pulsing dot + "Saving…" confirms writes are happening; it settles to solid green "Saved" ~1s after the last edit.</div>
+</div><!-- /frame 03 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 04 · INLINE RENAME
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">04 — Inline Rename</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar"><span class="status-time">10:16</span><span class="status-sep"></span><div class="status-dot"></div><span class="status-synced">synced</span><div class="status-avatar">PC</div></div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <div class="route-switcher">
+        <div class="route-switcher-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <input class="route-name-input" value="Pentland Skyline" style="background:rgba(224,112,32,0.12);">
+      </div>
+      <div class="rename-hint">Enter to save · Esc to cancel</div>
+
+      <div class="route-identity-sub" style="margin-top:6px;"><div class="route-location">Pentland Hills · Edinburgh</div><div class="autosave-chip"><div class="autosave-dot"></div>Saved</div></div>
+
+      <div class="route-hud">
+        <div class="route-hud-grid">
+          <div class="route-hud-stat"><div class="val">12.4</div><div class="lbl">km</div></div>
+          <div class="route-hud-stat"><div class="val">580</div><div class="lbl">m elev</div></div>
+          <div class="route-hud-stat"><div class="val">3</div><div class="lbl">waypoints</div></div>
+          <div class="route-hud-stat"><div class="val">~4h</div><div class="lbl">est. time</div></div>
+        </div>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="padding:10px 14px 14px;flex-shrink:0;display:flex;gap:8px;">
+        <button style="flex:1;padding:9px 10px;background:var(--p3);border:1px solid var(--fog-ghost);border-radius:4px;color:var(--fog);font:600 10px/1 var(--mono);letter-spacing:.04em;">GPX</button>
+        <button style="flex:1;padding:9px 10px;background:var(--ora);border:none;border-radius:4px;color:var(--p0);font:600 10px/1 var(--mono);letter-spacing:.04em;">Image</button>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+      <div class="planner-toolbar">
+        <div class="ptb-hint">Renaming route…</div>
+        <div class="ptb-spacer"></div>
+        <div class="ptb-route-info">12.4 km · <em>580 m ↑</em></div>
+      </div>
+      <svg class="map-svg" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid slice">
+        <polyline points="200,560 240,530 278,502 308,472 332,440 350,408 362,374 368,338 370,302 368,268 362,238 352,210" fill="none" stroke="#E07020" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="200,560 240,530 278,502 308,472 332,440 350,408 362,374 368,338 370,302 368,268 362,238 352,210" fill="none" stroke="rgba(7,14,20,0.55)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="map-compass"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="rgba(7,14,20,0.78)" stroke="#1E4858" stroke-width="1"/><polygon points="18,4 21,18 18,15 15,18" fill="#E07020"/><polygon points="18,32 21,18 18,21 15,18" fill="rgba(240,248,250,0.32)"/><text x="18" y="10.5" text-anchor="middle" dominant-baseline="central" fill="#E07020" font-size="5" font-family="IBM Plex Mono" font-weight="700">N</text></svg></div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Click the name (or its pencil icon in the untitled state) to rename in place — no modal. Selection is pre-highlighted so typing replaces immediately, matching the Docs-style "type to overwrite" pattern.</div>
+</div><!-- /frame 04 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 05 · OVERFLOW MENU + DELETE CONFIRM
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">05 — Route Overflow · Delete Confirm</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar"><span class="status-time">10:17</span><span class="status-sep"></span><div class="status-dot"></div><span class="status-synced">synced</span><div class="status-avatar">PC</div></div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <div class="route-switcher open">
+        <div class="route-switcher-glyph"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="route-switcher-body"><div class="route-switcher-name">Pentland Skyline</div></div>
+        <svg class="ico-sm route-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+
+        <div class="route-flyout">
+          <div class="route-flyout-hdr">My Routes · 5</div>
+          <div class="route-flyout-list">
+            <div class="route-flyout-item current">
+              <svg class="ico-xs route-item-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Pentland Skyline</div><div class="route-item-meta">12.4 km · Just now</div></div>
+            </div>
+            <div class="route-flyout-item" style="background:var(--p2);">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Coastal Loop AM</div><div class="route-item-meta">9.2 km · 6d ago</div></div>
+              <button class="route-item-overflow-btn" style="background:var(--p3);color:var(--fog);"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+            </div>
+            <div class="route-flyout-item">
+              <div class="route-item-check-ghost"></div>
+              <div class="route-item-glyph"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+              <div class="route-item-info"><div class="route-item-name">Forth Bridge Out-and-Back</div><div class="route-item-meta">24.1 km · 2w ago</div></div>
+            </div>
+          </div>
+          <div class="route-flyout-new"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New route</div>
+        </div>
+      </div>
+
+      <!-- Context menu + delete confirm render as panel-level siblings (not
+           nested in the scrollable/overflow-hidden flyout) so they aren't
+           clipped. Positioned to land visually beside the "Coastal Loop AM"
+           row's overflow button. -->
+      <div class="ctx-menu" style="top:270px;left:154px;">
+        <div class="ctx-menu-item"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Rename</div>
+        <div class="ctx-menu-item"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Duplicate</div>
+        <div class="ctx-menu-sep"></div>
+        <div class="ctx-menu-item danger"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete</div>
+      </div>
+
+      <!-- Storyboard inset: what "Delete" leads to — rendered over the map,
+           just past the panel's right edge, with room to breathe. -->
+      <div class="storyboard-caption" style="top:242px;left:316px;"><svg class="ico-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>tapping Delete shows</div>
+      <div class="confirm-card" style="top:262px;left:316px;">
+        <div class="confirm-card-title">Delete <strong>"Coastal Loop AM"</strong>? This can't be undone.</div>
+        <div class="confirm-card-actions">
+          <button class="confirm-btn cancel">Cancel</button>
+          <button class="confirm-btn delete">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">Each row's overflow opens Rename / Duplicate / Delete. Delete always routes through an explicit confirm (shown inset here) — never a silent destructive action.</div>
+</div><!-- /frame 05 -->
+
+
+<!-- ════════════════════════════════════════
+     FRAME 06 · EMPTY LIBRARY (first-time premium)
+════════════════════════════════════════ -->
+<div class="frame-wrap">
+  <div class="frame-label">06 — Empty Library</div>
+  <div class="frame-border"><div class="desk-frame">
+
+    <div class="panel">
+      <div class="status-bar"><span class="status-time">09:51</span><span class="status-sep"></span><div class="status-dot"></div><span class="status-synced">synced</span><div class="status-avatar">PC</div></div>
+      <div class="panel-hdr"><div class="wordmark">plot</div></div>
+      <div class="tab-bar"><div class="tab">Activities</div><div class="tab active">Planner</div></div>
+
+      <div class="route-switcher open">
+        <div class="route-switcher-glyph untitled"><svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+        <div class="route-switcher-body"><div class="route-switcher-label">My Routes</div></div>
+        <svg class="ico-sm route-switcher-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+
+        <div class="route-flyout">
+          <div class="route-flyout-empty">
+            <div class="route-flyout-empty-icon"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a4 4 0 0 0 4-4v-1a4 4 0 0 0-4-4H9a4 4 0 0 1-4-4v-1"/></svg></div>
+            <div class="route-flyout-empty-title">No saved routes yet</div>
+            <div class="route-flyout-empty-sub">Start plotting to create one — it saves itself.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Base start state — unchanged from existing planner -->
+      <div class="planner-new-route-wrap">
+        <div class="planner-section-lbl" style="opacity:0.4;">New Route</div>
+        <button class="planner-new-btn" style="opacity:0.4;">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Start New Route
+        </button>
+        <p style="font:400 9px/1.5 var(--mono);color:var(--fog-dim);letter-spacing:.04em;margin-top:8px;text-align:center;opacity:0.4;">or click anywhere on the map</p>
+      </div>
+      <div style="padding:8px 14px 0;opacity:0.4;">
+        <button class="detail-btn-secondary" style="width:100%;">
+          <svg class="ico-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import GPX
+        </button>
+      </div>
+    </div>
+
+    <div class="map-area">
+      <div class="map-bg"></div>
+      <div class="planner-toolbar">
+        <button class="ptb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Undo</span></button>
+        <button class="ptb-btn disabled"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Redo</span></button>
+        <div class="ptb-spacer"></div>
+        <div class="ptb-hint">Click the map to place your first point</div>
+      </div>
+    </div>
+
+  </div></div>
+  <div class="frame-note">First-time premium users see this the moment they open My Routes. The library and the "Start New Route" CTA lead to the same place — placing a point creates the first entry automatically.</div>
+</div><!-- /frame 06 -->
+
+</div><!-- /frames-row -->
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Image as ImageIcon, Download, Upload } from 'lucide-react';
+import { X, Image as ImageIcon, Download, Upload, ChevronRight, MapPin } from 'lucide-react';
 import ImportRoutePopover from '@/app/components/shell/ImportRoutePopover';
 import dynamic from 'next/dynamic';
 import Map from 'ol/Map';
@@ -16,12 +16,20 @@ import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
+import { getActiveRouteId, setActiveRouteId } from '@/lib/active-route';
+import { replayToCursor } from '@/lib/route-actions';
+import {
+  listRoutes, createRoute, getRoute, updateRoute, duplicateRoute, deleteRoute,
+  displayRouteLabel, UNTITLED_ROUTE_NAME, type RouteSummary,
+} from '@/lib/saved-routes';
 import { selectGpxWaypoints, downloadGpx, parseGpx } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
 import DetailPanel from './DetailPanel';
 import PlannerPanel from './PlannerPanel';
+import SavedRoutesPicker from './SavedRoutesPicker';
+import MobileRoutesSheet from './MobileRoutesSheet';
 import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileBottomSheet from './MobileBottomSheet';
@@ -121,7 +129,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleElevationHover = useCallback((pt: ElevationHoverPoint | null) => setElevationHoverPoint(pt), []);
 
   // Planner state
-  const { waypoints, segments, canUndo, canRedo, dispatch } = useRouteHistory();
+  const { waypoints, segments, canUndo, canRedo, dispatch, restore, actions, cursor } = useRouteHistory();
   const [addPointsEnabled, setAddPointsEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isExportingImage, setIsExportingImage] = useState(false);
@@ -129,13 +137,269 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waypointsRef = useRef(waypoints);
   const segmentsRef = useRef(segments);
+  const actionsRef = useRef(actions);
+  const cursorRef = useRef(cursor);
   waypointsRef.current = waypoints;
   segmentsRef.current = segments;
+  actionsRef.current = actions;
+  cursorRef.current = cursor;
 
   useRouteSnapping({ waypoints, segments, dispatch });
   const { elevationData, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
+  const distanceRef = useRef(distance);
+  distanceRef.current = distance;
+
+  // ── Saved routes (premium) ─────────────────────────────────────────────
+  const [routesList, setRoutesList] = useState<RouteSummary[]>([]);
+  const [routeMeta, setRouteMeta] = useState<{ id: string | null; name: string; location: string | null }>({ id: null, name: 'Untitled route', location: null });
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [isLocating, setIsLocating] = useState(false);
+  const [routeHydrated, setRouteHydrated] = useState(false);
+  const [mobileRoutesSheetOpen, setMobileRoutesSheetOpen] = useState(false);
+  const [premiumInitialView, setPremiumInitialView] = useState<{ center: [number, number]; zoom: number } | null>(null);
+  const routeMetaRef = useRef(routeMeta);
+  routeMetaRef.current = routeMeta;
+
+  // Overlay the active route's live in-memory state (name, location, stats) onto its row
+  // in the list — renames and stat changes must show up immediately, not just after the
+  // next backend refetch (autosave is debounced, so waiting for it would lag visibly).
+  const displayRoutesList = useMemo(() => {
+    if (!routeMeta.id) return routesList;
+    return routesList.map((r) => r.id === routeMeta.id
+      ? { ...r, name: routeMeta.name, location: routeMeta.location, distanceM: distance, waypointCount: waypoints.length }
+      : r);
+  }, [routesList, routeMeta.id, routeMeta.name, routeMeta.location, distance, waypoints.length]);
+
+  const hydratedRef = useRef(false);
+  const createInFlightRef = useRef(false);
+  const suppressNextAutosaveRef = useRef(false);
+  const premiumSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const refreshRoutesList = useCallback(() => {
+    if (!isPremium) return;
+    listRoutes().then(setRoutesList);
+  }, [isPremium]);
+
+  useEffect(() => { refreshRoutesList(); }, [refreshRoutesList]);
+
+  // Debounced PUT — shared by the content-change effect and the moveend map handler below,
+  // matching the existing dual-trigger local autosave pattern.
+  const schedulePremiumSave = useCallback(() => {
+    if (!isPremium || !routeMetaRef.current.id) return;
+    if (suppressNextAutosaveRef.current) {
+      suppressNextAutosaveRef.current = false;
+      return;
+    }
+    setSaveStatus('saving');
+    if (premiumSaveTimerRef.current) clearTimeout(premiumSaveTimerRef.current);
+    premiumSaveTimerRef.current = setTimeout(() => {
+      const id = routeMetaRef.current.id;
+      if (!id) return;
+      const map = mapInstanceRef.current;
+      const center = (map?.getView().getCenter() as [number, number]) ?? [0, 0];
+      const zoom = map?.getView().getZoom() ?? 7;
+      updateRoute(id, {
+        name: routeMetaRef.current.name,
+        location: routeMetaRef.current.location,
+        distanceM: distanceRef.current,
+        waypointCount: waypointsRef.current.length,
+        actions: actionsRef.current,
+        cursor: cursorRef.current,
+        mapCenter: center,
+        mapZoom: zoom,
+      }).then((summary) => {
+        if (summary) setSaveStatus('saved');
+      });
+    }, 1800);
+  }, [isPremium]);
+
+  // Hydrate the active route on mount — premium fetches from the backend, free reads
+  // localStorage (unchanged mechanism, just the new action-log shape). routeHydrated
+  // gates the route-identity UI so it doesn't flash "Untitled route" before the real
+  // name (if any) has loaded.
+  useEffect(() => {
+    if (isPremium) {
+      const id = getActiveRouteId();
+      if (!id) {
+        hydratedRef.current = true;
+        setRouteHydrated(true);
+        return;
+      }
+      getRoute(id).then((detail) => {
+        if (!detail) {
+          // Stale pointer — the route was deleted elsewhere (e.g. another device)
+          setActiveRouteId(null);
+          hydratedRef.current = true;
+          setRouteHydrated(true);
+          return;
+        }
+        suppressNextAutosaveRef.current = true;
+        restore({ actions: detail.actions, cursor: detail.cursor });
+        setRouteMeta({ id: detail.id, name: detail.name, location: detail.location });
+        setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
+        hydratedRef.current = true;
+        setRouteHydrated(true);
+      });
+    } else {
+      const stored = loadRoute();
+      if (stored?.actions?.length) {
+        restore({ actions: stored.actions, cursor: stored.cursor });
+      }
+      hydratedRef.current = true;
+      setRouteHydrated(true);
+    }
+    // Runs once on mount — isPremium is a stable prop for the lifetime of a session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apply the premium route's saved map view once the map is ready (fetch and map-ready
+  // can resolve in either order).
+  useEffect(() => {
+    if (!mapReady || !premiumInitialView) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    if (isValidBNG(premiumInitialView.center)) {
+      map.getView().setCenter(premiumInitialView.center);
+      map.getView().setZoom(premiumInitialView.zoom);
+    }
+    setPremiumInitialView(null);
+  }, [mapReady, premiumInitialView]);
+
+  // Create the backend route record silently on the first waypoint of a fresh session
+  // (no active route yet) — mirrors the free-tier "autosave-first" behaviour.
+  useEffect(() => {
+    if (!isPremium || !hydratedRef.current) return;
+    if (routeMeta.id || waypoints.length === 0 || createInFlightRef.current) return;
+    createInFlightRef.current = true;
+    createRoute('Untitled route').then((summary) => {
+      createInFlightRef.current = false;
+      if (!summary) return;
+      setActiveRouteId(summary.id);
+      setRouteMeta({ id: summary.id, name: summary.name, location: summary.location });
+      refreshRoutesList();
+    });
+  }, [isPremium, routeMeta.id, waypoints.length, refreshRoutesList]);
+
+  // Reverse-geocode the start point whenever the active route has waypoints but no
+  // location yet — covers every path that can produce that state (auto-created on first
+  // waypoint, explicit "+ New route" then plotting, or a hydrated/older route that never
+  // got a location). Guarded per-route-id so it fires once, not on every waypoint edit.
+  const geocodedRouteIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isPremium || !routeMeta.id || routeMeta.location || waypoints.length === 0) return;
+    if (geocodedRouteIdRef.current === routeMeta.id) return;
+    geocodedRouteIdRef.current = routeMeta.id;
+    const id = routeMeta.id;
+    const first = waypointsRef.current[0];
+    if (!first) return;
+    setIsLocating(true);
+    fetch(`/api/geocode/reverse?lat=${first.lat}&lng=${first.lng}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { location?: string | null } | null) => {
+        if (data?.location) {
+          setRouteMeta((m) => (m.id === id ? { ...m, location: data.location ?? null } : m));
+        }
+      })
+      .catch(() => { /* silently ignore — location is a nice-to-have, not load-bearing */ })
+      .finally(() => setIsLocating(false));
+  }, [isPremium, routeMeta.id, routeMeta.location, waypoints.length]);
+
+  // Premium autosave — triggers on content or identity changes; moveend (below) triggers
+  // the same debounce for map-view-only changes.
+  useEffect(() => {
+    schedulePremiumSave();
+  }, [actions, cursor, routeMeta.name, routeMeta.location, schedulePremiumSave]);
+
+  const handleSelectRoute = useCallback((id: string) => {
+    if (id === routeMetaRef.current.id) return;
+    setRouteHydrated(false);
+    getRoute(id).then((detail) => {
+      if (!detail) {
+        setRouteHydrated(true);
+        return;
+      }
+      suppressNextAutosaveRef.current = true;
+      restore({ actions: detail.actions, cursor: detail.cursor });
+      setRouteMeta({ id: detail.id, name: detail.name, location: detail.location });
+      setActiveRouteId(detail.id);
+      setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
+      setRouteHydrated(true);
+    });
+  }, [restore]);
+
+  const handleCreateNewRoute = useCallback(() => {
+    createRoute('Untitled route').then((summary) => {
+      if (!summary) return;
+      suppressNextAutosaveRef.current = true;
+      restore({ actions: [], cursor: 0 });
+      setRouteMeta({ id: summary.id, name: summary.name, location: summary.location });
+      setActiveRouteId(summary.id);
+      refreshRoutesList();
+    });
+  }, [restore, refreshRoutesList]);
+
+  const handleRenameActive = useCallback((name: string) => {
+    setRouteMeta((m) => ({ ...m, name }));
+  }, []);
+
+  const handleRenameRoute = useCallback((id: string, name: string) => {
+    if (id === routeMetaRef.current.id) {
+      setRouteMeta((m) => ({ ...m, name }));
+      return;
+    }
+    getRoute(id).then((detail) => {
+      if (!detail) return;
+      updateRoute(id, {
+        name,
+        location: detail.location,
+        distanceM: detail.distanceM,
+        waypointCount: detail.waypointCount,
+        actions: detail.actions,
+        cursor: detail.cursor,
+        mapCenter: detail.mapCenter,
+        mapZoom: detail.mapZoom,
+        mapRotation: detail.mapRotation,
+      }).then(() => refreshRoutesList());
+    });
+  }, [refreshRoutesList]);
+
+  const handleDuplicateRoute = useCallback((id: string) => {
+    (async () => {
+      let wps = waypointsRef.current;
+      let segs = segmentsRef.current;
+      let baseName = routeMetaRef.current.name;
+      if (id !== routeMetaRef.current.id) {
+        const detail = await getRoute(id);
+        if (!detail) return;
+        const replayed = replayToCursor(detail.actions, detail.cursor);
+        wps = replayed.waypoints;
+        segs = replayed.segments;
+        baseName = detail.name;
+      }
+      await duplicateRoute(id, `${baseName} (copy)`, wps, segs);
+      refreshRoutesList();
+    })();
+  }, [refreshRoutesList]);
+
+  const handleDeleteRoute = useCallback((id: string) => {
+    deleteRoute(id).then((ok) => {
+      if (!ok) return;
+      if (id === routeMetaRef.current.id) {
+        const next = routesList.find((r) => r.id !== id);
+        if (next) {
+          handleSelectRoute(next.id);
+        } else {
+          setActiveRouteId(null);
+          setRouteMeta({ id: null, name: 'Untitled route', location: null });
+          suppressNextAutosaveRef.current = true;
+          restore({ actions: [], cursor: 0 });
+        }
+      }
+      refreshRoutesList();
+    });
+  }, [routesList, handleSelectRoute, restore, refreshRoutesList]);
 
   const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return 0;
@@ -224,25 +488,19 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     window.history.replaceState(null, '', path);
   }, [mode, selectedId]);
 
-  // Load saved route on mount
+  // Auto-save route locally — free tier only; premium autosave is the effect above.
+  // Only runs when map is ready to avoid persisting [0,0] center.
   useEffect(() => {
-    const stored = loadRoute();
-    if (stored?.waypoints.length) {
-      dispatch({ type: 'LOAD', waypoints: stored.waypoints, segments: stored.segments });
-    }
-  }, [dispatch]);
-
-  // Auto-save route — only runs when map is ready to avoid persisting [0,0] center
-  useEffect(() => {
+    if (isPremium) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       const map = mapInstanceRef.current;
       if (!map) return;
       const center = map.getView().getCenter() as [number, number];
       const zoom = map.getView().getZoom() ?? 7;
-      saveRoute(waypointsRef.current, segmentsRef.current, center, zoom);
+      saveRoute({ actions: actionsRef.current, cursor: cursorRef.current, mapCenter: center, mapZoom: zoom });
     }, 500);
-  }, [waypoints, segments]);
+  }, [actions, cursor, isPremium]);
 
   const handleResetNorth = useCallback(() => {
     mapInstanceRef.current?.getView().animate({ rotation: 0, duration: 300 });
@@ -254,8 +512,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setMapReady(true);
     // In planner mode always restore stored position (the planner fit effect will override
     // this with the route bounds if there are waypoints). In browse mode only restore when
-    // there are no activities so the activity list auto-fit can take over.
-    if (initialMode === 'planner' || allActivities.length === 0) {
+    // there are no activities so the activity list auto-fit can take over. Premium restores
+    // its view separately (see the premiumInitialView effect above) once the fetch resolves.
+    if (!isPremium && (initialMode === 'planner' || allActivities.length === 0)) {
       const stored = loadRoute();
       if (stored?.mapCenter && isValidBNG(stored.mapCenter as [number, number])) {
         map.getView().setCenter(stored.mapCenter);
@@ -268,11 +527,17 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       const view = map.getView();
       const center = view.getCenter() as [number, number];
       const zoom = view.getZoom() ?? 7;
-      if (center) saveRoute(waypointsRef.current, segmentsRef.current, center, zoom);
+      if (center) {
+        if (isPremium) {
+          schedulePremiumSave();
+        } else {
+          saveRoute({ actions: actionsRef.current, cursor: cursorRef.current, mapCenter: center, mapZoom: zoom });
+        }
+      }
       setCompassBearing(view.getRotation() * 180 / Math.PI);
       setMapResolution(view.getResolution() ?? 10);
     });
-  }, [allActivities.length, initialMode]);
+  }, [allActivities.length, initialMode, isPremium, schedulePremiumSave]);
 
   // On initial /planner load, fit the map to the saved route once both the map and
   // waypoints are ready. Runs once — no animation so it snaps cleanly on load.
@@ -524,20 +789,39 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           )}
           {mode === 'planner' && (
             <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <PlannerPanel
-                distance={distance}
-                elevGain={elevGain}
-                waypoints={waypoints}
-                segments={segments}
-                elevationData={elevationData}
-                isLoadingElevation={isLoadingElevation}
-                dispatch={dispatch}
-                onFitToRoute={() => handleFitToRoute(waypoints)}
-                onExportImage={handleExportImage}
-                isExportingImage={isExportingImage}
-                onEditWaypoint={handleEditWaypoint}
-                onElevationHover={handleElevationHover}
-              />
+              {isPremium && (
+                <SavedRoutesPicker
+                  loading={!routeHydrated}
+                  routeName={routeMeta.name}
+                  routeLocation={routeMeta.location}
+                  isLocating={isLocating}
+                  saveStatus={saveStatus}
+                  routes={displayRoutesList}
+                  activeRouteId={routeMeta.id}
+                  onSelectRoute={handleSelectRoute}
+                  onCreateRoute={handleCreateNewRoute}
+                  onRenameActive={handleRenameActive}
+                  onRenameRoute={handleRenameRoute}
+                  onDuplicateRoute={handleDuplicateRoute}
+                  onDeleteRoute={handleDeleteRoute}
+                />
+              )}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <PlannerPanel
+                  distance={distance}
+                  elevGain={elevGain}
+                  waypoints={waypoints}
+                  segments={segments}
+                  elevationData={elevationData}
+                  isLoadingElevation={isLoadingElevation}
+                  dispatch={dispatch}
+                  onFitToRoute={() => handleFitToRoute(waypoints)}
+                  onExportImage={handleExportImage}
+                  isExportingImage={isExportingImage}
+                  onEditWaypoint={handleEditWaypoint}
+                  onElevationHover={handleElevationHover}
+                />
+              </div>
             </div>
           )}
           {mode === 'about' && (
@@ -718,6 +1002,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Planner HUD — always mounted, crossfades in when entering planner */}
       {(() => {
         const distKm = (distance / 1000).toFixed(1);
+        const { label: routeLabel, isPlaceholder: routeLabelIsPlaceholder } = displayRouteLabel({ name: routeMeta.name, location: routeMeta.location });
+        const usingLocationAsName = routeMeta.name === UNTITLED_ROUTE_NAME && !!routeMeta.location;
         return (
           <div style={{
             position: 'fixed', bottom: 10, left: 10, right: 10,
@@ -734,6 +1020,47 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             transform: mode === 'planner' ? 'translateY(0)' : 'translateY(100%)',
             transition: plannerHudDragging ? 'none' : 'height 0.3s ease, opacity 0.28s ease, transform 0.28s ease',
           }}>
+                {isPremium && (
+                  <>
+                    <style>{`@keyframes skeleton-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .15; } }`}</style>
+                    {routeHydrated ? (
+                      <div
+                        onClick={() => setMobileRoutesSheetOpen(true)}
+                        style={{
+                          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '10px 16px 0', cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{
+                          font: '600 11px/1.3 var(--mono)', color: routeLabelIsPlaceholder ? 'var(--fog-dim)' : 'var(--ice)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {routeLabel}
+                        </span>
+                        {!usingLocationAsName && (routeMeta.location || isLocating) && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                            {routeMeta.location && <MapPin size={9} style={{ flexShrink: 0 }} />}
+                            {routeMeta.location ?? 'Locating…'}
+                          </span>
+                        )}
+                        <div style={{ flex: 1 }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, font: '500 8px/1 var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--fog-dim)', flexShrink: 0 }}>
+                          <div style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: saveStatus === 'saving' ? 'var(--fog-dim)' : 'var(--grn)',
+                            boxShadow: saveStatus === 'saving' ? 'none' : '0 0 4px var(--grn)',
+                          }} />
+                          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+                        </div>
+                        <ChevronRight size={13} style={{ color: 'var(--fog-dim)', flexShrink: 0 }} />
+                      </div>
+                    ) : (
+                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '10px 16px 0' }}>
+                        <div style={{ width: 110, height: 11, borderRadius: 2, background: 'var(--p3)', animation: 'skeleton-pulse 1.4s ease-in-out infinite' }} />
+                      </div>
+                    )}
+                  </>
+                )}
                 {/* Drag zone — handle bar + stats row, large touch target */}
                 <div
                   onTouchStart={handlePlannerHudTouchStart}
@@ -816,6 +1143,21 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           waypoints={waypoints}
           onFitToRoute={handleFitToRoute}
           fileInputRef={mobileFileInputRef}
+        />,
+        document.body,
+      )}
+
+      {/* Mobile "My Routes" sheet — premium only */}
+      {mobileRoutesSheetOpen && isPremium && createPortal(
+        <MobileRoutesSheet
+          routes={displayRoutesList}
+          activeRouteId={routeMeta.id}
+          onClose={() => setMobileRoutesSheetOpen(false)}
+          onSelectRoute={handleSelectRoute}
+          onCreateRoute={handleCreateNewRoute}
+          onRenameRoute={handleRenameRoute}
+          onDuplicateRoute={handleDuplicateRoute}
+          onDeleteRoute={handleDeleteRoute}
         />,
         document.body,
       )}
