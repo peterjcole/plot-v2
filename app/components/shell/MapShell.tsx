@@ -81,13 +81,13 @@ interface MapShellProps {
   activities: ActivitySummary[];
   avatarInitials: string;
   isLoggedIn?: boolean;
-  isOwner?: boolean;
+  isPremium?: boolean;
   initialMode?: PanelMode;
   initialSelectedId?: string | null;
   authError?: boolean;
 }
 
-export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isOwner = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
+export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isPremium = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>(initialSelectedId ? 'detail' : initialMode);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [detailSnap, setDetailSnap] = useState<'mid' | 'expanded'>('mid');
@@ -198,7 +198,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   // Trigger photo catch-up import the first time "My photos" is enabled
   useEffect(() => {
-    if (!isOwner || !layerState.showPhotos || photosImportTriggeredRef.current) return;
+    if (!isPremium || !layerState.showPhotos || photosImportTriggeredRef.current) return;
     try {
       if (localStorage.getItem('plotv2-photos-import-triggered')) {
         photosImportTriggeredRef.current = true;
@@ -213,7 +213,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         }
       })
       .catch(() => { /* silently ignore */ });
-  }, [isOwner, layerState.showPhotos]);
+  }, [isPremium, layerState.showPhotos]);
 
   // Reflect panel mode in URL bar (no navigation, just history state)
   useEffect(() => {
@@ -575,10 +575,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           heatmapColor={layerState.heatmapColor}
           showExplorer={layerState.showExplorer}
           onExplorerStats={setExplorerStats}
-          showOwnerPhotos={isOwner && layerState.showPhotos}
+          showOwnerPhotos={isPremium && layerState.showPhotos}
           onPhotoClick={handleOwnerPhotoClick}
           onClusterPhotosClick={handleOwnerClusterPhotosClick}
-          onHeatmapClick={isOwner ? handleHeatmapClick : undefined}
+          onHeatmapClick={isPremium ? handleHeatmapClick : undefined}
           hoveredActivityRoute={hoveredActivityRoute}
           hoveredActivityColor={hoveredActivityColor}
           onGeolocate={handleGeolocate}
@@ -589,7 +589,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
         {/* Desktop chrome — layers, compass, scale, legend (hidden on mobile) */}
         <div className="hidden sm:block">
-          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} />
+          <LayersPanel state={layerState} onChange={patchLayers} bottom={16} isPremium={isPremium} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} />
         </div>
         <div className="hidden sm:flex absolute bottom-[68px] left-3 z-[14] items-center gap-2">
           <Compass bearing={compassBearing} onResetNorth={handleResetNorth} />
@@ -647,7 +647,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Conditional non-animated elements */}
       {mode !== 'planner' && (
         <>
-          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+          <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={80} isPremium={isPremium} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
           <button
             onClick={handleOpenPlanner}
             style={{
@@ -677,7 +677,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       )}
 
       {mode === 'planner' && (
-        <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isOwner={isOwner} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
+        <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isPremium={isPremium} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
       )}
 
       {/* Activities bottom sheet — always mounted, crossfades out when entering planner */}

@@ -10,6 +10,12 @@ export interface SessionData {
     firstname: string;
     lastname: string;
   };
+  // Premium (backend-powered) feature access — resolved once at login by
+  // calling the backend's athlete allowlist, then cached here so per-request
+  // checks (e.g. tile requests) don't need to hit the backend. See lib/entitlements.ts.
+  entitlements?: {
+    premium: boolean;
+  };
   oauthState?: string;
 }
 
