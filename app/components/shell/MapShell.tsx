@@ -188,12 +188,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   // matching the existing dual-trigger local autosave pattern.
   const schedulePremiumSave = useCallback(() => {
     if (!isPremium || !routeMetaRef.current.id) return;
+    // Clear any pending save before the suppress check — otherwise a save left over from
+    // the route we just switched away from (still in-flight within its debounce window)
+    // fires later and issues a redundant PUT against the newly-active route.
+    if (premiumSaveTimerRef.current) clearTimeout(premiumSaveTimerRef.current);
     if (suppressNextAutosaveRef.current) {
       suppressNextAutosaveRef.current = false;
       return;
     }
     setSaveStatus('saving');
-    if (premiumSaveTimerRef.current) clearTimeout(premiumSaveTimerRef.current);
     premiumSaveTimerRef.current = setTimeout(() => {
       const id = routeMetaRef.current.id;
       if (!id) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreVertical, Check, Route as RouteIcon } from 'lucide-react';
 import { displayRouteLabel, type RouteSummary } from '@/lib/saved-routes';
@@ -46,10 +46,22 @@ export default function RouteListRows({ routes, activeRouteId, onSelect, onRenam
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; anchor: DOMRect } | null>(null);
+  // Escape unmounts the focused <input>, which fires a native blur — guard commitRename
+  // (called from onBlur) against treating that as a save.
+  const renameCancelledRef = useRef(false);
 
   function commitRename(id: string) {
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
     const trimmed = renameValue.trim();
     if (trimmed) onRename(id, trimmed);
+    setRenamingId(null);
+  }
+
+  function cancelRename() {
+    renameCancelledRef.current = true;
     setRenamingId(null);
   }
 
@@ -109,7 +121,7 @@ export default function RouteListRows({ routes, activeRouteId, onSelect, onRenam
                   onChange={(e) => setRenameValue(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') commitRename(route.id);
-                    if (e.key === 'Escape') setRenamingId(null);
+                    if (e.key === 'Escape') cancelRename();
                   }}
                   onBlur={() => commitRename(route.id)}
                   style={{

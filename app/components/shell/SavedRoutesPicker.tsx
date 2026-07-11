@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronDown, MapPin, Plus, Pencil, Route as RouteIcon } from 'lucide-react';
 import { displayRouteLabel, UNTITLED_ROUTE_NAME, type RouteSummary } from '@/lib/saved-routes';
 import RouteListRows from './RouteListRows';
@@ -28,6 +28,9 @@ export default function SavedRoutesPicker({
   const [open, setOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [nameValue, setNameValue] = useState(routeName);
+  // Escape unmounts the focused <input>, which fires a native blur — guard commitRename
+  // (called from onBlur) against treating that as a save.
+  const renameCancelledRef = useRef(false);
 
   const { label, isPlaceholder } = displayRouteLabel({ name: routeName, location: routeLocation });
   // When the header is already showing the location in place of a name, the subline
@@ -41,8 +44,17 @@ export default function SavedRoutesPicker({
   }
 
   function commitRename() {
+    if (renameCancelledRef.current) {
+      renameCancelledRef.current = false;
+      return;
+    }
     const trimmed = nameValue.trim();
     if (trimmed && trimmed !== routeName) onRenameActive(trimmed);
+    setRenaming(false);
+  }
+
+  function cancelRename() {
+    renameCancelledRef.current = true;
     setRenaming(false);
   }
 
@@ -86,7 +98,7 @@ export default function SavedRoutesPicker({
             onChange={(e) => setNameValue(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitRename();
-              if (e.key === 'Escape') setRenaming(false);
+              if (e.key === 'Escape') cancelRename();
             }}
             onBlur={commitRename}
             style={{
