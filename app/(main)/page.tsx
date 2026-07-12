@@ -6,10 +6,11 @@ import MapShell, { type PanelMode } from '@/app/components/shell/MapShell';
 import { ActivitySummary } from '@/lib/types';
 
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ mode?: string; activity?: string }> }) {
-  const { mode, activity } = await searchParams;
+export default async function Home({ searchParams }: { searchParams: Promise<{ mode?: string; activity?: string; route?: string }> }) {
+  const { mode, activity, route } = await searchParams;
   const initialMode: PanelMode = mode === 'planner' ? 'planner' : mode === 'about' ? 'about' : 'browse';
   const initialSelectedId = activity ?? null;
+  const initialRouteId = route ?? null;
   const session = await getSession();
   const isLoggedIn = !!session.accessToken;
 
@@ -49,6 +50,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ m
       isPremium={isPremium}
       initialMode={initialMode}
       initialSelectedId={initialSelectedId}
+      initialRouteId={initialRouteId}
       authError={authError}
     />
   );

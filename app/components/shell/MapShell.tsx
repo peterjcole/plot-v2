@@ -20,7 +20,7 @@ import { getActiveRouteId, setActiveRouteId } from '@/lib/active-route';
 import { replayToCursor } from '@/lib/route-actions';
 import {
   listRoutes, createRoute, getRoute, updateRoute, duplicateRoute, deleteRoute,
-  displayRouteLabel, UNTITLED_ROUTE_NAME, type RouteSummary,
+  displayRouteLabel, routeExportName, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary,
 } from '@/lib/saved-routes';
 import { selectGpxWaypoints, downloadGpx, parseGpx } from '@/lib/gpx';
 import { OS_PROJECTION } from '@/lib/map-config';
@@ -92,10 +92,11 @@ interface MapShellProps {
   isPremium?: boolean;
   initialMode?: PanelMode;
   initialSelectedId?: string | null;
+  initialRouteId?: string | null;
   authError?: boolean;
 }
 
-export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isPremium = false, initialMode = 'browse', initialSelectedId = null, authError = false }: MapShellProps) {
+export default function MapShell({ activities, avatarInitials, isLoggedIn = false, isPremium = false, initialMode = 'browse', initialSelectedId = null, initialRouteId = null, authError = false }: MapShellProps) {
   const [mode, setMode] = useState<PanelMode>(initialSelectedId ? 'detail' : initialMode);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [detailSnap, setDetailSnap] = useState<'mid' | 'expanded'>('mid');
@@ -223,37 +224,59 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   // gates the route-identity UI so it doesn't flash "Untitled route" before the real
   // name (if any) has loaded.
   useEffect(() => {
-    if (isPremium) {
-      const id = getActiveRouteId();
-      if (!id) {
-        hydratedRef.current = true;
-        setRouteHydrated(true);
-        return;
-      }
-      getRoute(id).then((detail) => {
-        if (!detail) {
-          // Stale pointer — the route was deleted elsewhere (e.g. another device)
-          setActiveRouteId(null);
-          hydratedRef.current = true;
-          setRouteHydrated(true);
-          return;
-        }
-        suppressNextAutosaveRef.current = true;
-        restore({ actions: detail.actions, cursor: detail.cursor });
-        setRouteMeta({ id: detail.id, name: detail.name, location: detail.location });
-        setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
-        hydratedRef.current = true;
-        setRouteHydrated(true);
-      });
-    } else {
+    if (!isPremium) {
       const stored = loadRoute();
       if (stored?.actions?.length) {
         restore({ actions: stored.actions, cursor: stored.cursor });
       }
       hydratedRef.current = true;
       setRouteHydrated(true);
+      return;
     }
-    // Runs once on mount — isPremium is a stable prop for the lifetime of a session.
+
+    const applyDetail = (detail: NonNullable<Awaited<ReturnType<typeof getRoute>>>) => {
+      suppressNextAutosaveRef.current = true;
+      restore({ actions: detail.actions, cursor: detail.cursor });
+      setRouteMeta({ id: detail.id, name: detail.name, location: detail.location });
+      setActiveRouteId(detail.id);
+      setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
+    };
+    const finishEmpty = () => {
+      setActiveRouteId(null);
+      hydratedRef.current = true;
+      setRouteHydrated(true);
+    };
+
+    (async () => {
+      // A route id in the URL (/planner?route=<id>) takes precedence over the localStorage
+      // pointer — this is what makes a saved-route link shareable/reloadable.
+      const storedId = getActiveRouteId();
+      const id = initialRouteId ?? storedId;
+      if (!id) {
+        finishEmpty();
+        return;
+      }
+      const detail = await getRoute(id);
+      if (detail) {
+        applyDetail(detail);
+        hydratedRef.current = true;
+        setRouteHydrated(true);
+        return;
+      }
+      // The URL's id 404'd (deleted, or not ours) — fall back to the localStorage pointer
+      // rather than leaving the planner stuck on a dead id.
+      if (initialRouteId && storedId && storedId !== initialRouteId) {
+        const fallback = await getRoute(storedId);
+        if (fallback) {
+          applyDetail(fallback);
+          hydratedRef.current = true;
+          setRouteHydrated(true);
+          return;
+        }
+      }
+      finishEmpty();
+    })();
+    // Runs once on mount — isPremium/initialRouteId are stable props for the lifetime of a session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -308,6 +331,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       .catch(() => { /* silently ignore — location is a nice-to-have, not load-bearing */ })
       .finally(() => setIsLocating(false));
   }, [isPremium, routeMeta.id, routeMeta.location, waypoints.length]);
+
+  // A GPX/Strava import replaces the whole route with a new start point, so the previously
+  // geocoded location is stale. Clearing it (and the per-id guard above) lets the geocode
+  // effect re-fire against the new first waypoint. No-op on free tier / before a route exists.
+  const handleRouteReplaced = useCallback(() => {
+    if (!isPremium || !routeMetaRef.current.id) return;
+    geocodedRouteIdRef.current = null;
+    setRouteMeta((m) => ({ ...m, location: null }));
+  }, [isPremium]);
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
   // the same debounce for map-view-only changes.
@@ -443,7 +475,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [allActivities, activityDetail, selectedId]);
 
   const { lightboxPhotos, lightboxOpen, lightboxIndex, handlePhotoClick, handleLightboxClose, handlePhotoMarkerClick } = useLightbox(activityDetail, selectedId);
-  const { plannerHudHeight, setPlannerHudHeight, plannerHudDragging, handlePlannerHudTouchStart, handlePlannerHudTouchMove, handlePlannerHudTouchEnd } = usePlannerHud();
+  const { plannerHudHeight, setPlannerHudHeight, plannerHudDragging, handlePlannerHudTouchStart, handlePlannerHudTouchMove, handlePlannerHudTouchEnd, guardTap } = usePlannerHud();
   const {
     photoPopup, setPhotoPopup,
     clusterPhotosPopup, setClusterPhotosPopup,
@@ -482,14 +514,16 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       .catch(() => { /* silently ignore */ });
   }, [isPremium, layerState.showPhotos]);
 
-  // Reflect panel mode in URL bar (no navigation, just history state)
+  // Reflect panel mode in URL bar (no navigation, just history state). Premium planner
+  // routes carry their short route id (?route=<id>) so the URL is shareable/reloadable;
+  // free users always get a bare /planner — they have no saved-route id to carry.
   useEffect(() => {
     let path = '/';
     if (mode === 'detail' && selectedId) path = `/?activity=${selectedId}`;
-    else if (mode === 'planner') path = '/planner';
+    else if (mode === 'planner') path = isPremium && routeMeta.id ? `/planner?route=${routeMeta.id}` : '/planner';
     else if (mode === 'about') path = '/about';
     window.history.replaceState(null, '', path);
-  }, [mode, selectedId]);
+  }, [mode, selectedId, isPremium, routeMeta.id]);
 
   // Auto-save route locally — free tier only; premium autosave is the effect above.
   // Only runs when map is ready to avoid persisting [0,0] center.
@@ -681,7 +715,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleMobileExportGpx = useCallback(() => {
     if (waypoints.length === 0) return;
-    downloadGpx(waypoints, segments);
+    downloadGpx(waypoints, segments, routeExportName(routeMetaRef.current));
   }, [waypoints, segments]);
 
   const handleMobileGpxImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -700,11 +734,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       if (viaPoints.length >= 1) {
         dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
         handleFitToRoute(viaPoints);
+        handleRouteReplaced();
       }
     };
     reader.readAsText(file);
     e.target.value = '';
-  }, [waypoints.length, dispatch, handleFitToRoute]);
+  }, [waypoints.length, dispatch, handleFitToRoute, handleRouteReplaced]);
 
   const handleExportImage = useCallback(async () => {
     const map = mapInstanceRef.current;
@@ -820,6 +855,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   dispatch={dispatch}
                   onFitToRoute={() => handleFitToRoute(waypoints)}
                   onExportImage={handleExportImage}
+                  onExportGpx={handleMobileExportGpx}
                   isExportingImage={isExportingImage}
                   onEditWaypoint={handleEditWaypoint}
                   onElevationHover={handleElevationHover}
@@ -906,6 +942,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onReverse={() => dispatch({ type: 'REVERSE' })}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
+            onImported={handleRouteReplaced}
           />
         )}
       </div>
@@ -1005,7 +1042,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       {/* Planner HUD — always mounted, crossfades in when entering planner */}
       {(() => {
         const distKm = (distance / 1000).toFixed(1);
-        const { label: routeLabel, isPlaceholder: routeLabelIsPlaceholder } = displayRouteLabel({ name: routeMeta.name, location: routeMeta.location });
+        const { label: routeLabel, kind: routeLabelKind } = displayRouteLabel({ name: routeMeta.name, location: routeMeta.location });
         const usingLocationAsName = routeMeta.name === UNTITLED_ROUTE_NAME && !!routeMeta.location;
         return (
           <div style={{
@@ -1023,75 +1060,81 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             transform: mode === 'planner' ? 'translateY(0)' : 'translateY(100%)',
             transition: plannerHudDragging ? 'none' : 'height 0.3s ease, opacity 0.28s ease, transform 0.28s ease',
           }}>
-                {isPremium && (
-                  <>
-                    <style>{`@keyframes skeleton-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .15; } }`}</style>
-                    {routeHydrated ? (
-                      <div
-                        onClick={() => setMobileRoutesSheetOpen(true)}
-                        style={{
-                          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '10px 16px 0', cursor: 'pointer',
-                        }}
-                      >
-                        <span style={{
-                          font: '600 11px/1.3 var(--mono)', color: routeLabelIsPlaceholder ? 'var(--fog-dim)' : 'var(--ice)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {routeLabel}
-                        </span>
-                        {!usingLocationAsName && (routeMeta.location || isLocating) && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-                            {routeMeta.location && <MapPin size={9} style={{ flexShrink: 0 }} />}
-                            {routeMeta.location ?? 'Locating…'}
-                          </span>
-                        )}
-                        <div style={{ flex: 1 }} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, font: '500 8px/1 var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--fog-dim)', flexShrink: 0 }}>
-                          <div style={{
-                            width: 5, height: 5, borderRadius: '50%',
-                            background: saveStatus === 'saving' ? 'var(--fog-dim)' : 'var(--grn)',
-                            boxShadow: saveStatus === 'saving' ? 'none' : '0 0 4px var(--grn)',
-                          }} />
-                          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
-                        </div>
-                        <ChevronRight size={13} style={{ color: 'var(--fog-dim)', flexShrink: 0 }} />
-                      </div>
-                    ) : (
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '10px 16px 0' }}>
-                        <div style={{ width: 110, height: 11, borderRadius: 2, background: 'var(--p3)', animation: 'skeleton-pulse 1.4s ease-in-out infinite' }} />
-                      </div>
-                    )}
-                  </>
-                )}
-                {/* Drag zone — handle bar + stats row, large touch target */}
+                {/* Draggable zone — route identity + handle bar + stats, so swiping anywhere
+                    across the route's attributes resizes the sheet. Taps still open the
+                    routes sheet / toggle height, guarded so a drag-release doesn't also
+                    register as a tap (see usePlannerHud's guardTap). */}
                 <div
                   onTouchStart={handlePlannerHudTouchStart}
                   onTouchMove={handlePlannerHudTouchMove}
                   onTouchEnd={handlePlannerHudTouchEnd}
-                  onClick={() => setPlannerHudHeight(h => h > PLANNER_HUD_COLLAPSED + 5 ? PLANNER_HUD_COLLAPSED : PLANNER_HUD_EXPANDED)}
                   style={{ flexShrink: 0, userSelect: 'none', cursor: 'grab' }}
                 >
-                  <div style={{ padding: '10px 0 6px' }}>
-                    <div style={{ width: 48, height: 6, background: 'var(--p3)', borderRadius: 3, margin: '0 auto' }} />
-                  </div>
-                  {/* Stats inside drag zone so swiping on them also works */}
-                  <div style={{ display: 'flex', padding: '0 20px 14px' }}>
-                    {[
-                      { val: distKm, lbl: 'km' },
-                      { val: elevGain > 0 ? String(elevGain) : '—', lbl: 'm elev' },
-                      { val: String(waypoints.length), lbl: 'waypts' },
-                    ].map((s, i, arr) => (
-                      <div key={s.lbl} style={{
-                        flex: 1, display: 'flex', flexDirection: 'column', gap: 3,
-                        borderRight: i < arr.length - 1 ? '1px solid var(--fog-ghost)' : 'none',
-                        paddingRight: i < arr.length - 1 ? 16 : 0,
-                        paddingLeft: i > 0 ? 16 : 0,
-                      }}>
-                        <div style={{ font: '700 18px/1 var(--mono)', color: 'var(--ora)' }}>{s.val}</div>
-                        <div style={{ font: '400 8px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fog-dim)' }}>{s.lbl}</div>
-                      </div>
-                    ))}
+                  {isPremium && (
+                    <>
+                      <style>{`@keyframes skeleton-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .15; } }`}</style>
+                      {routeHydrated ? (
+                        <div
+                          onClick={guardTap(() => setMobileRoutesSheetOpen(true))}
+                          style={{
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '10px 16px 0', cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{
+                            font: '600 11px/1.3 var(--mono)', ...routeLabelStyle(routeLabelKind),
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {routeLabel}
+                          </span>
+                          {!usingLocationAsName && (routeMeta.location || isLocating) && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 3, font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                              {routeMeta.location && <MapPin size={9} style={{ flexShrink: 0 }} />}
+                              {routeMeta.location ?? 'Locating…'}
+                            </span>
+                          )}
+                          <div style={{ flex: 1 }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, font: '500 8px/1 var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--fog-dim)', flexShrink: 0 }}>
+                            <div style={{
+                              width: 5, height: 5, borderRadius: '50%',
+                              background: saveStatus === 'saving' ? 'var(--fog-dim)' : 'var(--grn)',
+                              boxShadow: saveStatus === 'saving' ? 'none' : '0 0 4px var(--grn)',
+                            }} />
+                            {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+                          </div>
+                          <ChevronRight size={13} style={{ color: 'var(--fog-dim)', flexShrink: 0 }} />
+                        </div>
+                      ) : (
+                        <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', padding: '10px 16px 0' }}>
+                          <div style={{ width: 110, height: 11, borderRadius: 2, background: 'var(--p3)', animation: 'skeleton-pulse 1.4s ease-in-out infinite' }} />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div
+                    onClick={guardTap(() => setPlannerHudHeight(h => h > PLANNER_HUD_COLLAPSED + 5 ? PLANNER_HUD_COLLAPSED : PLANNER_HUD_EXPANDED))}
+                  >
+                    <div style={{ padding: '12px 0 8px' }}>
+                      <div style={{ width: 56, height: 6, background: 'var(--p3)', borderRadius: 3, margin: '0 auto' }} />
+                    </div>
+                    {/* Stats inside drag zone so swiping on them also works */}
+                    <div style={{ display: 'flex', padding: '0 20px 14px' }}>
+                      {[
+                        { val: distKm, lbl: 'km' },
+                        { val: elevGain > 0 ? String(elevGain) : '—', lbl: 'm elev' },
+                        { val: String(waypoints.length), lbl: 'waypts' },
+                      ].map((s, i, arr) => (
+                        <div key={s.lbl} style={{
+                          flex: 1, display: 'flex', flexDirection: 'column', gap: 3,
+                          borderRight: i < arr.length - 1 ? '1px solid var(--fog-ghost)' : 'none',
+                          paddingRight: i < arr.length - 1 ? 16 : 0,
+                          paddingLeft: i > 0 ? 16 : 0,
+                        }}>
+                          <div style={{ font: '700 18px/1 var(--mono)', color: 'var(--ora)' }}>{s.val}</div>
+                          <div style={{ font: '400 8px/1 var(--mono)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fog-dim)' }}>{s.lbl}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>{/* end drag zone */}
                 <div style={{ position: 'relative', padding: '0 16px 10px' }}>
@@ -1146,6 +1189,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           waypoints={waypoints}
           onFitToRoute={handleFitToRoute}
           fileInputRef={mobileFileInputRef}
+          onImported={handleRouteReplaced}
         />,
         document.body,
       )}

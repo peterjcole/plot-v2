@@ -28,6 +28,9 @@ interface PlannerToolbarProps {
   onBack?: () => void;
   onToggleLayers?: () => void;
   onExportGpx?: () => void;
+  // Called after an import (GPX file or Strava URL) replaces the route, so the caller can
+  // re-run reverse geocoding against the new start point.
+  onImported?: () => void;
 }
 
 function fmtDist(m: number): string {
@@ -90,6 +93,7 @@ export default function PlannerToolbar({
   onBack,
   onToggleLayers,
   onExportGpx,
+  onImported,
 }: PlannerToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importAnchor, setImportAnchor] = useState<DOMRect | null>(null);
@@ -134,11 +138,12 @@ export default function PlannerToolbar({
       if (viaPoints.length >= 1) {
         dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
         onFitToRoute?.(viaPoints);
+        onImported?.();
       }
     };
     reader.readAsText(file);
     e.target.value = '';
-  }, [waypoints.length, dispatch, onFitToRoute]);
+  }, [waypoints.length, dispatch, onFitToRoute, onImported]);
 
   const hasRoute = waypoints.length >= 2;
 
@@ -236,6 +241,7 @@ export default function PlannerToolbar({
           waypoints={waypoints}
           onFitToRoute={onFitToRoute}
           fileInputRef={fileInputRef}
+          onImported={onImported}
         />,
         document.body,
       )}

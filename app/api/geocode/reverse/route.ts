@@ -5,6 +5,9 @@ import { hasPremium } from '@/lib/entitlements';
 interface PhotonFeature {
   properties: {
     name?: string;
+    city?: string;
+    district?: string;
+    locality?: string;
     county?: string;
     state?: string;
     country?: string;
@@ -43,7 +46,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ location: null });
     }
 
-    const place = feature.properties.name;
+    // Photon returns the single nearest feature, which for a trailhead/street/POI is far
+    // more specific than useful. Prefer the enclosing settlement (village/town/city) it
+    // reports over the raw feature name, so labels read "Ambleside" rather than "Stock
+    // Ghyll Lane" or a crag name.
+    const place = feature.properties.city || feature.properties.district || feature.properties.locality || feature.properties.name;
     const region = feature.properties.county || feature.properties.state || feature.properties.country;
     const location = [place, region].filter(Boolean).join(' · ') || null;
 
