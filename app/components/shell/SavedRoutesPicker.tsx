@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { ChevronDown, MapPin, Plus, Pencil, Route as RouteIcon } from 'lucide-react';
-import { displayRouteLabel, UNTITLED_ROUTE_NAME, type RouteSummary } from '@/lib/saved-routes';
+import { displayRouteLabel, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary } from '@/lib/saved-routes';
 import RouteListRows from './RouteListRows';
 
 interface SavedRoutesPickerProps {
@@ -32,13 +32,16 @@ export default function SavedRoutesPicker({
   // (called from onBlur) against treating that as a save.
   const renameCancelledRef = useRef(false);
 
-  const { label, isPlaceholder } = displayRouteLabel({ name: routeName, location: routeLocation });
+  const { label, kind: labelKind } = displayRouteLabel({ name: routeName, location: routeLocation });
+  const isPlaceholder = labelKind === 'placeholder';
   // When the header is already showing the location in place of a name, the subline
   // below shouldn't repeat it.
   const usingLocationAsName = routeName === UNTITLED_ROUTE_NAME && !!routeLocation;
 
   function startRename() {
-    setNameValue(routeName);
+    // Untitled routes have the literal placeholder text as their `name` — pre-clear
+    // rather than making the user delete it first.
+    setNameValue(routeName === UNTITLED_ROUTE_NAME ? '' : routeName);
     setRenaming(true);
     setOpen(false);
   }
@@ -103,13 +106,15 @@ export default function SavedRoutesPicker({
             onBlur={commitRename}
             style={{
               flex: 1, minWidth: 0, background: 'transparent', border: 'none', borderBottom: '1px solid var(--ora)',
-              outline: 'none', font: '600 11px/1.3 var(--mono)', color: 'var(--ice)', padding: '0 0 3px',
+              // font-size 16px avoids iOS Safari zooming the viewport on focus (see globals.css
+              // for the project-wide default this mirrors).
+              outline: 'none', font: '600 16px/1.3 var(--mono)', color: 'var(--ice)', padding: '0 0 3px',
             }}
           />
         ) : (
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => { e.stopPropagation(); startRename(); }}>
             <span style={{
-              font: '600 11px/1.3 var(--mono)', color: isPlaceholder ? 'var(--fog-dim)' : 'var(--ice)',
+              font: '600 11px/1.3 var(--mono)', ...routeLabelStyle(labelKind),
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {label}
@@ -117,12 +122,13 @@ export default function SavedRoutesPicker({
             <Pencil size={10} style={{ color: 'var(--fog-dim)', flexShrink: 0, opacity: 0.7 }} />
           </div>
         )}
-        {!renaming && (
-          <ChevronDown
-            size={14}
-            style={{ color: open ? 'var(--ora)' : 'var(--fog-dim)', flexShrink: 0, transition: 'transform .15s', transform: open ? 'rotate(180deg)' : 'none' }}
-          />
-        )}
+        {/* Rendered even while renaming (purely decorative — the outer row's onClick
+            already ignores clicks during renaming) so entering/exiting rename mode
+            doesn't yank the row's width around. */}
+        <ChevronDown
+          size={14}
+          style={{ color: open ? 'var(--ora)' : 'var(--fog-dim)', flexShrink: 0, transition: 'transform .15s', transform: open ? 'rotate(180deg)' : 'none', visibility: renaming ? 'hidden' : 'visible' }}
+        />
 
         {open && (
           <>
@@ -162,30 +168,31 @@ export default function SavedRoutesPicker({
         )}
       </div>
 
-      {!renaming && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '0 14px 8px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 4, font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)',
-            letterSpacing: '.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-          }}>
-            {!usingLocationAsName && (
-              <>
-                {routeLocation && <MapPin size={10} style={{ flexShrink: 0 }} />}
-                {routeLocation ?? (isLocating ? 'Locating…' : '')}
-              </>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, font: '500 8px/1 var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--fog-dim)', flexShrink: 0 }}>
-            <div style={{
-              width: 5, height: 5, borderRadius: '50%',
-              background: saveStatus === 'saving' ? 'var(--fog-dim)' : 'var(--grn)',
-              boxShadow: saveStatus === 'saving' ? 'none' : '0 0 4px var(--grn)',
-              animation: saveStatus === 'saving' ? 'pulse-dot 1s ease-in-out infinite' : 'none',
-            }} />
-            {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
-          </div>
+      {/* Rendered even while renaming — hiding this row entirely used to collapse the
+          header to a single oversized line and pop back once renaming ended, a jarring
+          layout shift. Keeping it in flow (just visually hidden) holds the height steady. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '0 14px 8px', visibility: renaming ? 'hidden' : 'visible' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4, font: '400 9px/1 var(--mono)', color: 'var(--fog-dim)',
+          letterSpacing: '.04em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+        }}>
+          {!usingLocationAsName && (
+            <>
+              {routeLocation && <MapPin size={10} style={{ flexShrink: 0 }} />}
+              {routeLocation ?? (isLocating ? 'Locating…' : '')}
+            </>
+          )}
         </div>
-      )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, font: '500 8px/1 var(--mono)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--fog-dim)', flexShrink: 0 }}>
+          <div style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: saveStatus === 'saving' ? 'var(--fog-dim)' : 'var(--grn)',
+            boxShadow: saveStatus === 'saving' ? 'none' : '0 0 4px var(--grn)',
+            animation: saveStatus === 'saving' ? 'pulse-dot 1s ease-in-out infinite' : 'none',
+          }} />
+          {saveStatus === 'saving' ? 'Saving…' : 'Saved'}
+        </div>
+      </div>
     </div>
   );
 }

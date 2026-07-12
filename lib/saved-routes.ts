@@ -24,13 +24,37 @@ export const UNTITLED_ROUTE_NAME = 'Untitled route';
 /**
  * What to actually display in place of a route's name: the real name if the user set
  * one, else its geocoded location (more useful than a bare "Untitled route" when you
- * have several), else the literal placeholder as a last resort. `isPlaceholder` tells
- * callers whether they're showing the literal placeholder (dim it) vs real info.
+ * have several), else the literal placeholder as a last resort. `kind` tells callers
+ * which of those three it is, so they can style geocoded/placeholder labels as
+ * visually distinct from a real custom name.
  */
-export function displayRouteLabel(route: { name: string; location: string | null }): { label: string; isPlaceholder: boolean } {
-  if (route.name !== UNTITLED_ROUTE_NAME) return { label: route.name, isPlaceholder: false };
-  if (route.location) return { label: route.location, isPlaceholder: false };
-  return { label: UNTITLED_ROUTE_NAME, isPlaceholder: true };
+export function displayRouteLabel(route: { name: string; location: string | null }): { label: string; kind: 'custom' | 'geocoded' | 'placeholder' } {
+  if (route.name !== UNTITLED_ROUTE_NAME) return { label: route.name, kind: 'custom' };
+  if (route.location) return { label: route.location, kind: 'geocoded' };
+  return { label: UNTITLED_ROUTE_NAME, kind: 'placeholder' };
+}
+
+/**
+ * Text styling for a route label by `displayRouteLabel` kind — custom names are full
+ * brightness, geocoded (auto-derived) names are dimmer + italic so they read as "not
+ * something you typed", and the bare placeholder is dimmest of all.
+ */
+export function routeLabelStyle(kind: 'custom' | 'geocoded' | 'placeholder'): { color: string; fontStyle: 'italic' | 'normal' } {
+  if (kind === 'custom') return { color: 'var(--ice)', fontStyle: 'normal' };
+  if (kind === 'geocoded') return { color: 'var(--fog)', fontStyle: 'italic' };
+  return { color: 'var(--fog-dim)', fontStyle: 'normal' };
+}
+
+/**
+ * Filesystem-safe slug for a GPX export filename, e.g. "Lake District Loop" → "lake-district-loop.gpx".
+ * Falls back to "route" when there's no real name/location to derive one from (free tier,
+ * or a still-untitled route with no geocoded location yet).
+ */
+export function routeExportName(route: { name: string; location: string | null }): string {
+  const { label, kind } = displayRouteLabel(route);
+  if (kind === 'placeholder') return 'route';
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'route';
 }
 
 export interface RouteUpdatePatch {

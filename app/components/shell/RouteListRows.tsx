@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreVertical, Check, Route as RouteIcon } from 'lucide-react';
-import { displayRouteLabel, type RouteSummary } from '@/lib/saved-routes';
+import { displayRouteLabel, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary } from '@/lib/saved-routes';
 import DeleteRouteConfirm from './DeleteRouteConfirm';
 
 interface RouteListRowsProps {
@@ -90,7 +90,8 @@ export default function RouteListRows({ routes, activeRouteId, onSelect, onRenam
       `}</style>
       {routes.map((route) => {
         const isCurrent = route.id === activeRouteId;
-        const { label, isPlaceholder } = displayRouteLabel(route);
+        const { label, kind: labelKind } = displayRouteLabel(route);
+        const isPlaceholder = labelKind === 'placeholder';
         const isRenaming = renamingId === route.id;
         return (
           <div
@@ -126,39 +127,41 @@ export default function RouteListRows({ routes, activeRouteId, onSelect, onRenam
                   onBlur={() => commitRename(route.id)}
                   style={{
                     width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--ora)',
-                    outline: 'none', font: '600 10px/1.3 var(--mono)', color: 'var(--ice)', padding: '0 0 2px',
+                    // font-size 16px avoids iOS Safari zooming the viewport on focus.
+                    outline: 'none', font: '600 16px/1.3 var(--mono)', color: 'var(--ice)', padding: '0 0 2px',
                   }}
                 />
               ) : (
-                <>
-                  <div style={{
-                    font: '600 10px/1.3 var(--mono)', color: isPlaceholder ? 'var(--fog-dim)' : 'var(--ice)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {label}
-                  </div>
-                  <div style={{ font: '400 8px/1 var(--mono)', color: 'var(--fog-dim)', marginTop: 3 }}>
-                    {fmtDist(route.distanceM)} · {relativeTime(route.updatedAt)}
-                  </div>
-                </>
+                <div style={{
+                  font: '600 10px/1.3 var(--mono)', ...routeLabelStyle(labelKind),
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {label}
+                </div>
               )}
+              {/* Kept in flow (not unmounted) while renaming — swapping the label alone
+                  for an input, rather than this whole two-line block, keeps the row's
+                  height steady instead of jumping when rename mode toggles. */}
+              <div style={{ font: '400 8px/1 var(--mono)', color: 'var(--fog-dim)', marginTop: 3, visibility: isRenaming ? 'hidden' : 'visible' }}>
+                {fmtDist(route.distanceM)} · {relativeTime(route.updatedAt)}
+              </div>
             </div>
-            {!isRenaming && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const anchor = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                  setMenuFor(menuFor?.id === route.id ? null : { id: route.id, anchor });
-                }}
-                aria-label="Route options"
-                style={{
-                  width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--fog-dim)', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0,
-                }}
-              >
-                <MoreVertical size={13} />
-              </button>
-            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const anchor = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                setMenuFor(menuFor?.id === route.id ? null : { id: route.id, anchor });
+              }}
+              disabled={isRenaming}
+              aria-label="Route options"
+              style={{
+                width: 22, height: 22, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--fog-dim)', background: 'transparent', border: 'none', cursor: isRenaming ? 'default' : 'pointer', flexShrink: 0,
+                visibility: isRenaming ? 'hidden' : 'visible',
+              }}
+            >
+              <MoreVertical size={13} />
+            </button>
           </div>
         );
       })}
@@ -177,7 +180,13 @@ export default function RouteListRows({ routes, activeRouteId, onSelect, onRenam
                 }}
               >
                 <div
-                  onClick={() => { setRenamingId(menuFor.id); setRenameValue(menuRoute.name); setMenuFor(null); }}
+                  onClick={() => {
+                    setRenamingId(menuFor.id);
+                    // Untitled routes have the literal placeholder text as their `name` —
+                    // pre-clear rather than making the user delete it first.
+                    setRenameValue(menuRoute.name === UNTITLED_ROUTE_NAME ? '' : menuRoute.name);
+                    setMenuFor(null);
+                  }}
                   style={{ padding: '7px 8px', borderRadius: 3, font: '500 9.5px/1 var(--mono)', color: 'var(--fog)', cursor: 'pointer' }}
                 >
                   Rename

@@ -13,6 +13,9 @@ interface ImportRoutePopoverProps {
   waypoints: Waypoint[];
   onFitToRoute?: (waypoints: Waypoint[]) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  // Called after a Strava-URL import replaces the route, so the caller can re-run
+  // reverse geocoding against the new start point (mirrors GPX file import).
+  onImported?: () => void;
 }
 
 type Step = 'chooser' | 'strava-url';
@@ -36,6 +39,7 @@ export default function ImportRoutePopover({
   waypoints,
   onFitToRoute,
   fileInputRef,
+  onImported,
 }: ImportRoutePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
@@ -154,6 +158,7 @@ export default function ImportRoutePopover({
       if (viaPoints.length >= 1) {
         dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments as RouteSegment[] });
         onFitToRoute?.(viaPoints);
+        onImported?.();
         onClose();
       }
     } catch {
@@ -161,7 +166,7 @@ export default function ImportRoutePopover({
     } finally {
       setLoading(false);
     }
-  }, [urlInput, waypoints, dispatch, onFitToRoute, onClose]);
+  }, [urlInput, waypoints, dispatch, onFitToRoute, onImported, onClose]);
 
   const handleUrlKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !loading) handleStravaImport();

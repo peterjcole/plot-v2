@@ -111,6 +111,14 @@ body {
   font-family: var(--mono);
 }
 
+/* iOS Safari zooms the viewport on focus when an input's font-size is below 16px.
+   Default every input to 16px so this can't regress as new inputs get added; components
+   that need visually smaller-looking type should scale via padding/line-height instead,
+   or override deliberately with a comment explaining why zoom is acceptable there. */
+input, textarea, select {
+  font-size: 16px;
+}
+
 /* Hide scrollbars while preserving scroll functionality */
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 

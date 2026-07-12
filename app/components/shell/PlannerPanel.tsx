@@ -16,6 +16,7 @@ interface PlannerPanelProps {
   dispatch: React.Dispatch<RouteAction>;
   onFitToRoute?: () => void;
   onExportImage?: () => void;
+  onExportGpx?: () => void;
   isExportingImage?: boolean;
   onEditWaypoint?: (index: number) => void;
   onElevationHover?: (point: ElevationHoverPoint | null) => void;
@@ -48,11 +49,12 @@ function StatCell({ label, value }: { label: string; value: string }) {
 }
 
 
-export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, isExportingImage = false, onEditWaypoint, onElevationHover }: PlannerPanelProps) {
+export default function PlannerPanel({ distance, elevGain, waypoints, segments, elevationData, isLoadingElevation, dispatch, onFitToRoute, onExportImage, onExportGpx, isExportingImage = false, onEditWaypoint, onElevationHover }: PlannerPanelProps) {
   const hasRoute = waypoints.length >= 2;
 
   function handleExportGpx() {
     if (waypoints.length < 2) return;
+    if (onExportGpx) { onExportGpx(); return; }
     downloadGpx(waypoints, segments, 'route');
   }
 
