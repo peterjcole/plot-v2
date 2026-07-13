@@ -89,7 +89,7 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildTrackPoints(
+export function buildTrackPoints(
   waypoints: Waypoint[],
   segments?: RouteSegment[]
 ): Waypoint[] {
