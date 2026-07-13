@@ -135,6 +135,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const mapInstanceRef = useRef<Map | null>(null);
+  // Set right before a programmatic setCenter/setZoom/fit (applying a route's own saved or
+  // fitted view) so the moveend handler below can tell that apart from a genuine user pan —
+  // otherwise re-viewing a route re-triggers its own autosave for no reason, and worse, can
+  // write whatever the map happens to be showing 1800ms later into the wrong route's row if
+  // the user has switched again by then.
+  const applyingProgrammaticViewRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const waypointsRef = useRef(waypoints);
   const segmentsRef = useRef(segments);
@@ -214,10 +220,25 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         mapCenter: center,
         mapZoom: zoom,
       }).then((summary) => {
-        if (summary) setSaveStatus('saved');
+        if (summary) { setSaveStatus('saved'); return; }
+        // PUT failed (most likely a 404 — the route was deleted in another tab). Confirm
+        // it's really gone rather than a transient blip, and if so, recreate it under a new
+        // id so the work in progress isn't lost. If the user has since switched routes,
+        // leave saveStatus alone — it belongs to whatever route is active now.
+        if (routeMetaRef.current.id !== id) return;
+        getRoute(id).then((stillThere) => {
+          if (stillThere || routeMetaRef.current.id !== id) return;
+          createRoute(routeMetaRef.current.name).then((created) => {
+            if (!created || routeMetaRef.current.id !== id) return;
+            geocodedRouteIdRef.current = null;
+            setRouteMeta((m) => (m.id === id ? { ...m, id: created.id } : m));
+            setActiveRouteId(created.id);
+            refreshRoutesList();
+          });
+        });
       });
     }, 1800);
-  }, [isPremium]);
+  }, [isPremium, refreshRoutesList]);
 
   // Hydrate the active route on mount — premium fetches from the backend, free reads
   // localStorage (unchanged mechanism, just the new action-log shape). routeHydrated
@@ -257,6 +278,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         return;
       }
       const detail = await getRoute(id);
+      // The user may have already started a route by hand, or opened an activity into the
+      // planner, while this fetch was in flight — don't clobber that with stale hydration.
+      if (waypointsRef.current.length > 0) {
+        hydratedRef.current = true;
+        setRouteHydrated(true);
+        return;
+      }
       if (detail) {
         applyDetail(detail);
         hydratedRef.current = true;
@@ -267,6 +295,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       // rather than leaving the planner stuck on a dead id.
       if (initialRouteId && storedId && storedId !== initialRouteId) {
         const fallback = await getRoute(storedId);
+        if (waypointsRef.current.length > 0) {
+          hydratedRef.current = true;
+          setRouteHydrated(true);
+          return;
+        }
         if (fallback) {
           applyDetail(fallback);
           hydratedRef.current = true;
@@ -286,9 +319,22 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     if (!mapReady || !premiumInitialView) return;
     const map = mapInstanceRef.current;
     if (!map) return;
+    applyingProgrammaticViewRef.current = true;
     if (isValidBNG(premiumInitialView.center)) {
       map.getView().setCenter(premiumInitialView.center);
       map.getView().setZoom(premiumInitialView.zoom);
+    } else {
+      // No real saved view yet — e.g. a route that was auto-created and never manually
+      // repositioned still has its create-time default ([0,0], zoom 7), which fails the BNG
+      // check. Fit to the route's own waypoints instead of silently leaving the map wherever
+      // it was previously pointed (which reads as "the wrong route's location").
+      const wps = waypointsRef.current;
+      if (wps.length >= 2) {
+        const coords = wps.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
+        map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 9 });
+      } else {
+        applyingProgrammaticViewRef.current = false;
+      }
     }
     setPremiumInitialView(null);
   }, [mapReady, premiumInitialView]);
@@ -342,16 +388,23 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [isPremium]);
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
-  // the same debounce for map-view-only changes.
+  // the same debounce for map-view-only changes. routeMeta.id is included so that a route
+  // whose id is (re)adopted after its content is already set — e.g. the activity-into-planner
+  // flow, or the delete-recovery path above — actually gets its content persisted; every
+  // other setRouteMeta({id}) call site pairs the id change with suppressNextAutosaveRef, so
+  // this doesn't cause a double-save there.
   useEffect(() => {
     schedulePremiumSave();
-  }, [actions, cursor, routeMeta.name, routeMeta.location, schedulePremiumSave]);
+  }, [actions, cursor, routeMeta.id, routeMeta.name, routeMeta.location, schedulePremiumSave]);
 
   const handleSelectRoute = useCallback((id: string) => {
     if (id === routeMetaRef.current.id) return;
     setRouteHydrated(false);
     getRoute(id).then((detail) => {
       if (!detail) {
+        // Row was stale — probably deleted in another tab. Drop it from the list so it
+        // doesn't sit there looking selectable but dead.
+        refreshRoutesList();
         setRouteHydrated(true);
         return;
       }
@@ -362,7 +415,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
       setRouteHydrated(true);
     });
-  }, [restore]);
+  }, [restore, refreshRoutesList]);
 
   const handleCreateNewRoute = useCallback(() => {
     createRoute('Untitled route').then((summary) => {
@@ -564,7 +617,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       const view = map.getView();
       const center = view.getCenter() as [number, number];
       const zoom = view.getZoom() ?? 7;
-      if (center) {
+      if (applyingProgrammaticViewRef.current) {
+        // This moveend was caused by us applying a route's own (already-saved, or just-fit)
+        // view on selection — not a user pan — so it's not something to save.
+        applyingProgrammaticViewRef.current = false;
+      } else if (center) {
         if (isPremium) {
           schedulePremiumSave();
         } else {
@@ -682,17 +739,50 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const handleOpenInPlanner = useCallback(() => {
     if (!activityDetail?.route?.length) { handleOpenPlanner(); return; }
-    if (waypoints.length > 0 && !window.confirm('Load this activity into the planner? This will replace your current route.')) return;
+    // Free tier has a single working route, so loading an activity genuinely replaces it —
+    // keep the confirm. Premium instead spins up a dedicated new route below, so nothing is
+    // lost and no confirm is needed.
+    if (!isPremium && waypoints.length > 0 && !window.confirm('Load this activity into the planner? This will replace your current route.')) return;
     const rawWaypoints = activityDetail.route.map(([lat, lng]) => ({ lat, lng }));
     // Create via-points every 2km with full track coordinates in each segment (same as GPX import)
     const { waypoints: viaPoints, segments: viaSegments } = selectGpxWaypoints(rawWaypoints, 2);
-    dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
+    if (isPremium) {
+      // Detach from whatever route is currently active so the pending autosave can't PUT
+      // this activity's track over it, and hold off the generic auto-create effect (it would
+      // otherwise race in and mint a plain "Untitled route" for the same first waypoint).
+      const newName = `Route from '${activityDetail.name}'`;
+      createInFlightRef.current = true;
+      geocodedRouteIdRef.current = null;
+      setActiveRouteId(null);
+      setRouteMeta({ id: null, name: newName, location: null });
+      dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
+      createRoute(newName).then((summary) => {
+        createInFlightRef.current = false;
+        if (summary) {
+          setRouteMeta({ id: summary.id, name: summary.name, location: summary.location });
+          setActiveRouteId(summary.id);
+          refreshRoutesList();
+          return;
+        }
+        // createRoute failed (network hiccup) — retry once with a generic name. Nothing else
+        // will retry this: the auto-create effect's own deps (routeMeta.id, waypoints.length)
+        // haven't changed just because this ref flipped back to false, so it won't refire.
+        createRoute(UNTITLED_ROUTE_NAME).then((fallback) => {
+          if (!fallback) return;
+          setRouteMeta({ id: fallback.id, name: fallback.name, location: fallback.location });
+          setActiveRouteId(fallback.id);
+          refreshRoutesList();
+        });
+      });
+    } else {
+      dispatch({ type: 'LOAD', waypoints: viaPoints, segments: viaSegments });
+    }
     setLoadedActivityId(String(activityDetail.id));
     setMode('planner');
     setSelectedId(null);
     setActivityDetail(null);
     handleFitToRoute(viaPoints);
-  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner, waypoints.length, setActivityDetail]);
+  }, [activityDetail, dispatch, handleFitToRoute, handleOpenPlanner, isPremium, waypoints.length, setActivityDetail, refreshRoutesList]);
 
   const handleGeolocate = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -836,6 +926,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   saveStatus={saveStatus}
                   routes={displayRoutesList}
                   activeRouteId={routeMeta.id}
+                  onOpen={refreshRoutesList}
                   onSelectRoute={handleSelectRoute}
                   onCreateRoute={handleCreateNewRoute}
                   onRenameActive={handleRenameActive}
@@ -1075,7 +1166,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                       <style>{`@keyframes skeleton-pulse { 0%, 100% { opacity: .5; } 50% { opacity: .15; } }`}</style>
                       {routeHydrated ? (
                         <div
-                          onClick={guardTap(() => setMobileRoutesSheetOpen(true))}
+                          onClick={guardTap(() => { refreshRoutesList(); setMobileRoutesSheetOpen(true); })}
                           style={{
                             flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
                             padding: '10px 16px 0', cursor: 'pointer',
