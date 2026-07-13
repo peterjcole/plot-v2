@@ -3,7 +3,11 @@ import { getMobileBackendConfig } from '@/lib/mobile-auth';
 import { replayToCursor } from '@/lib/route-actions';
 import { buildTrackPoints, generateGpx, simplifyWaypoints } from '@/lib/gpx';
 import { routeExportName, type RouteDetail } from '@/lib/saved-routes';
+import { sampleElevationsForCoords } from '@/lib/dem';
+import { elevationGain, smoothElevation } from '@/lib/elevation';
 import type { Waypoint } from '@/lib/types';
+
+const MAX_TRACK_POINTS = 1000;
 
 function boundingBox(points: Waypoint[]): [number, number, number, number] | null {
   if (points.length === 0) return null;
@@ -59,15 +63,27 @@ export async function GET(
     });
   }
 
+  // Routed segments carry no elevation (only manually-placed waypoints might) — sample the
+  // DEM ourselves, same pipeline the desktop elevation profile uses (see lib/dem.ts,
+  // lib/elevation.ts), so ascent reads consistently across web and mobile.
+  const simplified = simplifyWaypoints(trackPoints, MAX_TRACK_POINTS);
+  const elevations = await sampleElevationsForCoords(simplified);
+  const sampled = simplified.map((wp, i) => ({ ...wp, ele: elevations[i] }));
+  // Same smoothing window as the desktop elevation profile (useElevationProfile.ts),
+  // so ascent reads consistently between web and mobile.
+  const windowSize = Math.max(5, Math.round(sampled.length / 40));
+  const waypointsWithEle = smoothElevation(sampled, windowSize);
+
   return NextResponse.json({
     id: route.id,
     name: route.name,
     location: route.location,
     distanceM: route.distanceM,
+    ascentM: elevationGain(waypointsWithEle),
     waypointCount: route.waypointCount,
     createdAt: route.createdAt,
     updatedAt: route.updatedAt,
-    waypoints: simplifyWaypoints(trackPoints, 100),
+    waypoints: waypointsWithEle,
     bbox: boundingBox(trackPoints),
   });
 }

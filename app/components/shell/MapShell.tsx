@@ -23,6 +23,7 @@ import {
   displayRouteLabel, routeExportName, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary,
 } from '@/lib/saved-routes';
 import { selectGpxWaypoints, downloadGpx, parseGpx } from '@/lib/gpx';
+import { elevationGain } from '@/lib/elevation';
 import { OS_PROJECTION } from '@/lib/map-config';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
@@ -491,12 +492,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return 0;
-    let gain = 0;
-    for (let i = 1; i < elevationData.length; i++) {
-      const delta = elevationData[i].ele - elevationData[i - 1].ele;
-      if (delta > 0) gain += delta;
-    }
-    return Math.round(gain);
+    return elevationGain(elevationData);
   }, [elevationData]);
 
   const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
