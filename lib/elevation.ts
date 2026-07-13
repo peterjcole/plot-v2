@@ -21,10 +21,10 @@ export function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-export function smoothElevation(
-  points: ElevationPoint[],
+export function smoothElevation<T extends { ele: number }>(
+  points: T[],
   windowSize: number
-): ElevationPoint[] {
+): T[] {
   if (points.length < windowSize * 2) return points;
   const half = Math.floor(windowSize / 2);
   return points.map((pt, i) => {
@@ -34,6 +34,17 @@ export function smoothElevation(
     for (let j = start; j <= end; j++) sum += points[j].ele;
     return { ...pt, ele: sum / (end - start + 1) };
   });
+}
+
+/** Total ascent (meters): sum of positive elevation deltas between consecutive points. */
+export function elevationGain(points: { ele: number }[]): number {
+  if (points.length < 2) return 0;
+  let gain = 0;
+  for (let i = 1; i < points.length; i++) {
+    const delta = points[i].ele - points[i - 1].ele;
+    if (delta > 0) gain += delta;
+  }
+  return Math.round(gain);
 }
 
 export function downsampleToChartPoints(

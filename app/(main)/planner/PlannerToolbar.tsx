@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, ChevronLeft } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
+import { elevationGain } from '@/lib/elevation';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import type { ElevationPoint } from './useElevationProfile';
 import ImportRoutePopover from '@/app/components/shell/ImportRoutePopover';
@@ -100,12 +101,7 @@ export default function PlannerToolbar({
 
   const elevGain = useMemo(() => {
     if (!elevationData || elevationData.length < 2) return null;
-    let gain = 0;
-    for (let i = 1; i < elevationData.length; i++) {
-      const delta = elevationData[i].ele - elevationData[i - 1].ele;
-      if (delta > 0) gain += delta;
-    }
-    return Math.round(gain);
+    return elevationGain(elevationData);
   }, [elevationData]);
 
   const handleUndo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);

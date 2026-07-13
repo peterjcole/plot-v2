@@ -71,3 +71,36 @@ export function sampleElevation(lng: number, lat: number, z: number, tiles: Map<
     sample(x0 + 1, y0 + 1) * fx       * fy
   );
 }
+
+export const DEFAULT_TERR_Z = 13; // ≈11 m/px at UK latitudes — better than ORS SRTM ~30 m
+
+/** Bilinearly sample elevation (meters) for each coordinate, fetching (and caching) only the DEM tiles they cross. */
+export async function sampleElevationsForCoords(
+  coords: { lat: number; lng: number }[],
+  z = DEFAULT_TERR_Z,
+): Promise<number[]> {
+  const terrN = 1 << z;
+
+  // Collect the distinct set of DEM tiles the polyline crosses, including bilinear neighbours
+  const tileSet = new Set<string>();
+  for (const { lng, lat } of coords) {
+    const [px, py] = lngLatToTerrPx(lng, lat, terrN);
+    const tx = Math.floor(px / TILE_SIZE);
+    const ty = Math.floor(py / TILE_SIZE);
+    tileSet.add(`${tx},${ty}`);
+    tileSet.add(`${tx + 1},${ty}`);
+    tileSet.add(`${tx},${ty + 1}`);
+    tileSet.add(`${tx + 1},${ty + 1}`);
+  }
+
+  const tileEntries = await Promise.all(
+    [...tileSet].map(async (k) => {
+      const [x, y] = k.split(',').map(Number);
+      const data = await fetchTerrElev(z, x, y);
+      return [`${z}/${x}/${y}`, data] as [string, Float32Array | null];
+    })
+  );
+  const tiles = new Map<string, Float32Array | null>(tileEntries);
+
+  return coords.map(({ lng, lat }) => sampleElevation(lng, lat, z, tiles));
+}
