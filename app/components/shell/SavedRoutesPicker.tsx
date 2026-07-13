@@ -13,6 +13,7 @@ interface SavedRoutesPickerProps {
   saveStatus: 'idle' | 'saving' | 'saved';
   routes: RouteSummary[];
   activeRouteId: string | null;
+  onOpen?: () => void;
   onSelectRoute: (id: string) => void;
   onCreateRoute: () => void;
   onRenameActive: (name: string) => void;
@@ -22,7 +23,7 @@ interface SavedRoutesPickerProps {
 }
 
 export default function SavedRoutesPicker({
-  loading = false, routeName, routeLocation, isLocating = false, saveStatus, routes, activeRouteId,
+  loading = false, routeName, routeLocation, isLocating = false, saveStatus, routes, activeRouteId, onOpen,
   onSelectRoute, onCreateRoute, onRenameActive, onRenameRoute, onDuplicateRoute, onDeleteRoute,
 }: SavedRoutesPickerProps) {
   const [open, setOpen] = useState(false);
@@ -80,7 +81,13 @@ export default function SavedRoutesPicker({
     <div style={{ flexShrink: 0, borderBottom: '1px solid var(--fog-ghost)', position: 'relative' }}>
       <style>{`@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }`}</style>
       <div
-        onClick={() => !renaming && setOpen((v) => !v)}
+        onClick={() => {
+          if (renaming) return;
+          // Refresh on open (not close) so a delete/rename made in another tab shows up
+          // instead of a stale cached list.
+          if (!open) onOpen?.();
+          setOpen((v) => !v);
+        }}
         style={{
           height: 44, display: 'flex', alignItems: 'center', gap: 9, padding: '0 14px',
           cursor: renaming ? 'default' : 'pointer', background: open ? 'var(--p2)' : 'transparent',
