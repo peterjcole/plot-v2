@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/mobile/auth/:path*',
-        destination: 'https://plot-backend.hold-it.workers.dev/auth/:path*',
+        destination: `${process.env.TILES_BACKEND_URL}/auth/:path*`,
       },
     ];
   },
