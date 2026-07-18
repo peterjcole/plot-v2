@@ -87,3 +87,34 @@ export async function GET(
     bbox: boundingBox(trackPoints),
   });
 }
+
+// Swipe-to-delete on iOS: proxies straight to the backend's ownership-checked
+// DELETE (removes the R2 blob then the D1 row) — same shape as the web
+// client's DELETE proxy (app/api/routes/[id]/route.ts), but authenticated via
+// the mobile JWT rather than a browser session.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const backend = await getMobileBackendConfig(request);
+  if (!backend) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const res = await fetch(`${backend.url}/routes/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${backend.token}`,
+        'X-Athlete-Id': backend.athleteId,
+      },
+    });
+    if (!res.ok) {
+      return new NextResponse(null, { status: res.status });
+    }
+    return NextResponse.json(await res.json());
+  } catch {
+    return new NextResponse(null, { status: 502 });
+  }
+}
