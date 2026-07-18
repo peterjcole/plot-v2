@@ -24,7 +24,12 @@ const emptyPng = async (size: number) => {
     create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   }).png().toBuffer();
   return new NextResponse(new Uint8Array(buf), {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+    headers: {
+      'Content-Type': 'image/png',
+      // Hillshade output is deterministic (terrain never changes) — s-maxage lets
+      // Vercel's Edge Network serve repeats without re-invoking the function.
+      'Cache-Control': 'public, max-age=86400, s-maxage=31536000, stale-while-revalidate=86400, immutable',
+    },
   });
 };
 
@@ -164,7 +169,9 @@ export async function GET(req: NextRequest) {
   return new NextResponse(new Uint8Array(png), {
     headers: {
       'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=86400',
+      // Deterministic output — let Vercel's Edge Network cache it (s-maxage), not
+      // just browsers (plain max-age), so repeat tile requests skip recompute.
+      'Cache-Control': 'public, max-age=86400, s-maxage=31536000, stale-while-revalidate=86400, immutable',
     },
   });
 }
