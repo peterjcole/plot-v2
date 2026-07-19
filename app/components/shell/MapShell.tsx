@@ -184,6 +184,12 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const createInFlightRef = useRef(false);
   const suppressNextAutosaveRef = useRef(false);
   const premiumSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Serialized form of the payload last confirmed saved (or just hydrated from the server) —
+  // schedulePremiumSave diffs against this before issuing a PUT, so a trigger whose net
+  // payload hasn't actually changed (e.g. a view-only nudge right after load) doesn't write
+  // a no-op update. `null` until the first hydration/save lands, which correctly means "no
+  // baseline yet, always save" for a genuinely new route.
+  const savedSnapshotRef = useRef<string | null>(null);
 
   const refreshRoutesList = useCallback(() => {
     if (!isPremium) return;
@@ -191,6 +197,24 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [isPremium]);
 
   useEffect(() => { refreshRoutesList(); }, [refreshRoutesList]);
+
+  // Shape (and key order) must match applyDetail's snapshot below, since the dirty-check is a
+  // plain string compare.
+  const buildSavePayload = useCallback(() => {
+    const map = mapInstanceRef.current;
+    const center = (map?.getView().getCenter() as [number, number]) ?? [0, 0];
+    const zoom = map?.getView().getZoom() ?? 7;
+    return {
+      name: routeMetaRef.current.name,
+      location: routeMetaRef.current.location,
+      distanceM: distanceRef.current,
+      waypointCount: waypointsRef.current.length,
+      actions: actionsRef.current,
+      cursor: cursorRef.current,
+      mapCenter: center,
+      mapZoom: zoom,
+    };
+  }, []);
 
   // Debounced PUT — shared by the content-change effect and the moveend map handler below,
   // matching the existing dual-trigger local autosave pattern.
@@ -208,20 +232,17 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     premiumSaveTimerRef.current = setTimeout(() => {
       const id = routeMetaRef.current.id;
       if (!id) return;
-      const map = mapInstanceRef.current;
-      const center = (map?.getView().getCenter() as [number, number]) ?? [0, 0];
-      const zoom = map?.getView().getZoom() ?? 7;
-      updateRoute(id, {
-        name: routeMetaRef.current.name,
-        location: routeMetaRef.current.location,
-        distanceM: distanceRef.current,
-        waypointCount: waypointsRef.current.length,
-        actions: actionsRef.current,
-        cursor: cursorRef.current,
-        mapCenter: center,
-        mapZoom: zoom,
-      }).then((summary) => {
-        if (summary) { setSaveStatus('saved'); return; }
+      const payload = buildSavePayload();
+      const serialized = JSON.stringify(payload);
+      if (savedSnapshotRef.current === serialized) {
+        // Nothing in the actual saved shape changed since the last save/hydration — this
+        // trigger came from a view/derived-state nudge, not a real edit. Don't burn a PUT
+        // (and the downstream "route updated" signal it causes on the phone) on a no-op.
+        setSaveStatus('saved');
+        return;
+      }
+      updateRoute(id, payload).then((summary) => {
+        if (summary) { savedSnapshotRef.current = serialized; setSaveStatus('saved'); return; }
         // PUT failed (most likely a 404 — the route was deleted in another tab). Confirm
         // it's really gone rather than a transient blip, and if so, recreate it under a new
         // id so the work in progress isn't lost. If the user has since switched routes,
@@ -239,7 +260,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         });
       });
     }, 1800);
-  }, [isPremium, refreshRoutesList]);
+  }, [isPremium, refreshRoutesList, buildSavePayload]);
 
   // Hydrate the active route on mount — premium fetches from the backend, free reads
   // localStorage (unchanged mechanism, just the new action-log shape). routeHydrated
@@ -262,6 +283,19 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       setRouteMeta({ id: detail.id, name: detail.name, location: detail.location });
       setActiveRouteId(detail.id);
       setPremiumInitialView({ center: detail.mapCenter, zoom: detail.mapZoom });
+      // Baseline for schedulePremiumSave's dirty-check — same key order as buildSavePayload,
+      // since the compare is a plain string equality. Opening this route now writes nothing
+      // until something actually diverges from what the server just gave us.
+      savedSnapshotRef.current = JSON.stringify({
+        name: detail.name,
+        location: detail.location,
+        distanceM: detail.distanceM,
+        waypointCount: detail.waypointCount,
+        actions: detail.actions,
+        cursor: detail.cursor,
+        mapCenter: detail.mapCenter,
+        mapZoom: detail.mapZoom,
+      });
     };
     const finishEmpty = () => {
       setActiveRouteId(null);
@@ -373,6 +407,17 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
       .then((data: { location?: string | null } | null) => {
         if (data?.location) {
           setRouteMeta((m) => (m.id === id ? { ...m, location: data.location ?? null } : m));
+          // The geocoded location is a derived nicety, not a user edit — treat it as
+          // already "saved" so this alone doesn't trigger a PUT (and the phone-side
+          // "route updated" it would cause). It's still captured: the next genuine edit's
+          // payload carries it and persists it for real. Spreading over the existing
+          // snapshot preserves buildSavePayload's key order.
+          if (savedSnapshotRef.current) {
+            try {
+              const snap = JSON.parse(savedSnapshotRef.current);
+              savedSnapshotRef.current = JSON.stringify({ ...snap, location: data.location ?? null });
+            } catch { /* malformed snapshot — leave it; worst case one extra real save */ }
+          }
         }
       })
       .catch(() => { /* silently ignore — location is a nice-to-have, not load-bearing */ })
@@ -638,6 +683,10 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     initialPlannerFitDoneRef.current = true;
     const map = mapInstanceRef.current;
     if (!map) return;
+    // This fit is programmatic, same as the premiumInitialView effect above — without the
+    // guard its moveend reaches the handleMapReady handler unmasked and schedules a save of
+    // a view the user never actually chose, on every multi-waypoint route opened this way.
+    applyingProgrammaticViewRef.current = true;
     const coords = waypoints.map((wp) => fromLonLat([wp.lng, wp.lat], OS_PROJECTION.code));
     map.getView().fit(boundingExtent(coords), { padding: [60, 60, 60, 60], maxZoom: 9 });
   }, [mapReady, waypoints, initialMode]);
