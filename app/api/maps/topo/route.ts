@@ -77,7 +77,7 @@ async function getProviderTile(
     case 'GBR':
       if (osKey) {
         res = await fetchTile(
-          `https://api.os.uk/maps/raster/v1/zxy/Leisure_3857/${z}/${x}/${y}.png?key=${osKey}`
+          `https://api.os.uk/maps/raster/v1/zxy/Outdoor_3857/${z}/${x}/${y}.png?key=${osKey}`
         );
       }
       break;
@@ -170,11 +170,19 @@ async function getProviderTile(
 
 // ── Route handler ────────────────────────────────────────────────────────────
 
-async function fetchTileBuffer(dark: boolean, z: number, x: number, y: number): Promise<Buffer | null> {
+async function fetchTileBuffer(
+  dark: boolean,
+  z: number,
+  x: number,
+  y: number,
+  gbFill = false
+): Promise<Buffer | null> {
   const iso = getCountry(z, x, y);
 
-  // GB is covered by the OS tile layer — return transparent
-  if (iso === 'GBR') return getTransparentTile();
+  // GB is covered by the OS tile layer — return transparent. Mobile clients
+  // render a single Mercator layer with no OS-27700 layer underneath, so
+  // gb=os fills GB with OS Outdoor_3857 instead (Leisure has no 3857 variant).
+  if (iso === 'GBR' && !gbFill) return getTransparentTile();
 
   const result = await getProviderTile(iso, z, x, y);
   if (!result) return null;
@@ -192,6 +200,7 @@ export async function GET(request: NextRequest) {
   const yStr = sp.get('y');
   const zStr = sp.get('z');
   const dark = sp.get('dark') === '1';
+  const gbFill = sp.get('gb') === 'os';
 
   if (!xStr || !yStr || !zStr) {
     return NextResponse.json({ error: 'x, y, z are required' }, { status: 400 });
@@ -206,13 +215,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (sp.get('scale') === '2') {
-    const buf = await stitchRetinaTile((tz, tx, ty) => fetchTileBuffer(dark, tz, tx, ty), z, x, y);
+    const buf = await stitchRetinaTile((tz, tx, ty) => fetchTileBuffer(dark, tz, tx, ty, gbFill), z, x, y);
     return new NextResponse(new Uint8Array(buf), {
       headers: { 'Content-Type': 'image/png', 'Cache-Control': CACHE },
     });
   }
 
-  const buf = await fetchTileBuffer(dark, z, x, y);
+  const buf = await fetchTileBuffer(dark, z, x, y, gbFill);
   if (!buf) {
     const missing = !process.env.THUNDERFOREST_API_KEY ? 500 : 502;
     return new NextResponse(null, { status: missing });
