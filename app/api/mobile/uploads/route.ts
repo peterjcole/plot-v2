@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMobileBackendConfig } from '@/lib/mobile-auth';
 
-// Forwards a GPX export (multipart/form-data: file, name, external_id,
-// activity_type, description) from the phone straight through to
-// plot-backend's POST /uploads, which does the actual Strava upload —
+// Forwards a GPX export (multipart/form-data: file, external_id, sport_type,
+// description) from the phone straight through to plot-backend's POST
+// /uploads, which does the actual Strava upload —
 // mirrors app/api/mobile/routes/route.ts's proxy shape. Strava's upload is
 // asynchronous: the response here is just the upload id/status, not a
 // finished activity; the client polls GET /api/mobile/uploads/[id].
