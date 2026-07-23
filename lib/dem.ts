@@ -3,33 +3,60 @@ import sharp from 'sharp';
 const TILE_SIZE = 256;
 const CACHE_MAX = 256;
 
-const tileCache = new Map<string, Float32Array | null>();
+const tileCache = new Map<string, { elev: Float32Array | null; errored: boolean }>();
 
-/** Fetch and decode a terrarium-encoded DEM tile to a 256×256 Float32 elevation grid (metres). */
-export async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Array | null> {
+/**
+ * Fetch and decode a terrarium-encoded DEM tile to a 256×256 Float32
+ * elevation grid (metres), reporting whether a *transient* fetch problem
+ * occurred (as opposed to a legitimate 404 — off-grid/ocean tiles genuinely
+ * don't exist and aren't an error). Retries once on a transient failure so a
+ * one-off network blip doesn't silently produce a flat/zero-elevation tile —
+ * that distinction matters to callers doing write-back caching, who should
+ * skip persisting a tile that may be wrong.
+ */
+export async function fetchTerrElevChecked(z: number, x: number, y: number): Promise<{ elev: Float32Array | null; errored: boolean }> {
   const key = `${z}/${x}/${y}`;
-  if (tileCache.has(key)) return tileCache.get(key)!;
+  const cached = tileCache.get(key);
+  if (cached) return cached;
 
   let elev: Float32Array | null = null;
-  try {
-    const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`);
-    if (res.ok) {
+  let errored = false;
+  const MAX_ATTEMPTS = 2;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`);
+      if (res.status === 404) {
+        errored = false;
+        break;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const buf = Buffer.from(await res.arrayBuffer());
       const { data } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
       elev = new Float32Array(TILE_SIZE * TILE_SIZE);
       for (let i = 0; i < TILE_SIZE * TILE_SIZE; i++) {
         elev[i] = data[i * 4] * 256 + data[i * 4 + 1] + data[i * 4 + 2] / 256 - 32768;
       }
+      errored = false;
+      break;
+    } catch {
+      errored = true;
+      if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 200));
     }
-  } catch {
-    elev = null;
   }
 
+  const result = { elev, errored };
   if (tileCache.size >= CACHE_MAX) {
     tileCache.delete(tileCache.keys().next().value!);
   }
-  tileCache.set(key, elev);
-  return elev;
+  tileCache.set(key, result);
+  return result;
+}
+
+/** Fetch and decode a terrarium-encoded DEM tile to a 256×256 Float32 elevation grid (metres). */
+export async function fetchTerrElev(z: number, x: number, y: number): Promise<Float32Array | null> {
+  return (await fetchTerrElevChecked(z, x, y)).elev;
 }
 
 /** Convert WGS84 lon/lat to fractional terrarium pixel coordinates at zoom level terrN = 1 << z. */

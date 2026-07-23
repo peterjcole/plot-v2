@@ -1,16 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import sharp from 'sharp';
-import { fetchTerrElev } from '@/lib/dem';
+import { fetchTerrElevChecked } from '@/lib/dem';
+import { getCachedTile, putCachedTile, hillshadeKey, HILLSHADE_CACHE_CONTROL } from '@/lib/hillshade-cache';
 
 const SIZE = 256;
+
+function pngResponse(buf: Buffer | Uint8Array, cacheControl: string) {
+  return new NextResponse(new Uint8Array(buf), {
+    headers: { 'Content-Type': 'image/png', 'Cache-Control': cacheControl },
+  });
+}
 
 const emptyPng = async () => {
   const buf = await sharp({
     create: { width: SIZE, height: SIZE, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   }).png().toBuffer();
-  return new NextResponse(new Uint8Array(buf), {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
-  });
+  // Not deterministic terrain output (just "no data here") — short cache only.
+  return pngResponse(buf, 'public, max-age=86400');
 };
 
 export async function GET(req: NextRequest) {
@@ -23,14 +29,20 @@ export async function GET(req: NextRequest) {
   const sunAz = 315 * (Math.PI / 180);
   const sunAlt = 35 * (Math.PI / 180);
 
+  const key = hillshadeKey('hillshade3857', z, x, y, { dark });
+  const cached = await getCachedTile(key);
+  if (cached) return pngResponse(cached, HILLSHADE_CACHE_CONTROL);
+
   // Fetch main tile + 4 neighbours in parallel for seamless cross-tile gradients
-  const [elevMain, elevN, elevS, elevW, elevE] = await Promise.all([
-    fetchTerrElev(z, x, y),
-    fetchTerrElev(z, x, y - 1),  // north (row above)
-    fetchTerrElev(z, x, y + 1),  // south (row below)
-    fetchTerrElev(z, x - 1, y),  // west  (col left)
-    fetchTerrElev(z, x + 1, y),  // east  (col right)
+  const [main, north, south, west, east] = await Promise.all([
+    fetchTerrElevChecked(z, x, y),
+    fetchTerrElevChecked(z, x, y - 1),  // north (row above)
+    fetchTerrElevChecked(z, x, y + 1),  // south (row below)
+    fetchTerrElevChecked(z, x - 1, y),  // west  (col left)
+    fetchTerrElevChecked(z, x + 1, y),  // east  (col right)
   ]);
+  const elevMain = main.elev, elevN = north.elev, elevS = south.elev, elevW = west.elev, elevE = east.elev;
+  const anyErrored = main.errored || north.errored || south.errored || west.errored || east.errored;
 
   if (!elevMain) return emptyPng();
 
@@ -113,10 +125,10 @@ export async function GET(req: NextRequest) {
 
   const png = await sharp(out, { raw: { width: SIZE, height: SIZE, channels: 4 } }).png().toBuffer();
 
-  return new NextResponse(new Uint8Array(png), {
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=86400',
-    },
-  });
+  // Persist for next time — unless a DEM sub-fetch errored (as opposed to a
+  // legitimate off-grid 404), in which case this tile might be wrong; let it
+  // recompute rather than freezing a possibly-bad result into R2 forever.
+  if (!anyErrored) after(() => putCachedTile(key, png));
+
+  return pngResponse(png, HILLSHADE_CACHE_CONTROL);
 }

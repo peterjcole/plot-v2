@@ -17,6 +17,7 @@
     "@turf/boolean-point-in-polygon": "^7.3.4",
     "@turf/helpers": "^7.3.4",
     "@vercel/analytics": "^1.6.1",
+    "aws4fetch": "^1.0.20",
     "iron-session": "^8.0.4",
     "jose": "^6.2.3",
     "leaflet": "^1.9.4",

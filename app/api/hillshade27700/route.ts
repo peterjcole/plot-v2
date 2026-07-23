@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import sharp from 'sharp';
 import proj4 from 'proj4';
 import { OS_PROJECTION } from '@/lib/map-config';
-import { fetchTerrElev, lngLatToTerrPx } from '@/lib/dem';
+import { fetchTerrElevChecked, lngLatToTerrPx } from '@/lib/dem';
+import { getCachedTile, putCachedTile, hillshadeKey, HILLSHADE_CACHE_CONTROL } from '@/lib/hillshade-cache';
 
 // Register projections once
 proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
@@ -19,18 +20,22 @@ const Lx = Math.sin(SUN_AZ) * Math.cos(SUN_ALT);
 const Ly = Math.cos(SUN_AZ) * Math.cos(SUN_ALT);
 const Lz = Math.sin(SUN_ALT);
 
+function pngResponse(buf: Buffer | Uint8Array) {
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      'Content-Type': 'image/png',
+      // Deterministic output — let Vercel's Edge Network cache it (s-maxage), not
+      // just browsers (plain max-age), so repeat tile requests skip recompute.
+      'Cache-Control': HILLSHADE_CACHE_CONTROL,
+    },
+  });
+}
+
 const emptyPng = async (size: number) => {
   const buf = await sharp({
     create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   }).png().toBuffer();
-  return new NextResponse(new Uint8Array(buf), {
-    headers: {
-      'Content-Type': 'image/png',
-      // Hillshade output is deterministic (terrain never changes) — s-maxage lets
-      // Vercel's Edge Network serve repeats without re-invoking the function.
-      'Cache-Control': 'public, max-age=86400, s-maxage=31536000, stale-while-revalidate=86400, immutable',
-    },
-  });
+  return pngResponse(buf);
 };
 
 export async function GET(req: NextRequest) {
@@ -43,6 +48,10 @@ export async function GET(req: NextRequest) {
   const OUT = searchParams.get('scale') === '2' ? 512 : 256;
 
   if (z < 0 || z > 9) return emptyPng(OUT);
+
+  const key = hillshadeKey('hillshade27700', z, x, y, { dark, scale2: OUT === 512 });
+  const cached = await getCachedTile(key);
+  if (cached) return pngResponse(cached);
 
   // Scale terrarium zoom to match BNG resolution — avoids blocky DEM at high OS zoom levels.
   // OS z=8 (3.5 m/px) and z=9 (1.75 m/px) need finer DEM than the z=12 default (≈22 m/px at 55°N).
@@ -79,11 +88,15 @@ export async function GET(req: NextRequest) {
 
   // 4. Fetch all needed terrarium tiles in parallel
   const tileMap = new Map<string, Float32Array | null>();
+  let anyErrored = false;
   const fetchPromises: Promise<void>[] = [];
   for (let ty = tyMin; ty <= tyMax; ty++) {
     for (let tx = txMin; tx <= txMax; tx++) {
       fetchPromises.push(
-        fetchTerrElev(terrZ, tx, ty).then(e => { tileMap.set(`${tx},${ty}`, e); })
+        fetchTerrElevChecked(terrZ, tx, ty).then(({ elev, errored }) => {
+          tileMap.set(`${tx},${ty}`, elev);
+          if (errored) anyErrored = true;
+        })
       );
     }
   }
@@ -166,12 +179,11 @@ export async function GET(req: NextRequest) {
 
   // 7. Return RGBA PNG
   const png = await sharp(out, { raw: { width: OUT, height: OUT, channels: 4 } }).png().toBuffer();
-  return new NextResponse(new Uint8Array(png), {
-    headers: {
-      'Content-Type': 'image/png',
-      // Deterministic output — let Vercel's Edge Network cache it (s-maxage), not
-      // just browsers (plain max-age), so repeat tile requests skip recompute.
-      'Cache-Control': 'public, max-age=86400, s-maxage=31536000, stale-while-revalidate=86400, immutable',
-    },
-  });
+
+  // Persist for next time — unless a DEM sub-fetch errored (as opposed to a
+  // legitimate 404), in which case this tile might be wrong; let it recompute
+  // rather than freezing a possibly-bad result into R2 forever.
+  if (!anyErrored) after(() => putCachedTile(key, png));
+
+  return pngResponse(png);
 }
