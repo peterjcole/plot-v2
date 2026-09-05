@@ -136,8 +136,8 @@ redeploying:
 | `minDistance` | `10000` | Minimum activity distance (metres) to qualify as "the long run". |
 | `levels` | `4` | `2` renders the 1-bit Floyd–Steinberg fallback instead — noisier, but usable if you leave the device on 1-bit. |
 | `hillshade` | `0` | `1` adds shaded relief. Off by default — Landranger contours already carry most of the terrain read, and shading eats into the four grey levels' headroom. |
-| `lw` | `14` | Total route line footprint in px. The route is drawn hollow (see below) so this is outer-edge to outer-edge, not a fill width. |
-| `casing` | `2` | Thickness of each of the two casing strokes, in px. The core is `lw - 2*casing`. |
+| `lw` | `15` | Total route line footprint in px. The route is drawn hollow (see below) so this is outer-edge to outer-edge, not a fill width. |
+| `casing` | `2.5` | Thickness of each of the two casing strokes, in px. The core is `lw - 2*casing`. |
 | `dither` | `1` | `0` leaves the core fully transparent instead of stippled (see below). |
 | `spacing` | `7` | Spacing in px between dots in the core's dither stipple. |
 | `dot` | `2` | Size in px of each dot (a square, not a circle — see below). |
