@@ -136,3 +136,23 @@ redeploying:
 | `minDistance` | `10000` | Minimum activity distance (metres) to qualify as "the long run". |
 | `levels` | `4` | `2` renders the 1-bit Floyd–Steinberg fallback instead — noisier, but usable if you leave the device on 1-bit. |
 | `hillshade` | `0` | `1` adds shaded relief. Off by default — Landranger contours already carry most of the terrain read, and shading eats into the four grey levels' headroom. |
+| `lw` | `11` | Total route line footprint in px. The route is drawn hollow (see below) so this is outer-edge to outer-edge, not a fill width. |
+| `casing` | `2` | Thickness of each of the two casing strokes, in px. The core is `lw - 2*casing`. |
+| `dither` | `1` | `0` leaves the core fully transparent instead of stippled (see below). |
+| `spacing` | `5` | Spacing in px between dots in the core's dither stipple. |
+| `dot` | `2` | Size in px of each dot (a square, not a circle — see below). |
+
+The route line is a **hollow outline** — two thin black casing strokes around
+a light dot-stipple core — rather than a solid line, so the OS Landranger
+paths and tracks the route followed stay visible underneath the trace instead
+of being blotted out by it. Pure black is reserved for the route:
+`toEpaperTone` never tone-maps the base map to level 0, so the casing is the
+only pure-black ink on screen and survives the final grey-level snap even at
+2px.
+
+The core's dots are squares on whole-pixel boundaries, not circles — a
+sub-pixel-radius circle anti-aliases to a value the final hard threshold snap
+(`quantiseGreyPng`) rounds away to paper white, so the dither vanished
+entirely until this was pixel-aligned. The dots are a fixed screen tied to
+canvas coordinates (not to the route path), so as the route curves the same
+dot grid just shows through wherever the stroke happens to be.

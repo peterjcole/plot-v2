@@ -20,6 +20,24 @@ export interface RouteStyle {
   /** 'full' = orange-fill start dot + checkerboard finish; 'simple' = outlined circles for both; 'none' = no endpoint markers. */
   markers: 'full' | 'simple' | 'none';
   markerRadius: number;
+  /**
+   * Draw the route as a hollow outline (two thin casing strokes, transparent
+   * middle) instead of a solid double-stroke. `outerWidth` stays the total
+   * footprint and `innerWidth` becomes the gap knocked out of the middle via
+   * an SVG mask — `routeColor` is unused for the line itself in this mode
+   * (it still drives the 'simple' endpoint markers). See also `dither`.
+   */
+  hollow: boolean;
+  /**
+   * Only meaningful when `hollow` is true. Fills the knocked-out core with a
+   * light stipple of square dots (an ordered-dither texture — a fixed
+   * pixel-grid screen, not tied to the route path — spaced `spacing`px
+   * apart, each `dotSize`px square) instead of leaving it fully transparent
+   * — enough texture to read as a deliberate light background while staying
+   * sparse enough that the base map still shows through the gaps between
+   * dots. Omit (undefined) for a fully transparent core.
+   */
+  dither?: { spacing: number; dotSize: number };
 }
 
 // Matches today's hard-coded values exactly — passing no routeStyle is a no-op.
@@ -32,6 +50,7 @@ const DEFAULT_ROUTE_STYLE: RouteStyle = {
   arrows: true,
   markers: 'full',
   markerRadius: 16,
+  hollow: false,
 };
 
 export interface StitchOptions {
@@ -112,7 +131,7 @@ function buildSvg(
   width: number,
   height: number,
 ): string {
-  const { innerWidth: INNER_W, outerWidth: OUTER_W, routeColor, outlineColor, opacity: ROUTE_OPACITY, markerRadius: r } = style;
+  const { innerWidth: INNER_W, outerWidth: OUTER_W, routeColor, outlineColor, opacity: ROUTE_OPACITY, markerRadius: r, hollow, dither } = style;
   // Filter out any NaN/Infinity pixel values — a single NaN in <polyline points>
   // causes librsvg to silently drop the entire polyline.
   const validPixels = routePixels.map(
@@ -160,13 +179,37 @@ function buildSvg(
   const [sx, sy] = firstValid;
   const [ex, ey] = lastValid;
 
-  // Defs: only clip-path for the 'full' end marker. Route outline is achieved by a
-  // double-stroke technique (wide outline stroke below, narrow colour stroke on top)
-  // which renders at full resolution without needing feMorphology (which is
-  // O(pixels) and too slow at export sizes).
-  const defs = style.markers === 'full'
-    ? `<defs><clipPath id="end-clip"><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}"/></clipPath></defs>`
-    : '';
+  // Defs: clip-path for the 'full' end marker, plus (when hollow) a mask that
+  // knocks a transparent core out of the casing stroke. Route outline is
+  // otherwise achieved by a double-stroke technique (wide outline stroke
+  // below, narrow colour stroke on top) which renders at full resolution
+  // without needing feMorphology (which is O(pixels) and too slow at export
+  // sizes).
+  const defParts: string[] = [];
+  if (style.markers === 'full') {
+    defParts.push(`<clipPath id="end-clip"><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}"/></clipPath>`);
+  }
+  if (hollow) {
+    defParts.push(
+      `<mask id="route-core" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}">` +
+        `<rect x="0" y="0" width="${width}" height="${height}" fill="white"/>` +
+        `<polyline points="${pts}" fill="none" stroke="black" stroke-width="${INNER_W}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `</mask>`,
+    );
+    if (dither) {
+      // Square dots on whole-pixel boundaries (no sub-pixel radius, no
+      // rotation) so they rasterize crisp and survive the final hard
+      // threshold snap in quantiseGreyPng instead of anti-aliasing down to
+      // a value that gets rounded away to paper white.
+      const { spacing, dotSize } = dither;
+      defParts.push(
+        `<pattern id="route-dither" patternUnits="userSpaceOnUse" width="${spacing}" height="${spacing}">` +
+          `<rect x="0" y="0" width="${dotSize}" height="${dotSize}" fill="${outlineColor}"/>` +
+        `</pattern>`,
+      );
+    }
+  }
+  const defs = defParts.length ? `<defs>${defParts.join('')}</defs>` : '';
 
   let startMarker = '';
   let endMarker = '';
@@ -203,8 +246,19 @@ function buildSvg(
     // per-stroke opacity path where a semi-transparent orange mixes with the background
     // and desaturates to brown.
     `<g opacity="${ROUTE_OPACITY}">`,
-    `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="${OUTER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
-    `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="${INNER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
+    hollow
+      ? [
+          `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="${OUTER_W}" stroke-linecap="round" stroke-linejoin="round" mask="url(#route-core)"/>`,
+          // Fills exactly the core the mask knocked out — same path and
+          // width, drawn on top, so it doesn't touch the casing edges.
+          dither
+            ? `<polyline points="${pts}" fill="none" stroke="url(#route-dither)" stroke-width="${INNER_W}" stroke-linecap="round" stroke-linejoin="round"/>`
+            : '',
+        ].join('\n')
+      : [
+          `<polyline points="${pts}" fill="none" stroke="${outlineColor}" stroke-width="${OUTER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
+          `<polyline points="${pts}" fill="none" stroke="${routeColor}" stroke-width="${INNER_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
+        ].join('\n'),
     ...arrows,
     `</g>`,
     startMarker,
