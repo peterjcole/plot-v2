@@ -23,14 +23,22 @@ a URL for the map image:
 }
 ```
 
-`src/full.liquid` renders that JSON into the device's markup using TRMNL's
-framework components (`title_bar`, `value`, `label`) so text is drawn
-natively and stays crisp. `image_url` points at `/api/trmnl/map` — a
+`src/full.liquid` sets `image_url` as the **background image** of the
+screen's `view` and leaves `title_bar` completely untouched — that's what
+makes it "native": it's the framework's own default title_bar chrome
+(dithered fill, its own font/spacing) sitting over a full-bleed map, not a
+custom overlay we built. `image_url` points at `/api/trmnl/map` — a
 greyscale PNG of the route already tone-mapped and quantised to TRMNL's
 2-bit (4-grey) palette, with the route drawn in pure black (the *only*
-pure-black pixels in the image) over a white-cased line. That image
-endpoint uses its own `?token=` query param rather than a header, because
-TRMNL's renderer fetches `<img src>` without custom headers.
+pure-black pixels in the image) over a white-cased line, rendered at full
+800x480 device resolution so nothing gets upscaled. That image endpoint
+uses its own `?token=` query param rather than a header, because TRMNL's
+renderer fetches the background image without custom headers.
+
+`settings.yml` ships with `no_screen_padding: 'yes'` (TRMNL calls this
+"full bleed" in the UI) so the map reaches every edge of the screen; the
+`m--4` (16px) margin on `title_bar` in the template is what keeps the bar
+itself from then hugging the screen edge too.
 
 ## Set the device to 4 grays
 
@@ -124,7 +132,7 @@ redeploying:
 
 | Param | Default | Notes |
 |---|---|---|
-| `w`, `h` | `800`, `352` | Pixel size. `352` assumes the framework's `title_bar` (~40px) + stat row (~88px) leave that much for the image in `full.liquid`'s 480px canvas — adjust here and in the template together if a framework update changes those heights. |
+| `w`, `h` | `800`, `480` | Full device resolution, rendered natively (no CSS scaling). The route is fitted to fill the frame — a route bbox is rarely 800x480-shaped, so the endpoint zooms in a bit past the "whole route guaranteed visible" fit to close empty margin on the shorter axis, capped so it can't crop a meaningful amount off the other one. |
 | `minDistance` | `10000` | Minimum activity distance (metres) to qualify as "the long run". |
 | `levels` | `4` | `2` renders the 1-bit Floyd–Steinberg fallback instead — noisier, but usable if you leave the device on 1-bit. |
 | `hillshade` | `0` | `1` adds shaded relief. Off by default — Landranger contours already carry most of the terrain read, and shading eats into the four grey levels' headroom. |

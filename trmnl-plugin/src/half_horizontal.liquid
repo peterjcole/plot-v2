@@ -1,25 +1,7 @@
-<div class="view view--half_horizontal">
-  <div class="layout layout--col gap--none">
-    <div class="w--full h--[140px]">
-      <img class="image image--cover" src="{{ image_url }}" alt="Route map">
-    </div>
-    <div class="grid grid--cols-3">
-      <div>
-        <span class="value value--small value--tnums" data-pixel-perfect="true">{{ distance }}</span>
-        <span class="label">KM</span>
-      </div>
-      <div>
-        <span class="value value--small value--tnums" data-pixel-perfect="true">{{ elevation }}</span>
-        <span class="label">M ASCENT</span>
-      </div>
-      <div>
-        <span class="value value--small value--tnums" data-pixel-perfect="true">{{ duration }}</span>
-        <span class="label">MOVING</span>
-      </div>
-    </div>
-  </div>
-  <div class="title_bar">
+<div class="view view--half_horizontal" style="background-image: url('{{ image_url }}'); background-size: cover; background-position: center;">
+  <div class="layout"></div>
+  <div class="title_bar m--2">
     <span class="title">plot</span>
-    <span class="instance">{{ date }}</span>
+    <span class="instance">{{ distance }} km · {{ elevation }} m · {{ duration }}</span>
   </div>
 </div>
