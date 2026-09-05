@@ -132,7 +132,7 @@ redeploying:
 
 | Param | Default | Notes |
 |---|---|---|
-| `w`, `h` | `800`, `480` | Full device resolution, rendered natively (no CSS scaling). The route is fitted to fill the frame — a route bbox is rarely 800x480-shaped, so the endpoint zooms in a bit past the "whole route guaranteed visible" fit to close empty margin on the shorter axis, capped so it can't crop a meaningful amount off the other one. |
+| `w`, `h` | `800`, `480` | Full device resolution, rendered natively (no CSS scaling, no upscaling of the stitched map — a route bbox is rarely 800x480-shaped, so the shorter axis is left with margin rather than blown up past its native tile resolution to fill the frame). |
 | `minDistance` | `10000` | Minimum activity distance (metres) to qualify as "the long run". |
 | `levels` | `4` | `2` renders the 1-bit Floyd–Steinberg fallback instead — noisier, but usable if you leave the device on 1-bit. |
 | `hillshade` | `0` | `1` adds shaded relief. Off by default — Landranger contours already carry most of the terrain read, and shading eats into the four grey levels' headroom. |
