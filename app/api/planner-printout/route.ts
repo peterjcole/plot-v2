@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { type ExportMode, calculateRenderDimensions, getExportRenderZoom } from '@/lib/render-dimensions';
 import { type BaseMap } from '@/lib/map-config';
 import { stitchMapImage } from '@/lib/stitch-map';
+import { computeRouteFraming } from '@/lib/route-framing';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -40,19 +41,17 @@ export async function POST(request: NextRequest) {
   let height = parseInt(process.env.EXPORT_DEFAULT_HEIGHT ?? '6144', 10);
   let renderZoom = getExportRenderZoom(exportMode);
 
-  if (hasRoute) {
-    const lats = route.map(([lat]) => lat);
-    const lngs = route.map(([, lng]) => lng);
-    const bbox = {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLng: Math.min(...lngs),
-      maxLng: Math.max(...lngs),
-    };
-    // Always centre on the route bbox — the viewport center from the client
-    // may differ (user panned/zoomed), which would place the route outside the image.
-    center = [(bbox.minLat + bbox.maxLat) / 2, (bbox.minLng + bbox.maxLng) / 2];
+  // Frame on the route bbox when we have one — the viewport center from the
+  // client may differ (user panned/zoomed), which would place the route
+  // outside the image. Without a route, frame on the client-supplied center
+  // (a single-point "bbox") purely to get the same GB/topo determination.
+  const { bbox, center: framedCenter, useTopo } = computeRouteFraming(
+    hasRoute ? route : [center],
+    baseMap,
+  );
+  center = framedCenter;
 
+  if (hasRoute) {
     const MAX_ROUTE_PIXELS = exportMode === 'satellite'
       ? parseInt(process.env.EXPORT_MAX_PIXELS_SATELLITE ?? '10000000', 10)
       : parseInt(process.env.EXPORT_MAX_PIXELS_OS ?? '25000000', 10);
@@ -62,30 +61,15 @@ export async function POST(request: NextRequest) {
     renderZoom = dims.renderZoom;
   }
 
-  // Detect routes outside Great Britain — same bounds check as ActivityMap.
   // Outside GB, OS tiles return transparent (server-side clipping), so we switch
   // to EPSG:3857 topo tiles and recompute dimensions in mercator space.
-  const GB_BOUNDS = { minLat: 49.8, maxLat: 61.5, minLng: -8.0, maxLng: 2.0 };
-  const isGB = baseMap === 'satellite'
-    || (center[0] >= GB_BOUNDS.minLat && center[0] <= GB_BOUNDS.maxLat
-        && center[1] >= GB_BOUNDS.minLng && center[1] <= GB_BOUNDS.maxLng);
-  const useTopo = baseMap === 'os' && !isGB;
-
   if (useTopo && hasRoute) {
-    const lats = route.map(([lat]) => lat);
-    const lngs = route.map(([, lng]) => lng);
-    const bbox = {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLng: Math.min(...lngs),
-      maxLng: Math.max(...lngs),
-    };
+    const MAX_ROUTE_PIXELS = parseInt(process.env.EXPORT_MAX_PIXELS_OS ?? '25000000', 10);
     const avgLat = center[0];
     const avgLatRad = avgLat * Math.PI / 180;
     const circumference = 40_075_016.686;
     const widthM = (bbox.maxLng - bbox.minLng) * 111320 * Math.cos(avgLatRad);
     const heightM = (bbox.maxLat - bbox.minLat) * 111320;
-    const MAX_ROUTE_PIXELS = parseInt(process.env.EXPORT_MAX_PIXELS_OS ?? '25000000', 10);
     // Topo tiles go up to z=16; cap at 15 (explorer) / 14 (landranger) for matching detail level
     const topoMaxZoom = exportMode === 'landranger' ? 14 : 15;
     renderZoom = topoMaxZoom;

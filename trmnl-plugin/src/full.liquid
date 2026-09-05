@@ -1,0 +1,25 @@
+<div class="view view--full">
+  <div class="layout layout--col gap--none">
+    <div class="w--full h--[352px]">
+      <img class="image image--cover" src="{{ image_url }}" alt="Route map">
+    </div>
+    <div class="grid grid--cols-3">
+      <div>
+        <span class="value value--large value--tnums" data-pixel-perfect="true">{{ distance }}</span>
+        <span class="label">KM</span>
+      </div>
+      <div>
+        <span class="value value--large value--tnums" data-pixel-perfect="true">{{ elevation }}</span>
+        <span class="label">M ASCENT</span>
+      </div>
+      <div>
+        <span class="value value--large value--tnums" data-pixel-perfect="true">{{ duration }}</span>
+        <span class="label">MOVING</span>
+      </div>
+    </div>
+  </div>
+  <div class="title_bar">
+    <span class="title">plot</span>
+    <span class="instance">{{ date }} · {{ activity_name }}</span>
+  </div>
+</div>

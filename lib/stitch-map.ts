@@ -8,6 +8,32 @@ import { getActivityColor } from '@/lib/activity-categories';
 proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
 proj4.defs('EPSG:27700', OS_PROJECTION.proj4);
 
+export interface RouteStyle {
+  innerWidth: number;
+  outerWidth: number;
+  routeColor: string;
+  outlineColor: string;
+  /** Opacity of the group both strokes composite into before transparency. */
+  opacity: number;
+  /** Draw direction chevrons every 2000m (up to 20, skipping first/last 5%). */
+  arrows: boolean;
+  /** 'full' = orange-fill start dot + checkerboard finish; 'simple' = outlined circles for both; 'none' = no endpoint markers. */
+  markers: 'full' | 'simple' | 'none';
+  markerRadius: number;
+}
+
+// Matches today's hard-coded values exactly — passing no routeStyle is a no-op.
+const DEFAULT_ROUTE_STYLE: RouteStyle = {
+  innerWidth: 11,
+  outerWidth: 16,
+  routeColor: '', // filled in per-call from activityType/default orange
+  outlineColor: 'rgba(7,14,20,1)',
+  opacity: 0.68,
+  arrows: true,
+  markers: 'full',
+  markerRadius: 16,
+};
+
 export interface StitchOptions {
   route: [number, number][];
   center: [number, number];
@@ -24,6 +50,19 @@ export interface StitchOptions {
   bypassSecret?: string;
   /** Output format — defaults to 'jpeg' for backwards compat */
   outputFormat?: 'jpeg' | 'png';
+  /** Overrides route line width/colour/markers. Defaults reproduce today's rendering. */
+  routeStyle?: Partial<RouteStyle>;
+  /**
+   * Post-process the stitched base map (tiles + hillshade, pre-route) —
+   * e.g. quantising to an e-paper grey palette. Runs on the raw pixel
+   * buffer, after tile compositing and before the route SVG is drawn on
+   * top, so the route keeps whatever colour/contrast the transform doesn't
+   * touch (e.g. a reserved pure black).
+   */
+  transformBase?: (
+    raw: Buffer,
+    info: { width: number; height: number; channels: number },
+  ) => Promise<Buffer>;
 }
 
 function osLatLngToPixel(lat: number, lng: number, zoom: number): [number, number] {
@@ -69,17 +108,11 @@ function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number): num
 function buildSvg(
   route: [number, number][],
   routePixels: [number, number][],
-  routeColor: string,
-  outlineColor: string,
+  style: RouteStyle,
   width: number,
   height: number,
 ): string {
-  // Match OL selected route (MainMap.tsx): inner 11px, casing 16px, both at full opacity,
-  // wrapped in a group at 0.68 opacity so the double-stroke composites as a solid unit
-  // before transparency — keeps the route colour saturated (no background bleed-through).
-  const INNER_W = 11;
-  const OUTER_W = 16;
-  const ROUTE_OPACITY = 0.68;
+  const { innerWidth: INNER_W, outerWidth: OUTER_W, routeColor, outlineColor, opacity: ROUTE_OPACITY, markerRadius: r } = style;
   // Filter out any NaN/Infinity pixel values — a single NaN in <polyline points>
   // causes librsvg to silently drop the entire polyline.
   const validPixels = routePixels.map(
@@ -91,31 +124,33 @@ function buildSvg(
     .join(' ');
 
   // Sample direction arrows every 2000m, max 20, skip first/last 5%
-  const cumDist: number[] = [0];
-  for (let i = 1; i < route.length; i++) {
-    cumDist.push(
-      cumDist[i - 1] +
-        haversineDistance(route[i - 1][0], route[i - 1][1], route[i][0], route[i][1]),
-    );
-  }
   const arrows: string[] = [];
-  if (cumDist[cumDist.length - 1] >= 500) {
-    const skip = Math.floor(route.length * 0.05);
-    let nextTarget = 2000;
-    let count = 0;
-    for (let i = skip; i < route.length - skip; i++) {
-      if (cumDist[i] >= nextTarget) {
-        const ahead = Math.min(i + 5, route.length - 1);
-        const deg = bearingDeg(route[i][0], route[i][1], route[ahead][0], route[ahead][1]);
-        const [ax, ay] = validPixels[i];
-        if (!isFinite(ax) || !isFinite(ay)) { nextTarget += 2000; continue; }
-        arrows.push(
-          `<g transform="translate(${ax.toFixed(1)},${ay.toFixed(1)}) rotate(${deg.toFixed(1)})">` +
-            `<path d="M14,7 L0,-7 L-14,7" fill="none" stroke="${outlineColor}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
-            `</g>`,
-        );
-        nextTarget += 2000;
-        if (++count >= 20) break;
+  if (style.arrows) {
+    const cumDist: number[] = [0];
+    for (let i = 1; i < route.length; i++) {
+      cumDist.push(
+        cumDist[i - 1] +
+          haversineDistance(route[i - 1][0], route[i - 1][1], route[i][0], route[i][1]),
+      );
+    }
+    if (cumDist[cumDist.length - 1] >= 500) {
+      const skip = Math.floor(route.length * 0.05);
+      let nextTarget = 2000;
+      let count = 0;
+      for (let i = skip; i < route.length - skip; i++) {
+        if (cumDist[i] >= nextTarget) {
+          const ahead = Math.min(i + 5, route.length - 1);
+          const deg = bearingDeg(route[i][0], route[i][1], route[ahead][0], route[ahead][1]);
+          const [ax, ay] = validPixels[i];
+          if (!isFinite(ax) || !isFinite(ay)) { nextTarget += 2000; continue; }
+          arrows.push(
+            `<g transform="translate(${ax.toFixed(1)},${ay.toFixed(1)}) rotate(${deg.toFixed(1)})">` +
+              `<path d="M14,7 L0,-7 L-14,7" fill="none" stroke="${outlineColor}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
+              `</g>`,
+          );
+          nextTarget += 2000;
+          if (++count >= 20) break;
+        }
       }
     }
   }
@@ -124,34 +159,39 @@ function buildSvg(
   const lastValid = [...validPixels].reverse().find(([x, y]) => isFinite(x) && isFinite(y)) ?? validPixels[validPixels.length - 1];
   const [sx, sy] = firstValid;
   const [ex, ey] = lastValid;
-  // Markers scaled up to be visible at full export resolution (~3× screen)
-  const r = 16;
 
-  // Defs: only clip-path for end marker. Route outline is achieved by a double-stroke
-  // technique (wide outline stroke below, narrow colour stroke on top) which renders
-  // at full resolution without needing feMorphology (which is O(pixels) and too slow
-  // at export sizes).
-  const defs =
-    `<defs>` +
-    `<clipPath id="end-clip">` +
-    `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}"/>` +
-    `</clipPath>` +
-    `</defs>`;
+  // Defs: only clip-path for the 'full' end marker. Route outline is achieved by a
+  // double-stroke technique (wide outline stroke below, narrow colour stroke on top)
+  // which renders at full resolution without needing feMorphology (which is
+  // O(pixels) and too slow at export sizes).
+  const defs = style.markers === 'full'
+    ? `<defs><clipPath id="end-clip"><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}"/></clipPath></defs>`
+    : '';
 
-  const startMarker =
-    `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}" ` +
-    `fill="${routeColor}" stroke="white" stroke-width="${(r * 0.25).toFixed(1)}" opacity="0.75"/>`;
-
-  // Checkerboard end marker (matches ActivityMap)
-  const endMarker = [
-    `<g clip-path="url(#end-clip)">`,
-    `<rect x="${(ex - r).toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${r}" height="${r}" fill="${routeColor}"/>`,
-    `<rect x="${ex.toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${r}" height="${r}" fill="white"/>`,
-    `<rect x="${(ex - r).toFixed(1)}" y="${ey.toFixed(1)}" width="${r}" height="${r}" fill="white"/>`,
-    `<rect x="${ex.toFixed(1)}" y="${ey.toFixed(1)}" width="${r}" height="${r}" fill="${routeColor}"/>`,
-    `</g>`,
-    `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}" fill="none" stroke="white" stroke-width="3.5"/>`,
-  ].join('');
+  let startMarker = '';
+  let endMarker = '';
+  if (style.markers === 'full') {
+    startMarker =
+      `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}" ` +
+      `fill="${routeColor}" stroke="white" stroke-width="${(r * 0.25).toFixed(1)}" opacity="0.75"/>`;
+    // Checkerboard end marker (matches ActivityMap)
+    endMarker = [
+      `<g clip-path="url(#end-clip)">`,
+      `<rect x="${(ex - r).toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${r}" height="${r}" fill="${routeColor}"/>`,
+      `<rect x="${ex.toFixed(1)}" y="${(ey - r).toFixed(1)}" width="${r}" height="${r}" fill="white"/>`,
+      `<rect x="${(ex - r).toFixed(1)}" y="${ey.toFixed(1)}" width="${r}" height="${r}" fill="white"/>`,
+      `<rect x="${ex.toFixed(1)}" y="${ey.toFixed(1)}" width="${r}" height="${r}" fill="${routeColor}"/>`,
+      `</g>`,
+      `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}" fill="none" stroke="white" stroke-width="3.5"/>`,
+    ].join('');
+  } else if (style.markers === 'simple') {
+    // Small outlined circles for both ends — legible at low marker radii
+    // where the checkerboard/fill pattern would just read as noise.
+    startMarker =
+      `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="${r}" fill="${routeColor}" stroke="${outlineColor}" stroke-width="2"/>`;
+    endMarker =
+      `<circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="${r}" fill="${outlineColor}" stroke="${routeColor}" stroke-width="3"/>`;
+  }
 
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -178,9 +218,12 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
 
   const isSatellite = baseMap === 'satellite';
   const isTopo = useTopo === true && !isSatellite;
-  const routeColor = opts.activityType ? getActivityColor(opts.activityType) : '#E07020';
-  // Match OL selected route (MainMap.tsx:1188) — fully opaque casing; group opacity handles translucency
-  const outlineColor = 'rgba(7,14,20,1)';
+  const defaultRouteColor = opts.activityType ? getActivityColor(opts.activityType) : '#E07020';
+  const routeStyle: RouteStyle = {
+    ...DEFAULT_ROUTE_STYLE,
+    routeColor: defaultRouteColor,
+    ...opts.routeStyle,
+  };
 
   const latLngToPixel = (lat: number, lng: number): [number, number] =>
     (isSatellite || isTopo)
@@ -309,12 +352,19 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const { data: croppedRaw } = await sharp(stitchedRaw, {
+  const { data: croppedRawInitial } = await sharp(stitchedRaw, {
     raw: { width: stitchedInfo.width, height: stitchedInfo.height, channels: stitchedInfo.channels },
   })
     .extract({ left: offsetX, top: offsetY, width, height })
     .raw()
     .toBuffer({ resolveWithObject: true });
+
+  // Post-process the base map (e.g. tone-map to an e-paper grey palette)
+  // before the route is drawn on top, so the route's own colours are
+  // unaffected by whatever the transform does to the map underneath.
+  const croppedRaw = opts.transformBase
+    ? await opts.transformBase(croppedRawInitial, { width, height, channels: stitchedInfo.channels })
+    : croppedRawInitial;
 
   const outputFormat = opts.outputFormat ?? 'jpeg';
 
@@ -343,8 +393,7 @@ export async function stitchMapImage(opts: StitchOptions): Promise<Buffer> {
   const svgStr = buildSvg(
     route,
     routePixels,
-    routeColor,
-    outlineColor,
+    routeStyle,
     width,
     height,
   );

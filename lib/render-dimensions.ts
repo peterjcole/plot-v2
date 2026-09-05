@@ -7,6 +7,10 @@ export type ExportMode = 'explorer' | 'landranger' | 'satellite';
  *
  * @param padding Fraction of canvas the route bbox may occupy (default 0.85).
  *   Lower values zoom out further and show more surrounding map context.
+ * @param maxOsZoom Highest EPSG:27700 zoom level to consider (default 9,
+ *   the native Explorer-detail top zoom). Pass a lower cap — e.g. 7 for
+ *   Landranger — to keep coarser, more legible linework on small/low-colour
+ *   displays. Ignored for satellite/topo (Web Mercator) frames.
  */
 export function fitZoomForFrame(opts: {
   width: number;
@@ -15,6 +19,7 @@ export function fitZoomForFrame(opts: {
   isSatellite: boolean;
   isTopo: boolean;
   padding?: number;
+  maxOsZoom?: number;
 }): number {
   const { width, height, bbox, isSatellite, isTopo } = opts;
   const FIT_PADDING = opts.padding ?? 0.85;
@@ -41,7 +46,8 @@ export function fitZoomForFrame(opts: {
   // EPSG:27700 OS — fixed resolutions per zoom
   const widthM = (maxLng - minLng) * 111320 * Math.cos(avgLatRad);
   const heightM = (maxLat - minLat) * 111320;
-  for (let z = 9; z >= 0; z--) {
+  const startZoom = Math.min(opts.maxOsZoom ?? 9, 9);
+  for (let z = startZoom; z >= 0; z--) {
     const res = OS_RESOLUTIONS[z];
     if (widthM / res <= availW && heightM / res <= availH) return z;
   }

@@ -1,0 +1,130 @@
+# plot — TRMNL plugin
+
+Shows the route, date, distance, and elevation gain of your most recent long
+run/ride on a TRMNL e-paper device, backed by `/api/trmnl` and
+`/api/trmnl/map` in the plot app.
+
+## How it works
+
+TRMNL polls `GET /api/trmnl` (with an `Authorization: Bearer` header) on a
+schedule. That endpoint returns JSON — the activity's stats, formatted, plus
+a URL for the map image:
+
+```json
+{
+  "activity_name": "Long Sunday Loop",
+  "activity_type": "Run",
+  "date": "5 Sep 2026",
+  "distance": "21.53",
+  "elevation": "367",
+  "duration": "2:50:50",
+  "pace": "7:56",
+  "image_url": "https://<host>/api/trmnl/map?token=...&v=19960305682"
+}
+```
+
+`src/full.liquid` renders that JSON into the device's markup using TRMNL's
+framework components (`title_bar`, `value`, `label`) so text is drawn
+natively and stays crisp. `image_url` points at `/api/trmnl/map` — a
+greyscale PNG of the route already tone-mapped and quantised to TRMNL's
+2-bit (4-grey) palette, with the route drawn in pure black (the *only*
+pure-black pixels in the image) over a white-cased line. That image
+endpoint uses its own `?token=` query param rather than a header, because
+TRMNL's renderer fetches `<img src>` without custom headers.
+
+## Set the device to 4 grays
+
+The base map only reads well with a real tonal range — at 1-bit it has to
+be dithered, which is noisy at this resolution. Set the **palette per
+playlist item**, not device-wide, so your other plugins keep 1-bit's faster
+refresh:
+
+Playlist → this plugin's item → **⋯** → **Presentation** → **Color
+Palette** → **4 grays (2-bit)**.
+
+(Background: [Understanding color palettes](https://help.trmnl.com/en/articles/12985974-understanding-color-palettes).)
+
+## Setup — manual (no CLI required)
+
+1. In the TRMNL dashboard: **Plugins → Private Plugin → New**, strategy
+   **Polling**.
+2. **Polling URL**: `https://<your-plot-deployment>/api/trmnl`
+3. **Polling Verb**: `GET`
+4. **Polling Headers**: `Authorization=Bearer <TRMNL_BEARER_TOKEN>`
+5. **Refresh interval**: 60 minutes is plenty — the underlying activity
+   data changes at most a few times a day, and TRMNL skips regenerating
+   the screen when the polled payload is unchanged.
+6. Paste the contents of `src/full.liquid` into the markup editor (and
+   `src/half_horizontal.liquid` into the mashup markup, if you want it in a
+   half-screen playlist slot too).
+7. Add the plugin to a playlist, then set its palette to 4 grays as above.
+
+## Setup — CLI (`trmnlp`)
+
+```bash
+gem install trmnl_preview   # or: docker run --pull always -p 4567:4567 -v "$(pwd):/plugin" trmnl/trmnlp serve
+cd trmnl-plugin
+trmnlp login                # saves an API key to ~/.config/trmnlp/config.yml
+trmnlp push                 # creates the plugin from src/settings.yml + src/*.liquid
+```
+
+After the first push, set the real **Polling URL** and **Polling Headers**
+in the TRMNL UI (step 2–4 above) — `src/settings.yml` ships with both
+blank deliberately, so the bearer token never ends up committed to this
+repo. Don't `trmnlp push` again until you've either left those fields
+alone or re-synced them with `trmnlp pull` first, or you'll blank them out
+on the live plugin.
+
+### Local preview
+
+```bash
+trmnlp serve   # http://localhost:4567 — hot-reloads src/*.liquid
+```
+
+`trmnlp serve` calls whatever's in `src/settings.yml`'s `polling_url` — so
+to preview against your real data, temporarily paste your deployment URL
+and bearer header into `src/settings.yml` locally (don't commit that
+change), or run `trmnlp pull` once after configuring the plugin in the UI.
+
+`trmnlp build --png --width 800 --height 480 --color-depth 2` renders a
+static PNG of the current template without a device, useful for a quick
+look at layout changes.
+
+### Updating an existing plugin
+
+```bash
+trmnlp login
+trmnlp clone plot <plugin-id>
+cd plot
+# ...edit src/*.liquid...
+trmnlp push
+```
+
+## Environment variables (plot app)
+
+Set both in `.env.local` for development and in Vercel for production —
+neither is in `.env.example` since this repo doesn't keep one; treat this
+README as the source of truth for them.
+
+| Variable | Used by | Notes |
+|---|---|---|
+| `TRMNL_BEARER_TOKEN` | `/api/trmnl` | Compared against the `Authorization: Bearer` header TRMNL sends when polling. Generate with e.g. `openssl rand -hex 32`. |
+| `TRMNL_IMAGE_TOKEN` | `/api/trmnl/map` | Compared against `?token=` on the map image URL. Separate from the bearer token since it travels in a URL (visible in logs, the device's request history) rather than a header. |
+
+## Optional: IP allowlisting
+
+If you'd rather not rely on the token alone, TRMNL publishes the IPs it
+polls from at <https://trmnl.com/api/ips> — allowlist them in front of
+`/api/trmnl` and `/api/trmnl/map` if your hosting supports it.
+
+## Tuning the map image
+
+`/api/trmnl/map` accepts query params if you want to try variations without
+redeploying:
+
+| Param | Default | Notes |
+|---|---|---|
+| `w`, `h` | `800`, `352` | Pixel size. `352` assumes the framework's `title_bar` (~40px) + stat row (~88px) leave that much for the image in `full.liquid`'s 480px canvas — adjust here and in the template together if a framework update changes those heights. |
+| `minDistance` | `10000` | Minimum activity distance (metres) to qualify as "the long run". |
+| `levels` | `4` | `2` renders the 1-bit Floyd–Steinberg fallback instead — noisier, but usable if you leave the device on 1-bit. |
+| `hillshade` | `0` | `1` adds shaded relief. Off by default — Landranger contours already carry most of the terrain read, and shading eats into the four grey levels' headroom. |

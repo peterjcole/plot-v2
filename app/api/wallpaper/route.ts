@@ -8,6 +8,7 @@ import { fitZoomForFrame } from '@/lib/render-dimensions';
 import { buildWallpaperHud } from '@/lib/wallpaper-hud';
 import { trimRouteEnds } from '@/lib/route-trim';
 import { OS_PROJECTION } from '@/lib/map-config';
+import { computeRouteFraming } from '@/lib/route-framing';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -42,8 +43,6 @@ interface RenderCache {
 }
 
 let lastRender: RenderCache | null = null;
-
-const GB_BOUNDS = { minLat: 49.8, maxLat: 61.5, minLng: -8.0, maxLng: 2.0 };
 
 export async function GET(request: NextRequest) {
   const bearerToken = process.env.WALLPAPER_BEARER_TOKEN;
@@ -105,25 +104,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const route = activity.route;
-    const lats = route.map(([lat]) => lat);
-    const lngs = route.map(([, lng]) => lng);
-    const bbox = {
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats),
-      minLng: Math.min(...lngs),
-      maxLng: Math.max(...lngs),
-    };
-    const center: [number, number] = [
-      (bbox.minLat + bbox.maxLat) / 2,
-      (bbox.minLng + bbox.maxLng) / 2,
-    ];
-
+    const { bbox, center, useTopo } = computeRouteFraming(route, baseMap);
     const isSatellite = baseMap === 'satellite';
-    const isGB = isSatellite || (
-      center[0] >= GB_BOUNDS.minLat && center[0] <= GB_BOUNDS.maxLat &&
-      center[1] >= GB_BOUNDS.minLng && center[1] <= GB_BOUNDS.maxLng
-    );
-    const useTopo = baseMap === 'os' && !isGB;
 
     const renderZoom = fitZoomForFrame({ width, height, bbox, isSatellite, isTopo: useTopo, padding: 0.82 });
 

@@ -1,0 +1,16 @@
+# TRMNLP configuration — local dev only, never uploaded to TRMNL.
+# {{ env.VARIABLE }} interpolation is available here.
+
+watch:
+  - .trmnlp.yml
+  - src
+
+custom_fields: {}
+
+# `trmnlp serve` renders templates against whatever's in src/settings.yml's
+# polling_url/polling_headers (blank in this repo — see README "Local
+# preview"). These don't affect that fetch; they're template-only overrides
+# for TRMNL's own merge variables (device name, timezone, etc.), included
+# here in case you want to preview mashup layouts without a live device.
+variables:
+  trmnl: {}

@@ -1,0 +1,24 @@
+#
+# Changes to this file will be overwritten by `trmnlp pull`.
+#
+# Docs: https://help.trmnl.com/en/articles/10542599-importing-and-exporting-private-plugins
+#
+strategy: polling
+name: plot
+description: Most recent long run
+no_screen_padding: 'no'
+dark_mode: 'no'
+static_data: ''
+polling_verb: get
+# Pinned rather than "latest" so a framework release can't silently reflow
+# the layout — bump deliberately and re-check trmnlp lint/serve.
+framework_version: 2.3.0
+# Left blank here on purpose: the real URL and Authorization header contain
+# a secret and should never be committed. Set both directly in the TRMNL
+# private-plugin editor (Polling tab) after the first `trmnlp push`. See
+# ../README.md for the full setup flow, including local preview.
+polling_url: ''
+polling_headers: ''
+# Minutes between refreshes. plot's backend activity data changes at most a
+# few times a day, so there's no reason to poll more often than this.
+refresh_interval: 60
