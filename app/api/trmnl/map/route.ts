@@ -24,9 +24,9 @@ export const maxDuration = 30;
 // stipple (ordered dither) fills it, sparse enough that the map still shows
 // through the gaps but dense enough that the corridor reads as a deliberate
 // light background rather than a bare hole.
-const DEFAULT_OUTER_WIDTH = 11;
+const DEFAULT_OUTER_WIDTH = 14;
 const DEFAULT_CASING = 2;
-const DEFAULT_DITHER_SPACING = 5;
+const DEFAULT_DITHER_SPACING = 7;
 const DEFAULT_DITHER_DOT_SIZE = 2;
 const TRMNL_ROUTE_STYLE: Partial<RouteStyle> = {
   outerWidth: DEFAULT_OUTER_WIDTH,
