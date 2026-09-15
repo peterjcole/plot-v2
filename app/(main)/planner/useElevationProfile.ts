@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { type ElevationPoint, haversineDistance, smoothElevation, downsampleToChartPoints } from '@/lib/elevation';
+import {
+  type ElevationPoint,
+  distanceWindowSize,
+  downsampleToChartPoints,
+  elevationGain,
+  haversineDistance,
+  smoothElevation,
+} from '@/lib/elevation';
 
 export type { ElevationPoint };
 
@@ -56,6 +63,7 @@ export function useElevationProfile(
   const [elevationData, setElevationData] = useState<ElevationPoint[] | null>(
     null
   );
+  const [elevGainMeters, setElevGainMeters] = useState<number | null>(null);
   const [isFetching, setIsFetching] = useState(false);
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -86,6 +94,7 @@ export function useElevationProfile(
       if (waypoints.length < 2) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale data when route is removed
         setElevationData(null);
+        setElevGainMeters(null);
         setIsFetching(false);
         setSettledKey(null);
       }
@@ -116,6 +125,7 @@ export function useElevationProfile(
           }) => {
             if (!data.coordinates || data.coordinates.length === 0) {
               setElevationData(null);
+              setElevGainMeters(null);
               return;
             }
 
@@ -131,11 +141,17 @@ export function useElevationProfile(
               return { distance: cumDist, ele: c.ele, lat: c.lat, lng: c.lng };
             });
 
-            const windowSize = Math.max(5, Math.round(points.length / 40));
+            // Ground-distance window (not point-count-based — see
+            // distanceWindowSize) for the chart curve. Ascent itself is
+            // computed from `smoothed` below, *before* downsampling to
+            // chart points loses the resolution elevationGain's own
+            // distance-binned threshold needs.
+            const windowSize = distanceWindowSize(points.length, cumDist, 30);
             const smoothed = smoothElevation(points, windowSize);
             const downsampled = downsampleToChartPoints(smoothed);
 
             setElevationData(downsampled);
+            setElevGainMeters(smoothed.length >= 2 ? elevationGain(smoothed) : null);
             setSettledKey(polylineKey);
           }
         )
@@ -143,6 +159,7 @@ export function useElevationProfile(
           if (err.name === 'AbortError') return;
           console.error('Elevation profile error:', err);
           setElevationData(null);
+          setElevGainMeters(null);
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsFetching(false);
@@ -167,5 +184,5 @@ export function useElevationProfile(
   const isStale = needsElevation && (polylineKey !== settledKey || hasPendingSegments);
   const isLoading = isStale || isFetching;
 
-  return { elevationData, isLoading };
+  return { elevationData, elevGainMeters, isLoading };
 }

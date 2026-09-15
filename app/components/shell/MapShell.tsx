@@ -23,7 +23,6 @@ import {
   displayRouteLabel, routeExportName, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary,
 } from '@/lib/saved-routes';
 import { selectGpxWaypoints, downloadGpx, parseGpx } from '@/lib/gpx';
-import { elevationGain } from '@/lib/elevation';
 import { OS_PROJECTION } from '@/lib/map-config';
 import LeftPanel from './LeftPanel';
 import BrowsePanel from './BrowsePanel';
@@ -153,7 +152,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   cursorRef.current = cursor;
 
   useRouteSnapping({ waypoints, segments, dispatch });
-  const { elevationData, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
+  const { elevationData, elevGainMeters, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
   const distanceRef = useRef(distance);
@@ -535,10 +534,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     });
   }, [routesList, handleSelectRoute, restore, refreshRoutesList]);
 
-  const elevGain = useMemo(() => {
-    if (!elevationData || elevationData.length < 2) return 0;
-    return elevationGain(elevationData);
-  }, [elevationData]);
+  // Computed by the hook from its pre-downsample profile (see
+  // useElevationProfile) — not from `elevationData` here, which is already
+  // downsampled to ~200 chart points and would under-count ascent on a
+  // long route.
+  const elevGain = elevGainMeters ?? 0;
 
   const [mobilePlannerLayersOpen, setMobilePlannerLayersOpen] = useState(false);
   const [mobileImportAnchor, setMobileImportAnchor] = useState<DOMRect | null>(null);
@@ -1072,7 +1072,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onToggleAddPoints={() => setAddPointsEnabled((v) => !v)}
             snapEnabled={snapEnabled}
             onToggleSnap={() => setSnapEnabled((v) => !v)}
-            elevationData={elevationData}
+            elevGain={elevGainMeters}
             isLoadingElevation={isLoadingElevation}
             onFitToRoute={handleFitToRoute}
             onReverse={() => dispatch({ type: 'REVERSE' })}

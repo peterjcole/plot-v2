@@ -1,13 +1,11 @@
 'use client';
 
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, ChevronLeft } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
-import { elevationGain } from '@/lib/elevation';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import type { ElevationPoint } from './useElevationProfile';
 import ImportRoutePopover from '@/app/components/shell/ImportRoutePopover';
 
 interface PlannerToolbarProps {
@@ -21,7 +19,10 @@ interface PlannerToolbarProps {
   onToggleAddPoints: () => void;
   snapEnabled: boolean;
   onToggleSnap: () => void;
-  elevationData: ElevationPoint[] | null;
+  /** Computed by `useElevationProfile` from its full-resolution profile
+   * (before downsampling to chart points) — null while there's no route
+   * or the profile hasn't loaded yet. */
+  elevGain: number | null;
   isLoadingElevation: boolean;
   onElevationHover?: (point: { lat: number; lng: number; ele: number; distance: number } | null) => void;
   onFitToRoute?: (waypoints: Waypoint[]) => void;
@@ -88,7 +89,7 @@ export default function PlannerToolbar({
   onToggleAddPoints,
   snapEnabled,
   onToggleSnap,
-  elevationData,
+  elevGain,
   onFitToRoute,
   onReverse,
   onBack,
@@ -98,11 +99,6 @@ export default function PlannerToolbar({
 }: PlannerToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importAnchor, setImportAnchor] = useState<DOMRect | null>(null);
-
-  const elevGain = useMemo(() => {
-    if (!elevationData || elevationData.length < 2) return null;
-    return elevationGain(elevationData);
-  }, [elevationData]);
 
   const handleUndo = useCallback(() => dispatch({ type: 'UNDO' }), [dispatch]);
   const handleRedo = useCallback(() => dispatch({ type: 'REDO' }), [dispatch]);

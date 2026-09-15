@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { type ElevationPoint, haversineDistance, smoothElevation, downsampleToChartPoints } from '@/lib/elevation';
+import {
+  type ElevationPoint,
+  distanceWindowSize,
+  downsampleToChartPoints,
+  haversineDistance,
+  smoothElevation,
+} from '@/lib/elevation';
 
 export function useActivityElevationProfile(route: [number, number][] | undefined) {
   const [elevationData, setElevationData] = useState<ElevationPoint[] | null>(null);
@@ -49,7 +55,11 @@ export function useActivityElevationProfile(route: [number, number][] | undefine
           if (i > 0) cumDist += haversineDistance(data.coordinates[i - 1], c);
           return { distance: cumDist, ele: c.ele, lat: c.lat, lng: c.lng };
         });
-        const windowSize = Math.max(5, Math.round(points.length / 40));
+        // Ground-distance window, not point-count-based — see
+        // distanceWindowSize. This profile is chart-only (the displayed
+        // "Elevation" stat is Strava's own total), so only the curve's
+        // smoothness is at stake here.
+        const windowSize = distanceWindowSize(points.length, cumDist, 30);
         const smoothed = smoothElevation(points, windowSize);
         setElevationData(downsampleToChartPoints(smoothed));
       })
