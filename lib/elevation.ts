@@ -28,17 +28,23 @@ export function haversineDistance(
  * scales the *ground* window with route length and point density instead
  * of holding it fixed — a 20km route with dense waypoints got a ~390m
  * window, flattening every climb shorter than that (see the 2026-09
- * elevation-mismatch investigation, DESIGN.md). Minimum of 5 guards
- * against a near-empty window on a very sparse or very short route.
+ * elevation-mismatch investigation, DESIGN.md).
+ *
+ * Floored at 1, not some larger minimum: when points are already spaced
+ * wider than `targetMeters` apart (a sparsely-simplified route), forcing
+ * a bigger sample count would smooth over *more* ground than intended,
+ * not less — the opposite of what a "minimum window" should protect
+ * against. 1 sample means no smoothing beyond what's already inherent in
+ * the point spacing, which is correct there.
  */
 export function distanceWindowSize(
   pointCount: number,
   totalDistanceMeters: number,
   targetMeters: number
 ): number {
-  if (pointCount < 2 || totalDistanceMeters <= 0) return 5;
+  if (pointCount < 2 || totalDistanceMeters <= 0) return 1;
   const avgSpacing = totalDistanceMeters / (pointCount - 1);
-  return Math.max(5, Math.round(targetMeters / avgSpacing));
+  return Math.max(1, Math.round(targetMeters / avgSpacing));
 }
 
 export function smoothElevation<T extends { ele: number }>(
