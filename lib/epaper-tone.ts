@@ -52,7 +52,7 @@ export async function toEpaperTone(
   const grey = new Float32Array(width * height);
   for (let i = 0, p = 0; i < data.length; i += channels, p++) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
-    const [, s, l] = rgbToHsl(r, g, b);
+    const [h, s, l] = rgbToHsl(r, g, b);
 
     let ink: number; // 0 (darkest feature) .. 1 (paper white)
     if (l > 0.75) {
@@ -71,6 +71,20 @@ export async function toEpaperTone(
       // the darker we push it, with a lift so mid-lightness features don't
       // collapse into the fill band above.
       ink = Math.max(0, l * 0.75);
+    }
+
+    // Woodland fill (hue ~60°-170°, i.e. yellow-green through green to
+    // teal-green) is a solid *area* colour, not linework — but its natural
+    // saturation trips the isFeatureBlend check above (meant for thin
+    // contour/road blend pixels) and its base lightness is often well
+    // under 0.75, so both branches above can crush it down to the same
+    // darkest bucket as contours and text. That's what made forest areas
+    // read as overpoweringly dark. Floor it at the fill/feature boundary
+    // so woodland never goes darker than the medium "fill" grey — still
+    // visible as shaded, but no longer competing with actual linework.
+    const isWoodlandGreen = s > 0.15 && h > 60 / 360 && h < 170 / 360;
+    if (isWoodlandGreen) {
+      ink = Math.max(ink, 0.42);
     }
 
     grey[p] = ink;
