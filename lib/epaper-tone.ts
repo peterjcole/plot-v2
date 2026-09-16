@@ -6,6 +6,19 @@ import sharp from 'sharp';
 // text, and blended orange contour pixels detected via raw RGB chroma,
 // since HSL saturation is unreliable at high lightness).
 
+// 4x4 Bayer ordered-dither matrix, normalised to (0,1) thresholds. Used to
+// mix woodland fill between the "fill" and "paper" grey levels — a flat
+// floor can only ever land it on one of the 3 available buckets (255/170/
+// 85), which reads as a single solid medium-grey block over a whole forest.
+// A spatial dither of the two lightest buckets gets a perceptually lighter,
+// still-textured result no single flat tone can express.
+const BAYER4 = [
+  [0, 8, 2, 10],
+  [12, 4, 14, 6],
+  [3, 11, 1, 9],
+  [15, 7, 13, 5],
+].map(row => row.map(v => (v + 0.5) / 16));
+
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   const rn = r / 255, gn = g / 255, bn = b / 255;
   const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
@@ -79,12 +92,16 @@ export async function toEpaperTone(
     // contour/road blend pixels) and its base lightness is often well
     // under 0.75, so both branches above can crush it down to the same
     // darkest bucket as contours and text. That's what made forest areas
-    // read as overpoweringly dark. Floor it at the fill/feature boundary
-    // so woodland never goes darker than the medium "fill" grey — still
-    // visible as shaded, but no longer competing with actual linework.
+    // read as overpoweringly dark. A flat floor only ever lands it on the
+    // single "fill" grey (170) — still a solid block, just a lighter one.
+    // Dither it between paper (255) and fill (170) instead, weighted by
+    // the source lightness, so it reads as a light, airy texture rather
+    // than a flat medium-grey mass.
     const isWoodlandGreen = s > 0.15 && h > 60 / 360 && h < 170 / 360;
     if (isWoodlandGreen) {
-      ink = Math.max(ink, 0.42);
+      const x = p % width, y = (p / width) | 0;
+      const whiteFraction = Math.min(0.85, Math.max(0.55, 0.5 + l * 0.4));
+      ink = BAYER4[y % 4][x % 4] < whiteFraction ? 0.85 : 0.5;
     }
 
     grey[p] = ink;
