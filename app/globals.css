@@ -14,6 +14,7 @@
     --ora: #E07020;
     --grn: #40B060;
     --blu: #4080C0;
+    --red: #C13A2A;
 
     /* Text */
     --ice: #F0F8FA;
@@ -46,6 +47,7 @@
     --fog-ghost: rgba(7, 54, 66, 0.12);
     --grn: #1F7A3A;
     --blu: #1E60A8;
+    --red: #9E2B25;
     --glass-lgt: rgba(238, 232, 213, 0.72);
     --glass: rgba(238, 232, 213, 0.93);
     --glass-hvy: rgba(238, 232, 213, 0.97);
@@ -65,6 +67,7 @@
   --color-ora: var(--ora);
   --color-grn: var(--grn);
   --color-blu: var(--blu);
+  --color-red: var(--red);
   --color-ice: var(--ice);
   --color-fog: var(--fog);
   --color-fog-dim: var(--fog-dim);
@@ -90,6 +93,12 @@
 
 .panel-fade-in {
   animation: panel-in 0.18s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-contour-ping {
+    animation: none;
+  }
 }
 
 html, body {
