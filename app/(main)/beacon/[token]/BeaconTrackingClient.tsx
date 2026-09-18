@@ -181,7 +181,7 @@ export default function BeaconTrackingClient({ token, initial }: BeaconTrackingC
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-p0 font-mono">
-      <BeaconMap route={routeLine} trail={trail} current={current} ended={!!data.endedAt} osDark={osDark} cardPadding={cardPadding} />
+      <BeaconMap route={routeLine} trail={trail} current={current} ended={!!data.endedAt} osDark={osDark} activity={data.activity} cardPadding={cardPadding} />
 
       {/* Wordmark — the only place this page uses the display face; the
           route name below is plain mono, on purpose. */}
@@ -241,9 +241,6 @@ export default function BeaconTrackingClient({ token, initial }: BeaconTrackingC
         <div className="border-t border-fog-ghost pt-3 flex flex-col gap-2">
           <p className="text-sm font-medium" style={{ color: statusColor }}>
             {lastPing ? `Updated ${formatAgo(lastPing.recordedAt, now)}` : 'Waiting for first location'}
-          </p>
-          <p className="text-xs text-fog-dim">
-            This page can lag behind reality — treat it as a guide, not a guarantee. Check the time above before relying on it.
           </p>
           {data.hasGpx && (
             <a
