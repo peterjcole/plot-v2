@@ -74,13 +74,13 @@ function CurrentLocationMarker({ position, live }: { position: [number, number];
     const icon = L.divIcon({
       className: '',
       html: `
-        <div style="position:relative;width:26px;height:26px;display:flex;align-items:center;justify-content:center;">
-          <div style="position:relative;z-index:2;width:12px;height:12px;border-radius:50%;background:${PROGRESS_COLOR};border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.5);"></div>
+        <div style="position:relative;width:34px;height:34px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:relative;z-index:2;width:20px;height:20px;border-radius:50%;background:${PROGRESS_COLOR};border:3px solid white;box-shadow:0 1px 5px rgba(0,0,0,0.55);"></div>
           ${live ? `<div class="animate-contour-ping" style="position:absolute;border-radius:50%;border:1.5px solid ${PROGRESS_COLOR};"></div>` : ''}
         </div>
       `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
     });
     const marker = L.marker(position, { icon, interactive: false, zIndexOffset: 2000 });
     marker.addTo(map);

@@ -212,14 +212,21 @@ export default function BeaconTrackingClient({ token, initial }: BeaconTrackingC
               )}
             </div>
           </div>
-          <div className="relative mt-1.5 h-2.5 w-2.5 shrink-0">
+          {/* `flex items-center justify-center` (not `inset-0` on the ring)
+              is what keeps the ring centered as it grows: an absolutely
+              positioned element with no inset values takes its *static*
+              position from the flex alignment, and that gets recomputed
+              each frame as its animated width/height change. Pinning it
+              with `inset-0` plus a manual offset (the previous approach)
+              fixes its top-left corner instead, so it visibly drifted off
+              -center as it expanded. Same fix as the map's own live-location
+              marker, which already used this correctly. */}
+          <div className="relative mt-1.5 h-2.5 w-2.5 shrink-0 flex items-center justify-center">
             <div
               className="absolute inset-0 rounded-full"
               style={{ background: statusColor, boxShadow: `0 0 0 2px var(--glass)` }}
             />
-            {isLive && (
-              <div className="absolute inset-0 rounded-full border border-ora animate-contour-ping" style={{ left: -1.5, top: -1.5 }} />
-            )}
+            {isLive && <div className="absolute rounded-full border border-ora animate-contour-ping" />}
           </div>
         </div>
 
