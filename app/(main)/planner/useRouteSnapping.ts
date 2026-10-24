@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
+import { isAwaitingRoute } from '@/lib/route-actions';
 import { RouteAction } from './useRouteHistory';
 
 interface UseRouteSnappingOptions {
@@ -21,14 +22,16 @@ export function useRouteSnapping({
   const [isRouting, setIsRouting] = useState(false);
   // Latest route, read when a fetch resolves — results are applied by segment index, so they
   // must be checked against what that index means *now* (see `stillPending`)
+  // Synced in a layout effect — it runs during commit, before any fetch callback can, so it
+  // never lags the committed route (a passive effect can flush after a fetch resolves).
   const routeRef = useRef({ waypoints, segments });
-  useEffect(() => { routeRef.current = { waypoints, segments }; }, [waypoints, segments]);
+  useLayoutEffect(() => { routeRef.current = { waypoints, segments }; }, [waypoints, segments]);
 
   useEffect(() => {
     // Find segments that need routing: snapped=true, coordinates=[]
     const pending: number[] = [];
     segments.forEach((seg, i) => {
-      if (seg.snapped && seg.coordinates.length === 0) {
+      if (isAwaitingRoute(seg)) {
         pending.push(i);
       }
     });
@@ -60,7 +63,7 @@ export function useRouteSnapping({
           const a = wps[segIdx];
           const b = wps[segIdx + 1];
           const seg = segs[segIdx];
-          return !!a && !!b && !!seg && seg.snapped && seg.coordinates.length === 0
+          return !!a && !!b && !!seg && isAwaitingRoute(seg)
             && a.lat === from.lat && a.lng === from.lng && b.lat === to.lat && b.lng === to.lng;
         };
 
@@ -105,7 +108,8 @@ export function useRouteSnapping({
             });
           })
           .finally(() => {
-            abortControllersRef.current.delete(segIdx);
+            // Only if it's still ours — a newer request for this segment may have replaced it
+            if (abortControllersRef.current.get(segIdx) === controller) abortControllersRef.current.delete(segIdx);
             activeCountRef.current--;
             if (activeCountRef.current <= 0) {
               activeCountRef.current = 0;
