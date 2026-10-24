@@ -57,16 +57,23 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
     [path, session],
   );
 
-  // Keyed on the resolved start rather than the raw distance, so dragging within a span
-  // that resolves to the same start (e.g. snapped to a waypoint) doesn't rebuild the
-  // preview and with it every planner feature on the map.
-  const startKey = position ? JSON.stringify(position.start) : null;
+  // Keyed on the resolved start's fields rather than the raw distance (or the start object,
+  // which is new every render), so dragging within a span that resolves to the same start
+  // (e.g. snapped to a waypoint) doesn't rebuild the preview and every planner feature.
+  const s = position?.start;
+  const wi = s && 'waypointIndex' in s ? s.waypointIndex : null;
+  const si = s && 'segmentIndex' in s ? s.segmentIndex : null;
+  const ci = s && 'coordIndex' in s ? s.coordIndex : null;
+  const lat = s && 'point' in s ? s.point.lat : null;
+  const lng = s && 'point' in s ? s.point.lng : null;
   const draft = useMemo(() => {
-    if (!startKey) return null;
-    const start = JSON.parse(startKey) as RotateStart;
+    let start: RotateStart;
+    if (wi !== null) start = { waypointIndex: wi };
+    else if (si !== null && ci !== null && lat !== null && lng !== null) start = { segmentIndex: si, coordIndex: ci, point: { lat, lng } };
+    else return null;
     const action: RouteContentAction = { type: 'ROTATE', closed, closeSnap, start };
     return { action, start, preview: applyAction({ waypoints, segments }, action) };
-  }, [startKey, closed, closeSnap, waypoints, segments]);
+  }, [wi, si, ci, lat, lng, closed, closeSnap, waypoints, segments]);
 
   // Also wait out snapped segments still queued for routing (useRouteSnapping debounces
   // before isRouting flips) — their patch landing would end the session.

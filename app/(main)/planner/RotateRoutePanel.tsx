@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Link2, X, Check } from 'lucide-react';
+import { fmtKm } from '@/lib/format-stats';
 
 interface RotateRoutePanelProps {
   draftDist: number;
@@ -17,10 +18,6 @@ interface RotateRoutePanelProps {
 }
 
 const SLIDER_STEP = 10; // metres
-
-function fmtKm(m: number): string {
-  return (m / 1000).toFixed(m < 10000 ? 2 : 1);
-}
 
 const btnStyle: React.CSSProperties = {
   height: 32, padding: '0 12px', borderRadius: 4, border: 'none',
@@ -45,6 +42,10 @@ export default function RotateRoutePanel({
   onCancel,
 }: RotateRoutePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // Latest callbacks via a ref so the key listener is subscribed once, not re-attached
+  // every time `onApply` changes (which is every frame during a handle drag)
+  const latest = useRef({ onApply, onCancel, canApply });
+  useEffect(() => { latest.current = { onApply, onCancel, canApply }; });
   // Enter applies / Esc cancels — unless the user is typing somewhere (e.g. place search).
   // Enter on a focused button is left to that button (Cancel, the closing-leg toggle).
   useEffect(() => {
@@ -55,12 +56,13 @@ export default function RotateRoutePanel({
       const t = e.target as HTMLElement | null;
       const inPanel = !!t && !!panelRef.current?.contains(t);
       if (!inPanel && t !== document.body) return;
+      const { onApply, onCancel, canApply } = latest.current;
       if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
       else if (e.key === 'Enter' && canApply && t?.tagName !== 'BUTTON') { e.preventDefault(); onApply(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onApply, onCancel, canApply]);
+  }, []);
 
   return (
     <div

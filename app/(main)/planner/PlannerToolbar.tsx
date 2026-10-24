@@ -206,7 +206,7 @@ export default function PlannerToolbar({
         </TbBtn>
 
         {/* Rotate route — move the start/finish around the route as a loop */}
-        <TbBtn label="Rotate" active={rotating} disabled={!rotating && !canRotate} onClick={onToggleRotate}>
+        <TbBtn label="Rotate" active={rotating} disabled={!rotating && !canRotate} onClick={() => { setImportAnchor(null); onToggleRotate(); }}>
           <RotateCw size={16} />
         </TbBtn>
 
@@ -231,14 +231,14 @@ export default function PlannerToolbar({
         {onBack && (
           <div className="hidden sm:flex items-center">
             {SEP}
-            <TbBtn label="Back" onClick={onBack}>
+            <TbBtn label="Back" disabled={rotating} onClick={onBack}>
               <ChevronLeft size={16} />
             </TbBtn>
           </div>
         )}
       </div>
 
-      {importAnchor && createPortal(
+      {importAnchor && !rotating && createPortal(
         <ImportRoutePopover
           anchorRect={importAnchor}
           onClose={() => setImportAnchor(null)}

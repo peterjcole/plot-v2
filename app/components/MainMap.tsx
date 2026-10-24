@@ -155,6 +155,18 @@ const routingPendingStyle = [
   new Style({ stroke: new Stroke({ color: 'rgba(224,112,32,0.7)', width: 4, lineDash: [2, 6] }) }),
 ];
 
+/** Rotate mode: what's under `pixel` — the start/finish handle, the route line, or nothing.
+ * Touch gets a wider route tolerance (fingers are imprecise). */
+function hitRotateTarget(
+  map: Map, pixel: number[], pointerType: string,
+  rotateLayer: VectorLayer<VectorSource> | null, routeLayer: VectorLayer<VectorSource> | null,
+): 'handle' | 'route' | null {
+  if (map.hasFeatureAtPixel(pixel, { layerFilter: (l) => l === rotateLayer, hitTolerance: 16 })) return 'handle';
+  const routeTolerance = pointerType === 'touch' ? 20 : 10;
+  if (map.hasFeatureAtPixel(pixel, { layerFilter: (l) => l === routeLayer, hitTolerance: routeTolerance })) return 'route';
+  return null;
+}
+
 function waypointPinSvg(index: number): string {
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="44" viewBox="0 0 32 44">' +
@@ -316,6 +328,7 @@ export default function MainMap({
   const rotateSourceRef = useRef<VectorSource | null>(null);
   const rotateLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const rotateHandleRef = useRef(rotateHandle);
+  const rotateDraggingRef = useRef(false);
   useEffect(() => { rotateHandleRef.current = rotateHandle; }, [rotateHandle]);
   const plannerPropsRef = useRef(plannerProps);
   useEffect(() => { plannerPropsRef.current = plannerProps; }, [plannerProps]);
@@ -703,17 +716,18 @@ export default function MainMap({
 
     const onPointerDown = (e: PointerEvent) => {
       lastPointerTypeRef.current = e.pointerType;
-      if (dragPointer !== null || !e.isPrimary || e.button !== 0) return;
-      const pixel = map.getEventPixel(e);
-      const onHandle = map.forEachFeatureAtPixel(pixel, () => true, {
-        layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
-      });
-      const onRoute = !onHandle && e.pointerType !== 'touch' && map.forEachFeatureAtPixel(pixel, () => true, {
-        layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
-      });
-      if (!onHandle && !onRoute) return;
+      // Mid-drag, swallow any other pointer (a second finger) so OpenLayers doesn't start
+      // panning the map out from under the handle
+      if (dragPointer !== null) { e.stopPropagation(); return; }
+      if (!e.isPrimary || e.button !== 0) return;
+      const target = hitRotateTarget(map, map.getEventPixel(e), e.pointerType, rotateLayerRef.current, plannerRouteLayerRef.current);
+      // Touch presses on the route line pan the map (taps are handled by the click handler)
+      const onRoute = target === 'route' && e.pointerType !== 'touch';
+      if (target !== 'handle' && !onRoute) return;
       e.stopPropagation();
       dragPointer = e.pointerId;
+      rotateDraggingRef.current = true;
+      (map.getTargetElement() as HTMLElement).style.cursor = 'grabbing';
       // Keep receiving moves/up while the pointer is over overlays (panel, toolbar) or off-map
       viewport.setPointerCapture(e.pointerId);
       if (onRoute) report(e);
@@ -725,6 +739,7 @@ export default function MainMap({
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== dragPointer) return;
       dragPointer = null;
+      rotateDraggingRef.current = false;
       if (viewport.hasPointerCapture(e.pointerId)) viewport.releasePointerCapture(e.pointerId);
     };
 
@@ -740,6 +755,7 @@ export default function MainMap({
       cancelAnimationFrame(frame);
       // Rotate mode ended mid-drag (Enter/Esc while the button is held) — let go of the pointer
       if (dragPointer !== null && viewport.hasPointerCapture(dragPointer)) viewport.releasePointerCapture(dragPointer);
+      rotateDraggingRef.current = false;
       plannerModifyRef.current?.setActive(true);
     };
   }, [rotateActive]);
@@ -1570,10 +1586,7 @@ export default function MainMap({
         const rh = rotateHandleRef.current;
         if (rh) {
           if (lastPointerTypeRef.current !== 'touch') return;
-          const onRoute = map.forEachFeatureAtPixel(e.pixel, () => true, {
-            layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 20,
-          });
-          if (onRoute) {
+          if (hitRotateTarget(map, e.pixel, 'touch', rotateLayerRef.current, plannerRouteLayerRef.current)) {
             const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
             rh.onDrag({ lat, lng });
           }
@@ -1679,13 +1692,9 @@ export default function MainMap({
       const el = map.getTargetElement() as HTMLElement;
       if (plannerPropsRef.current && rotateHandleRef.current) {
         // Rotate mode: pins/insert are suspended — only the handle and the route respond
-        const handleHit = map.hasFeatureAtPixel(e.pixel, {
-          layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
-        });
-        const routeHit = !handleHit && map.hasFeatureAtPixel(e.pixel, {
-          layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
-        });
-        el.style.cursor = handleHit ? (e.dragging ? 'grabbing' : 'grab') : routeHit ? 'pointer' : '';
+        if (rotateDraggingRef.current) { el.style.cursor = 'grabbing'; return; }
+        const target = hitRotateTarget(map, e.pixel, 'mouse', rotateLayerRef.current, plannerRouteLayerRef.current);
+        el.style.cursor = target === 'handle' ? 'grab' : target === 'route' ? 'pointer' : '';
         return;
       }
       if (plannerPropsRef.current) {
