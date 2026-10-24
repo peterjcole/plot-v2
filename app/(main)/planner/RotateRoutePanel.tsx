@@ -10,7 +10,6 @@ interface RotateRoutePanelProps {
   closed: boolean;
   closeSnap: boolean;
   canApply: boolean;
-  isRouting: boolean;
   onChange: (dist: number) => void;
   onToggleCloseSnap: () => void;
   onApply: () => void;
@@ -40,7 +39,6 @@ export default function RotateRoutePanel({
   closed,
   closeSnap,
   canApply,
-  isRouting,
   onChange,
   onToggleCloseSnap,
   onApply,
@@ -53,6 +51,7 @@ export default function RotateRoutePanel({
     const onKey = (e: KeyboardEvent) => {
       // Only when nothing else has focus (the map) or focus is in this panel — not while
       // another popover or input is being used.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       const inPanel = !!t && !!panelRef.current?.contains(t);
       if (!inPanel && t !== document.body) return;
@@ -113,7 +112,6 @@ export default function RotateRoutePanel({
         <button
           onClick={onApply}
           disabled={!canApply}
-          title={isRouting ? 'Waiting for routing to finish' : undefined}
           style={{ ...btnStyle, background: canApply ? 'var(--ora)' : 'var(--p3)', color: canApply ? 'var(--p0)' : 'var(--fog-dim)', cursor: canApply ? 'pointer' : 'not-allowed' }}
         >
           <Check size={14} />

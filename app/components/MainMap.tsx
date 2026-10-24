@@ -738,6 +738,8 @@ export default function MainMap({
       viewport.removeEventListener('pointerup', onPointerUp);
       viewport.removeEventListener('pointercancel', onPointerUp);
       cancelAnimationFrame(frame);
+      // Rotate mode ended mid-drag (Enter/Esc while the button is held) — let go of the pointer
+      if (dragPointer !== null && viewport.hasPointerCapture(dragPointer)) viewport.releasePointerCapture(dragPointer);
       plannerModifyRef.current?.setActive(true);
     };
   }, [rotateActive]);
@@ -1675,6 +1677,17 @@ export default function MainMap({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onMove = (e: any) => {
       const el = map.getTargetElement() as HTMLElement;
+      if (plannerPropsRef.current && rotateHandleRef.current) {
+        // Rotate mode: pins/insert are suspended — only the handle and the route respond
+        const handleHit = map.hasFeatureAtPixel(e.pixel, {
+          layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
+        });
+        const routeHit = !handleHit && map.hasFeatureAtPixel(e.pixel, {
+          layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
+        });
+        el.style.cursor = handleHit ? (e.dragging ? 'grabbing' : 'grab') : routeHit ? 'pointer' : '';
+        return;
+      }
       if (plannerPropsRef.current) {
         const wpHit = map.hasFeatureAtPixel(e.pixel, {
           layerFilter: (l) => l === plannerWpLayerRef.current,

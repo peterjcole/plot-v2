@@ -195,7 +195,7 @@ export default function PlannerToolbar({
           </TbBtn>
 
           {/* Export GPX */}
-          <TbBtn label="Export" disabled={!hasRoute} onClick={handleExportGpx}>
+          <TbBtn label="Export" disabled={!hasRoute || rotating} onClick={handleExportGpx}>
             <Download size={16} />
           </TbBtn>
         </div>

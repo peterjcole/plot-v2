@@ -38,9 +38,12 @@ interface RotateSession {
  */
 export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isRouting, enabled, onApplied }: UseRouteRotateOptions) {
   const [session, setSession] = useState<RotateSession | null>(null);
-  // Adjusting state during render (not in an effect) — React re-renders immediately
-  if (!enabled && session) setSession(null);
-  const active = enabled && !!session && session.waypoints === waypoints && session.segments === segments;
+  // Any committed change underneath the session (route switched/loaded, undo, a routing
+  // patch) or leaving planner mode ends it outright. Adjusting state during render (not in
+  // an effect) — React re-renders immediately.
+  const stale = !!session && (!enabled || session.waypoints !== waypoints || session.segments !== segments);
+  if (stale) setSession(null);
+  const active = !!session && !stale;
 
   const closed = useMemo(() => isClosedLoop(waypoints), [waypoints]);
   const closeSnap = session?.closeSnap ?? snapEnabled;
@@ -62,7 +65,7 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
     if (!startKey) return null;
     const start = JSON.parse(startKey) as RotateStart;
     const action: RouteContentAction = { type: 'ROTATE', closed, closeSnap, start };
-    return { action, preview: applyAction({ waypoints, segments }, action) };
+    return { action, start, preview: applyAction({ waypoints, segments }, action) };
   }, [startKey, closed, closeSnap, waypoints, segments]);
 
   // Also wait out snapped segments still queued for routing (useRouteSnapping debounces
@@ -89,14 +92,19 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
     if (path) setDraftDist(projectOntoPath(path, p));
   }, [path, setDraftDist]);
 
-  const canApply = !!draft?.preview && !isRouting;
+  // Starting a session can't overlap routing (canStart), and any routing patch ends it, so
+  // routing needn't be re-checked here. The start must actually have moved: on an open
+  // route a no-move ROTATE would still add the closing leg, which is easy to do by accident
+  // (Enter on the auto-focused slider).
+  const moved = !!draft && !('waypointIndex' in draft.start && draft.start.waypointIndex === 0);
+  const canApply = !!draft?.preview && moved;
 
   const apply = useCallback(() => {
-    if (!draft?.preview || isRouting) return;
+    if (!draft?.preview || !canApply) return;
     dispatch(draft.action);
     setSession(null);
     onApplied?.();
-  }, [draft, isRouting, dispatch, onApplied]);
+  }, [draft, canApply, dispatch, onApplied]);
 
   return {
     active,

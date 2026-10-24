@@ -613,6 +613,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleStartRotate = useCallback(() => {
     setWaypointPopover(null);
     setSegmentTap(null);
+    setMobileImportAnchor(null);
+    setMobileRoutesSheetOpen(false);
     startRotate();
   }, [startRotate, setWaypointPopover, setSegmentTap]);
 
@@ -996,7 +998,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             </div>
           )}
           {mode === 'planner' && (
-            <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            // Rotate is modal: the whole sidebar (route picker, waypoint list, exports) is
+            // inert and dimmed — it shows the committed route the preview is about to replace
+            <div inert={rotating} className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: rotating ? 0.45 : 1, transition: 'opacity .15s' }}>
               {isPremium && (
                 <SavedRoutesPicker
                   loading={!routeHydrated}
@@ -1015,9 +1019,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   onDeleteRoute={handleDeleteRoute}
                 />
               )}
-              {/* Locked (inert + dimmed) while rotating — the sidebar shows the committed route,
-                  which the rotate preview on the map is about to replace */}
-              <div inert={rotating} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: rotating ? 0.45 : 1, transition: 'opacity .15s' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <PlannerPanel
                   distance={distance}
                   elevGain={elevGain}
@@ -1129,7 +1131,6 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             closed={rotate.closed}
             closeSnap={rotate.closeSnap}
             canApply={rotate.canApply}
-            isRouting={isRouting}
             onChange={rotate.setDraftDist}
             onToggleCloseSnap={rotate.toggleCloseSnap}
             onApply={rotate.apply}
@@ -1237,7 +1238,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         const { label: routeLabel, kind: routeLabelKind } = displayRouteLabel({ name: routeMeta.name, location: routeMeta.location });
         const usingLocationAsName = routeMeta.name === UNTITLED_ROUTE_NAME && !!routeMeta.location;
         return (
-          <div style={{
+          // Inert while rotating (modal) — My routes, Import and Export can't run mid-rotate
+          <div inert={rotating} style={{
             position: 'fixed', bottom: 10, left: 10, right: 10,
             height: plannerHudHeight,
             background: 'var(--p1)',
@@ -1247,7 +1249,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             touchAction: 'none',
-            opacity: mode === 'planner' ? 1 : 0,
+            opacity: mode === 'planner' ? (rotating ? 0.6 : 1) : 0,
             pointerEvents: mode === 'planner' ? 'auto' : 'none',
             transform: mode === 'planner' ? 'translateY(0)' : 'translateY(100%)',
             transition: plannerHudDragging ? 'none' : 'height 0.3s ease, opacity 0.28s ease, transform 0.28s ease',
