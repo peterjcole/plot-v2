@@ -11,8 +11,9 @@ import { boundingExtent } from 'ol/extent';
 import { ActivitySummary, ActivityData, PhotoItem } from '@/lib/types';
 import { type PlannerProps, type WaypointClickInfo, type SegmentTapInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
-import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
+import { useRouteHistory, type RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
+import { useRouteRotate } from '@/app/(main)/planner/useRouteRotate';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
@@ -34,6 +35,7 @@ import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileBottomSheet from './MobileBottomSheet';
 import PlannerToolbar from '@/app/(main)/planner/PlannerToolbar';
+import RotateRoutePanel from '@/app/(main)/planner/RotateRoutePanel';
 import Compass from './Compass';
 import ScaleBar from './ScaleBar';
 import MapLegend from './MapLegend';
@@ -130,7 +132,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleElevationHover = useCallback((pt: ElevationHoverPoint | null) => setElevationHoverPoint(pt), []);
 
   // Planner state
-  const { waypoints, segments, canUndo, canRedo, dispatch, restore, actions, cursor } = useRouteHistory();
+  const { waypoints, segments, canUndo, canRedo, dispatch: historyDispatch, restore, actions, cursor } = useRouteHistory();
+  // While rotate-route mode is open the route is locked: every edit path (toolbar, sidebar,
+  // map, popovers, import) goes through this one gate rather than each disabling itself.
+  // Routing patches still land — they belong to edits made before the session started.
+  const rotatingRef = useRef(false);
+  const dispatch = useCallback((action: RouteAction) => {
+    if (rotatingRef.current && action.type !== 'UPDATE_SEGMENT') return;
+    historyDispatch(action);
+  }, [historyDispatch]);
   const [addPointsEnabled, setAddPointsEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isExportingImage, setIsExportingImage] = useState(false);
@@ -151,7 +161,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   actionsRef.current = actions;
   cursorRef.current = cursor;
 
-  useRouteSnapping({ waypoints, segments, dispatch });
+  const { isRouting } = useRouteSnapping({ waypoints, segments, dispatch });
   const { elevationData, elevGainMeters, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
@@ -432,6 +442,17 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     setRouteMeta((m) => ({ ...m, location: null }));
   }, [isPremium]);
 
+  // Rotate-route preview. Only the map sees the rotated preview — elevation, autosave and
+  // the stats all stay on the committed route until Apply records a single ROTATE action.
+  const rotate = useRouteRotate({
+    waypoints, segments, dispatch: historyDispatch, snapEnabled, isRouting,
+    enabled: mode === 'planner', onApplied: handleRouteReplaced,
+  });
+  const rotating = rotate.active;
+  rotatingRef.current = rotating;
+  // What the map shows — the rotated preview while rotating
+  const shownRoute = rotate.previewState ?? { waypoints, segments };
+
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
   // the same debounce for map-view-only changes. routeMeta.id is included so that a route
   // whose id is (re)adopted after its content is already set — e.g. the activity-into-planner
@@ -580,12 +601,22 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     handleOwnerPhotoClick, handleOwnerClusterPhotosClick, handleHeatmapClick,
   } = useMapPopups();
   const {
-    waypointPopover,
+    waypointPopover, setWaypointPopover,
     segmentTap, setSegmentTap,
     handleWaypointClick, handleSegmentTap, handleSegmentInsert,
     handleWaypointPopoverClose, handleEditWaypoint,
     handleWaypointDelete, handleToggleSnapIn, handleToggleSnapOut,
   } = useWaypointInteraction(waypoints, segments, dispatch, mapInstanceRef, snapEnabled);
+
+  // Popovers act on committed indices and the route is locked while rotating — close them
+  const { start: startRotate } = rotate;
+  const handleStartRotate = useCallback(() => {
+    setWaypointPopover(null);
+    setSegmentTap(null);
+    setMobileImportAnchor(null);
+    setMobileRoutesSheetOpen(false);
+    startRotate();
+  }, [startRotate, setWaypointPopover, setSegmentTap]);
 
   const photosImportTriggeredRef = useRef(false);
 
@@ -904,7 +935,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [segments, osDark]);
 
   const plannerProps: PlannerProps | undefined = mode === 'planner'
-    ? { waypoints, segments, dispatch, addPointsEnabled, snapEnabled }
+    ? {
+        waypoints: shownRoute.waypoints,
+        segments: shownRoute.segments,
+        dispatch,
+        addPointsEnabled: addPointsEnabled && !rotating,
+        snapEnabled,
+      }
     : undefined;
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
@@ -961,7 +998,9 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             </div>
           )}
           {mode === 'planner' && (
-            <div className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            // Rotate is modal: the whole sidebar (route picker, waypoint list, exports) is
+            // inert and dimmed — it shows the committed route the preview is about to replace
+            <div inert={rotating} className="panel-fade-in" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: rotating ? 0.45 : 1, transition: 'opacity .15s' }}>
               {isPremium && (
                 <SavedRoutesPicker
                   loading={!routeHydrated}
@@ -1024,6 +1063,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
           baseLayer={layerState.baseLayer}
           plannerProps={plannerProps}
+          rotateHandle={rotating && rotate.handlePoint ? { point: rotate.handlePoint, onDrag: rotate.dragTo } : null}
           onMapReady={handleMapReady}
           osDark={osDark}
           showHillshade={layerState.showHillshade}
@@ -1076,9 +1116,25 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             isLoadingElevation={isLoadingElevation}
             onFitToRoute={handleFitToRoute}
             onReverse={() => dispatch({ type: 'REVERSE' })}
+            rotating={rotating}
+            canRotate={rotate.canStart}
+            onToggleRotate={rotating ? rotate.cancel : handleStartRotate}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
             onImported={handleRouteReplaced}
+          />
+        )}
+        {rotating && (
+          <RotateRoutePanel
+            draftDist={rotate.draftDist}
+            loopLength={rotate.loopLength}
+            closed={rotate.closed}
+            closeSnap={rotate.closeSnap}
+            canApply={rotate.canApply}
+            onChange={rotate.setDraftDist}
+            onToggleCloseSnap={rotate.toggleCloseSnap}
+            onApply={rotate.apply}
+            onCancel={rotate.cancel}
           />
         )}
       </div>
@@ -1136,7 +1192,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         </>
       )}
 
-      {mode === 'planner' && (
+      {/* Hidden while rotating — the rotate panel occupies this strip under the toolbar */}
+      {mode === 'planner' && !rotating && (
         <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isPremium={isPremium} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
       )}
 
@@ -1181,7 +1238,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         const { label: routeLabel, kind: routeLabelKind } = displayRouteLabel({ name: routeMeta.name, location: routeMeta.location });
         const usingLocationAsName = routeMeta.name === UNTITLED_ROUTE_NAME && !!routeMeta.location;
         return (
-          <div style={{
+          // Inert while rotating (modal) — My routes, Import and Export can't run mid-rotate
+          <div inert={rotating} style={{
             position: 'fixed', bottom: 10, left: 10, right: 10,
             height: plannerHudHeight,
             background: 'var(--p1)',
@@ -1191,7 +1249,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             touchAction: 'none',
-            opacity: mode === 'planner' ? 1 : 0,
+            opacity: mode === 'planner' ? (rotating ? 0.6 : 1) : 0,
             pointerEvents: mode === 'planner' ? 'auto' : 'none',
             transform: mode === 'planner' ? 'translateY(0)' : 'translateY(100%)',
             transition: plannerHudDragging ? 'none' : 'height 0.3s ease, opacity 0.28s ease, transform 0.28s ease',
