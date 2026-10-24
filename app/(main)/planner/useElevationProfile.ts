@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
+import { isAwaitingRoute } from '@/lib/route-actions';
 import {
   type ElevationPoint,
   distanceWindowSize,
@@ -70,9 +71,7 @@ export function useElevationProfile(
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if any segments are still pending routing (snapped but no coordinates)
-  const hasPendingSegments = segments.some(
-    (seg) => seg.snapped && seg.coordinates.length === 0
-  );
+  const hasPendingSegments = segments.some(isAwaitingRoute);
 
   const polyline = useMemo(
     () => (hasPendingSegments ? null : buildPolyline(waypoints, segments)),

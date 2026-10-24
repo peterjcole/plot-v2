@@ -31,6 +31,7 @@ import {
 } from '@/lib/map-config';
 import { getNgdStyle } from '@/lib/ngd-style';
 import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
+import { isAwaitingRoute } from '@/lib/route-actions';
 import { getActivityColor } from '@/lib/activity-categories';
 import type { RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import { applyStyle } from 'ol-mapbox-style';
@@ -231,7 +232,7 @@ function syncPlannerFeatures(
           ];
       const feature = new Feature({ geometry: new LineString(coords), segmentIndex: i, snapped: seg?.snapped ?? false });
       if (seg?.snapped && seg.coordinates.length >= 2) feature.setStyle(snappedRouteStyle);
-      else if (seg?.snapped && seg.coordinates.length === 0) feature.setStyle(routingPendingStyle);
+      else if (seg && isAwaitingRoute(seg)) feature.setStyle(routingPendingStyle);
       else feature.setStyle(unsnappedRouteStyle);
       routeSource.addFeature(feature);
     }

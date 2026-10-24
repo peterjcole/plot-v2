@@ -5,6 +5,14 @@ import { Waypoint, RouteSegment } from '@/lib/types';
 import { isAwaitingRoute } from '@/lib/route-actions';
 import { RouteAction } from './useRouteHistory';
 
+interface InFlight {
+  controller: AbortController;
+  from: Waypoint;
+  to: Waypoint;
+}
+
+const samePoint = (a: Waypoint | undefined, b: Waypoint) => !!a && a.lat === b.lat && a.lng === b.lng;
+
 interface UseRouteSnappingOptions {
   waypoints: Waypoint[];
   segments: RouteSegment[];
@@ -16,14 +24,16 @@ export function useRouteSnapping({
   segments,
   dispatch,
 }: UseRouteSnappingOptions) {
-  const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
+  // In-flight request per segment index, with the endpoints it was fetched for
+  const inFlightRef = useRef<Map<number, InFlight>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeCountRef = useRef(0);
   const [isRouting, setIsRouting] = useState(false);
-  // Latest route, read when a fetch resolves — results are applied by segment index, so they
-  // must be checked against what that index means *now* (see `stillPending`)
-  // Synced in a layout effect — it runs during commit, before any fetch callback can, so it
-  // never lags the committed route (a passive effect can flush after a fetch resolves).
+  // Latest committed route, read when a fetch resolves — results are applied by segment
+  // index, so they must be checked against what that index means *now* (see `stillPending`).
+  // Synced in a layout effect so it's current as of the last commit. It can't see actions
+  // dispatched but not yet rendered, so `stillPending` narrows the wrong-segment race rather
+  // than closing it.
   const routeRef = useRef({ waypoints, segments });
   useLayoutEffect(() => { routeRef.current = { waypoints, segments }; }, [waypoints, segments]);
 
@@ -36,6 +46,15 @@ export function useRouteSnapping({
       }
     });
 
+    // Drop requests that no longer match the route: the segment is no longer awaiting
+    // routing (undone, routed) or now joins different points. Matching ones keep running.
+    for (const [segIdx, req] of inFlightRef.current) {
+      if (!pending.includes(segIdx) || !samePoint(waypoints[segIdx], req.from) || !samePoint(waypoints[segIdx + 1], req.to)) {
+        req.controller.abort();
+        inFlightRef.current.delete(segIdx);
+      }
+    }
+
     if (pending.length === 0) return;
 
     // Debounce to batch rapid changes
@@ -44,27 +63,25 @@ export function useRouteSnapping({
       let addedCount = 0;
 
       for (const segIdx of pending) {
-        // Cancel any existing request for this segment
-        const existing = abortControllersRef.current.get(segIdx);
-        if (existing) existing.abort();
-
-        const controller = new AbortController();
-        abortControllersRef.current.set(segIdx, controller);
-
         const from = waypoints[segIdx];
         const to = waypoints[segIdx + 1];
         if (!from || !to) continue;
+
+        // Already fetching this exact segment — let it finish
+        const existing = inFlightRef.current.get(segIdx);
+        if (existing && samePoint(from, existing.from) && samePoint(to, existing.to)) continue;
+        existing?.controller.abort();
+
+        const controller = new AbortController();
+        inFlightRef.current.set(segIdx, { controller, from, to });
 
         // The route may have changed while the fetch was in flight (undo/redo, a rotate,
         // an insert...). Only apply the result if segment `segIdx` still joins the same two
         // points and is still waiting to be routed — otherwise it'd land on the wrong segment.
         const stillPending = () => {
           const { waypoints: wps, segments: segs } = routeRef.current;
-          const a = wps[segIdx];
-          const b = wps[segIdx + 1];
           const seg = segs[segIdx];
-          return !!a && !!b && !!seg && isAwaitingRoute(seg)
-            && a.lat === from.lat && a.lng === from.lng && b.lat === to.lat && b.lng === to.lng;
+          return !!seg && isAwaitingRoute(seg) && samePoint(wps[segIdx], from) && samePoint(wps[segIdx + 1], to);
         };
 
         addedCount++;
@@ -109,7 +126,7 @@ export function useRouteSnapping({
           })
           .finally(() => {
             // Only if it's still ours — a newer request for this segment may have replaced it
-            if (abortControllersRef.current.get(segIdx) === controller) abortControllersRef.current.delete(segIdx);
+            if (inFlightRef.current.get(segIdx)?.controller === controller) inFlightRef.current.delete(segIdx);
             activeCountRef.current--;
             if (activeCountRef.current <= 0) {
               activeCountRef.current = 0;
@@ -128,9 +145,9 @@ export function useRouteSnapping({
 
   // Cleanup on unmount
   useEffect(() => {
-    const controllers = abortControllersRef.current;
+    const inFlight = inFlightRef.current;
     return () => {
-      for (const controller of controllers.values()) {
+      for (const { controller } of inFlight.values()) {
         controller.abort();
       }
     };
