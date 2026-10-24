@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link2, X, Check } from 'lucide-react';
 
 interface RotateRoutePanelProps {
@@ -46,12 +46,16 @@ export default function RotateRoutePanel({
   onApply,
   onCancel,
 }: RotateRoutePanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
   // Enter applies / Esc cancels — unless the user is typing somewhere (e.g. place search).
   // Enter on a focused button is left to that button (Cancel, the closing-leg toggle).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Only when nothing else has focus (the map) or focus is in this panel — not while
+      // another popover or input is being used.
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      const inPanel = !!t && !!panelRef.current?.contains(t);
+      if (!inPanel && t !== document.body) return;
       if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
       else if (e.key === 'Enter' && canApply && t?.tagName !== 'BUTTON') { e.preventDefault(); onApply(); }
     };
@@ -61,6 +65,7 @@ export default function RotateRoutePanel({
 
   return (
     <div
+      ref={panelRef}
       className="animate-panel-in fixed sm:absolute top-[122px] sm:top-[60px] left-[10px] right-[10px] sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[420px] rounded-[10px] border border-p3 z-20 sm:z-[5]"
       style={{ background: 'var(--glass-lgt)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', padding: '12px 14px' }}
     >
@@ -77,6 +82,7 @@ export default function RotateRoutePanel({
         type="range"
         className="rotate-range"
         aria-label="Start position along the route"
+        autoFocus
         min={0}
         max={Math.max(SLIDER_STEP, Math.round(loopLength))}
         step={SLIDER_STEP}

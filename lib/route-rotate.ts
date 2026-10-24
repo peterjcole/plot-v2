@@ -26,6 +26,13 @@ export function buildLoop(state: RouteState, closed: boolean, closeSnap: boolean
     // start waypoint — extend its routed geometry to meet it (the two were up to the
     // closed-loop tolerance apart) rather than leaving a gap.
     const waypoints = state.waypoints.slice(0, -1);
+    // Don't lose the dropped finish waypoint's name/elevation if the start lacks them
+    const finish = state.waypoints[state.waypoints.length - 1];
+    if (finish.name != null || finish.ele != null) {
+      waypoints[0] = { name: finish.name, ele: finish.ele, ...waypoints[0] };
+      if (waypoints[0].name == null) delete waypoints[0].name;
+      if (waypoints[0].ele == null) delete waypoints[0].ele;
+    }
     const segments = [...state.segments];
     const last = segments[segments.length - 1];
     if (last && last.coordinates.length >= 2) {

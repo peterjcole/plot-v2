@@ -684,7 +684,8 @@ export default function MainMap({
     plannerModifyRef.current?.setActive(false);
 
     const viewport = map.getViewport();
-    let dragging = false;
+    // The pointer driving the drag — others (a second finger, a stray mouse) are ignored
+    let dragPointer: number | null = null;
     // Pointer moves can outpace rendering — report at most once per frame
     let frame = 0;
     let pending: PointerEvent | null = null;
@@ -702,6 +703,7 @@ export default function MainMap({
 
     const onPointerDown = (e: PointerEvent) => {
       lastPointerTypeRef.current = e.pointerType;
+      if (dragPointer !== null || !e.isPrimary || e.button !== 0) return;
       const pixel = map.getEventPixel(e);
       const onHandle = map.forEachFeatureAtPixel(pixel, () => true, {
         layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
@@ -711,15 +713,20 @@ export default function MainMap({
       });
       if (!onHandle && !onRoute) return;
       e.stopPropagation();
-      dragging = true;
+      dragPointer = e.pointerId;
+      // Keep receiving moves/up while the pointer is over overlays (panel, toolbar) or off-map
+      viewport.setPointerCapture(e.pointerId);
       if (onRoute) report(e);
     };
     const onPointerMove = (e: PointerEvent) => {
-      if (!dragging) return;
-      if (!e.buttons) { dragging = false; return; }
+      if (e.pointerId !== dragPointer) return;
       report(e);
     };
-    const onPointerUp = () => { dragging = false; };
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== dragPointer) return;
+      dragPointer = null;
+      if (viewport.hasPointerCapture(e.pointerId)) viewport.releasePointerCapture(e.pointerId);
+    };
 
     viewport.addEventListener('pointerdown', onPointerDown, { capture: true });
     viewport.addEventListener('pointermove', onPointerMove);

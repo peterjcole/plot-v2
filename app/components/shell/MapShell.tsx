@@ -450,7 +450,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   });
   const rotating = rotate.active;
   rotatingRef.current = rotating;
-  // What the map and waypoint list show — the rotated preview while rotating
+  // What the map shows — the rotated preview while rotating
   const shownRoute = rotating && rotate.previewState ? rotate.previewState : { waypoints, segments };
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
@@ -601,12 +601,20 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     handleOwnerPhotoClick, handleOwnerClusterPhotosClick, handleHeatmapClick,
   } = useMapPopups();
   const {
-    waypointPopover,
+    waypointPopover, setWaypointPopover,
     segmentTap, setSegmentTap,
     handleWaypointClick, handleSegmentTap, handleSegmentInsert,
     handleWaypointPopoverClose, handleEditWaypoint,
     handleWaypointDelete, handleToggleSnapIn, handleToggleSnapOut,
   } = useWaypointInteraction(waypoints, segments, dispatch, mapInstanceRef, snapEnabled);
+
+  // Popovers act on committed indices and the route is locked while rotating — close them
+  const { start: startRotate } = rotate;
+  const handleStartRotate = useCallback(() => {
+    setWaypointPopover(null);
+    setSegmentTap(null);
+    startRotate();
+  }, [startRotate, setWaypointPopover, setSegmentTap]);
 
   const photosImportTriggeredRef = useRef(false);
 
@@ -1007,12 +1015,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                   onDeleteRoute={handleDeleteRoute}
                 />
               )}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              {/* Locked (inert + dimmed) while rotating — the sidebar shows the committed route,
+                  which the rotate preview on the map is about to replace */}
+              <div inert={rotating} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', opacity: rotating ? 0.45 : 1, transition: 'opacity .15s' }}>
                 <PlannerPanel
                   distance={distance}
                   elevGain={elevGain}
-                  waypoints={shownRoute.waypoints}
-                  segments={shownRoute.segments}
+                  waypoints={waypoints}
+                  segments={segments}
                   elevationData={elevationData}
                   isLoadingElevation={isLoadingElevation}
                   dispatch={dispatch}
@@ -1106,7 +1116,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onReverse={() => dispatch({ type: 'REVERSE' })}
             rotating={rotating}
             canRotate={rotate.canStart}
-            onToggleRotate={rotating ? rotate.cancel : rotate.start}
+            onToggleRotate={rotating ? rotate.cancel : handleStartRotate}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
             onImported={handleRouteReplaced}

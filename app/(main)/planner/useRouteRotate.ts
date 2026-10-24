@@ -65,7 +65,10 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
     return { action, preview: applyAction({ waypoints, segments }, action) };
   }, [startKey, closed, closeSnap, waypoints, segments]);
 
-  const canStart = waypoints.length >= 2 && !isRouting;
+  // Also wait out snapped segments still queued for routing (useRouteSnapping debounces
+  // before isRouting flips) — their patch landing would end the session.
+  const canStart = waypoints.length >= 2 && !isRouting
+    && !segments.some((s) => s.snapped && s.coordinates.length === 0);
 
   const start = useCallback(() => {
     if (!canStart) return;
