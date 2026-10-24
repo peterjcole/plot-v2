@@ -11,7 +11,7 @@ import { boundingExtent } from 'ol/extent';
 import { ActivitySummary, ActivityData, PhotoItem } from '@/lib/types';
 import { type PlannerProps, type WaypointClickInfo, type SegmentTapInfo } from '@/app/components/MainMap';
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
-import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
+import { useRouteHistory, type RouteAction } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
 import { useRouteRotate } from '@/app/(main)/planner/useRouteRotate';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
@@ -132,7 +132,15 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const handleElevationHover = useCallback((pt: ElevationHoverPoint | null) => setElevationHoverPoint(pt), []);
 
   // Planner state
-  const { waypoints, segments, canUndo, canRedo, dispatch, restore, actions, cursor } = useRouteHistory();
+  const { waypoints, segments, canUndo, canRedo, dispatch: historyDispatch, restore, actions, cursor } = useRouteHistory();
+  // While rotate-route mode is open the route is locked: every edit path (toolbar, sidebar,
+  // map, popovers, import) goes through this one gate rather than each disabling itself.
+  // Routing patches still land — they belong to edits made before the session started.
+  const rotatingRef = useRef(false);
+  const dispatch = useCallback((action: RouteAction) => {
+    if (rotatingRef.current && action.type !== 'UPDATE_SEGMENT') return;
+    historyDispatch(action);
+  }, [historyDispatch]);
   const [addPointsEnabled, setAddPointsEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [isExportingImage, setIsExportingImage] = useState(false);
@@ -436,8 +444,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   // Rotate-route preview. Only the map sees the rotated preview — elevation, autosave and
   // the stats all stay on the committed route until Apply records a single ROTATE action.
-  const rotate = useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isRouting, onApplied: handleRouteReplaced });
-  const rotating = mode === 'planner' && rotate.active;
+  const rotate = useRouteRotate({
+    waypoints, segments, dispatch: historyDispatch, snapEnabled, isRouting,
+    enabled: mode === 'planner', onApplied: handleRouteReplaced,
+  });
+  const rotating = rotate.active;
+  rotatingRef.current = rotating;
+  // What the map and waypoint list show — the rotated preview while rotating
+  const shownRoute = rotating && rotate.previewState ? rotate.previewState : { waypoints, segments };
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
   // the same debounce for map-view-only changes. routeMeta.id is included so that a route
@@ -912,8 +926,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
 
   const plannerProps: PlannerProps | undefined = mode === 'planner'
     ? {
-        waypoints: rotating && rotate.previewState ? rotate.previewState.waypoints : waypoints,
-        segments: rotating && rotate.previewState ? rotate.previewState.segments : segments,
+        waypoints: shownRoute.waypoints,
+        segments: shownRoute.segments,
         dispatch,
         addPointsEnabled: addPointsEnabled && !rotating,
         snapEnabled,
@@ -997,8 +1011,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
                 <PlannerPanel
                   distance={distance}
                   elevGain={elevGain}
-                  waypoints={waypoints}
-                  segments={segments}
+                  waypoints={shownRoute.waypoints}
+                  segments={shownRoute.segments}
                   elevationData={elevationData}
                   isLoadingElevation={isLoadingElevation}
                   dispatch={dispatch}
@@ -1091,6 +1105,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             onFitToRoute={handleFitToRoute}
             onReverse={() => dispatch({ type: 'REVERSE' })}
             rotating={rotating}
+            canRotate={rotate.canStart}
             onToggleRotate={rotating ? rotate.cancel : rotate.start}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}

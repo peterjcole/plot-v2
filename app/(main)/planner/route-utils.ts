@@ -2,9 +2,10 @@ import proj4 from 'proj4';
 import { register } from 'ol/proj/proj4';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import LineString from 'ol/geom/LineString';
-import { getLength, getDistance } from 'ol/sphere';
+import { getLength } from 'ol/sphere';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import { type RotateStart, buildLoop } from '@/lib/route-rotate';
+import { haversineDistance } from '@/lib/elevation';
 import { OS_PROJECTION } from '@/lib/map-config';
 
 // Ensure projection is registered before any coordinate transforms
@@ -55,12 +56,8 @@ const CLOSED_LOOP_TOLERANCE = 25;
 /** A rotate start this close (metres along the loop) to a waypoint snaps onto it. */
 const WAYPOINT_SNAP_TOLERANCE = 5;
 
-function geoDistance(a: Waypoint, b: Waypoint): number {
-  return getDistance([a.lng, a.lat], [b.lng, b.lat]);
-}
-
 export function isClosedLoop(waypoints: Waypoint[]): boolean {
-  return waypoints.length >= 3 && geoDistance(waypoints[0], waypoints[waypoints.length - 1]) < CLOSED_LOOP_TOLERANCE;
+  return waypoints.length >= 3 && haversineDistance(waypoints[0], waypoints[waypoints.length - 1]) < CLOSED_LOOP_TOLERANCE;
 }
 
 interface LoopVertex {
@@ -80,15 +77,18 @@ export interface LoopPath {
   waypoints: Waypoint[];
   /** Distance along the loop at which each segment's geometry starts and ends. */
   segmentBounds: { start: number; end: number }[];
+  /** A segment the start may only snap to the ends of — the snapped closing leg, whose
+   * straight placeholder line isn't where the routed leg will actually run. */
+  waypointOnlySegment: number | null;
 }
 
 /**
  * Flattens the route-as-a-loop (see lib/route-rotate.ts `buildLoop`) into one polyline,
  * tagging each vertex with where it sits in the loop so a distance along it can be turned
  * back into a ROTATE start. The closing segment is always straight here — if it'll be
- * snapped, its routed geometry doesn't exist yet.
+ * snapped, its routed geometry doesn't exist yet, so the start can't land partway along it.
  */
-export function buildLoopPath(waypoints: Waypoint[], segments: RouteSegment[], closed: boolean): LoopPath {
+export function buildLoopPath(waypoints: Waypoint[], segments: RouteSegment[], closed: boolean, closeSnap: boolean): LoopPath {
   const loop = buildLoop({ waypoints, segments }, closed, false);
   const m = loop.waypoints.length;
   const vertices: LoopVertex[] = [];
@@ -99,7 +99,7 @@ export function buildLoopPath(waypoints: Waypoint[], segments: RouteSegment[], c
     const coords = routed ? seg.coordinates : [loop.waypoints[j], loop.waypoints[(j + 1) % m]];
     coords.forEach((c, i) => {
       const prev = vertices[vertices.length - 1];
-      if (prev) cumDist += geoDistance(prev.lngLat, c);
+      if (prev) cumDist += haversineDistance(prev.lngLat, c);
       if (i === 0) segmentBounds.push({ start: cumDist, end: cumDist });
       vertices.push({
         xy: fromLonLat([c.lng, c.lat], OS_PROJECTION.code),
@@ -111,7 +111,13 @@ export function buildLoopPath(waypoints: Waypoint[], segments: RouteSegment[], c
     });
     segmentBounds[j].end = cumDist;
   });
-  return { vertices, length: cumDist, waypoints: loop.waypoints, segmentBounds };
+  return {
+    vertices,
+    length: cumDist,
+    waypoints: loop.waypoints,
+    segmentBounds,
+    waypointOnlySegment: !closed && closeSnap ? loop.segments.length - 1 : null,
+  };
 }
 
 /** Converts a distance along the loop into a ROTATE start plus the map point it sits at. */
@@ -135,6 +141,7 @@ export function positionAtDistance(path: LoopPath, d: number): { start: RotateSt
   // segment and adding a near-duplicate one.
   const fromStart = dist - segmentBounds[j].start;
   const toEnd = segmentBounds[j].end - dist;
+  if (j === path.waypointOnlySegment) return atWaypoint(fromStart <= toEnd ? j : (j + 1) % m);
   if (fromStart <= WAYPOINT_SNAP_TOLERANCE && fromStart <= toEnd) return atWaypoint(j);
   if (toEnd <= WAYPOINT_SNAP_TOLERANCE) return atWaypoint((j + 1) % m);
 

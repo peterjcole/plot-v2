@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
 import { applyAction, type RouteContentAction } from '@/lib/route-actions';
+import type { RotateStart } from '@/lib/route-rotate';
 import { RouteAction } from './useRouteHistory';
 import { buildLoopPath, isClosedLoop, positionAtDistance, projectOntoPath } from './route-utils';
 
@@ -12,6 +13,9 @@ interface UseRouteRotateOptions {
   dispatch: React.Dispatch<RouteAction>;
   snapEnabled: boolean;
   isRouting: boolean;
+  /** False outside planner mode — any open session is discarded rather than resurfacing
+   * when the user comes back. */
+  enabled: boolean;
   /** Called after a rotation is committed — the route has a new start point. */
   onApplied?: () => void;
 }
@@ -32,27 +36,41 @@ interface RotateSession {
  * Undo reverts the whole rotation (plus the closing leg's routing patch, which the history
  * reducer skips over).
  */
-export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isRouting, onApplied }: UseRouteRotateOptions) {
+export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isRouting, enabled, onApplied }: UseRouteRotateOptions) {
   const [session, setSession] = useState<RotateSession | null>(null);
-  const active = !!session && session.waypoints === waypoints && session.segments === segments;
+  // Adjusting state during render (not in an effect) — React re-renders immediately
+  if (!enabled && session) setSession(null);
+  const active = enabled && !!session && session.waypoints === waypoints && session.segments === segments;
 
   const closed = useMemo(() => isClosedLoop(waypoints), [waypoints]);
+  const closeSnap = session?.closeSnap ?? snapEnabled;
   const path = useMemo(
-    () => (active ? buildLoopPath(waypoints, segments, closed) : null),
-    [active, waypoints, segments, closed],
+    () => (active ? buildLoopPath(waypoints, segments, closed, closeSnap) : null),
+    [active, waypoints, segments, closed, closeSnap],
   );
 
+  const position = useMemo(
+    () => (path && session ? positionAtDistance(path, session.draftDist) : null),
+    [path, session],
+  );
+
+  // Keyed on the resolved start rather than the raw distance, so dragging within a span
+  // that resolves to the same start (e.g. snapped to a waypoint) doesn't rebuild the
+  // preview and with it every planner feature on the map.
+  const startKey = position ? JSON.stringify(position.start) : null;
   const draft = useMemo(() => {
-    if (!active || !path || !session) return null;
-    const { start, point } = positionAtDistance(path, session.draftDist);
-    const action: RouteContentAction = { type: 'ROTATE', closed, closeSnap: session.closeSnap, start };
-    return { action, point, preview: applyAction({ waypoints, segments }, action) };
-  }, [active, path, session, closed, waypoints, segments]);
+    if (!startKey) return null;
+    const start = JSON.parse(startKey) as RotateStart;
+    const action: RouteContentAction = { type: 'ROTATE', closed, closeSnap, start };
+    return { action, preview: applyAction({ waypoints, segments }, action) };
+  }, [startKey, closed, closeSnap, waypoints, segments]);
+
+  const canStart = waypoints.length >= 2 && !isRouting;
 
   const start = useCallback(() => {
-    if (waypoints.length < 2) return;
+    if (!canStart) return;
     setSession({ waypoints, segments, draftDist: 0, closeSnap: snapEnabled });
-  }, [waypoints, segments, snapEnabled]);
+  }, [canStart, waypoints, segments, snapEnabled]);
 
   const cancel = useCallback(() => setSession(null), []);
 
@@ -79,13 +97,14 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
 
   return {
     active,
+    canStart,
     /** Route to render while rotating — the rotated preview, or the route itself at a no-op position. */
-    previewState: active ? (draft?.preview ?? { waypoints, segments }) : null,
-    handlePoint: draft?.point ?? null,
+    previewState: active ? (draft?.preview ?? null) : null,
+    handlePoint: position?.point ?? null,
     draftDist: session?.draftDist ?? 0,
     loopLength: path?.length ?? 0,
     closed,
-    closeSnap: session?.closeSnap ?? snapEnabled,
+    closeSnap,
     canApply,
     start,
     cancel,

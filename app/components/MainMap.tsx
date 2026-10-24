@@ -177,8 +177,11 @@ const rotateHandleStyle = [
   }),
 ];
 
+// Cached per index — syncPlannerFeatures rebuilds every pin on each route change (and on
+// every rotate-preview update), and re-decoding a data-URI icon each time is wasteful.
+const waypointStyleCache: Style[] = [];
 function waypointStyle(index: number): Style {
-  return new Style({
+  return waypointStyleCache[index] ??= new Style({
     // Start pin above the rest, so on a loop it isn't buried under the finish pin
     zIndex: index === 0 ? 1 : 0,
     image: new Icon({
@@ -671,7 +674,10 @@ export default function MainMap({
   // Rotate-route dragging — grab the handle (mouse or touch), or press anywhere on the route
   // with a mouse to jump the start there and keep dragging. Touch presses on the route line
   // are left to pan the map; a touch *tap* on it is handled by the click handler instead.
-  // Waypoint Modify is suspended for the duration so pins can't be moved mid-rotate.
+  // A press that starts a drag is caught in the capture phase and stopped there, so
+  // OpenLayers never sees it — DragPan doesn't start (and isn't left tracking a pointer whose
+  // pointerup it never gets), and no map click fires afterwards. Waypoint Modify is
+  // suspended for the duration so pins can't be moved mid-rotate.
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !rotateActive) return;
@@ -679,14 +685,23 @@ export default function MainMap({
 
     const viewport = map.getViewport();
     let dragging = false;
-    const setDragPan = (active: boolean) =>
-      map.getInteractions().forEach((i) => { if (i instanceof DragPan) i.setActive(active); });
-    const report = (e: PointerEvent) => {
-      const [lng, lat] = toLonLat(map.getCoordinateFromPixel(map.getEventPixel(e)), OS_PROJECTION.code);
+    // Pointer moves can outpace rendering — report at most once per frame
+    let frame = 0;
+    let pending: PointerEvent | null = null;
+    const flush = () => {
+      frame = 0;
+      if (!pending) return;
+      const [lng, lat] = toLonLat(map.getCoordinateFromPixel(map.getEventPixel(pending)), OS_PROJECTION.code);
+      pending = null;
       rotateHandleRef.current?.onDrag({ lat, lng });
+    };
+    const report = (e: PointerEvent) => {
+      pending = e;
+      if (!frame) frame = requestAnimationFrame(flush);
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      lastPointerTypeRef.current = e.pointerType;
       const pixel = map.getEventPixel(e);
       const onHandle = map.forEachFeatureAtPixel(pixel, () => true, {
         layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
@@ -695,31 +710,27 @@ export default function MainMap({
         layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
       });
       if (!onHandle && !onRoute) return;
+      e.stopPropagation();
       dragging = true;
-      setDragPan(false);
       if (onRoute) report(e);
     };
     const onPointerMove = (e: PointerEvent) => {
       if (!dragging) return;
-      if (!e.buttons) { dragging = false; setDragPan(true); return; }
+      if (!e.buttons) { dragging = false; return; }
       report(e);
     };
-    const onPointerUp = () => {
-      if (!dragging) return;
-      dragging = false;
-      setDragPan(true);
-    };
+    const onPointerUp = () => { dragging = false; };
 
-    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointerdown', onPointerDown, { capture: true });
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
     viewport.addEventListener('pointercancel', onPointerUp);
     return () => {
-      viewport.removeEventListener('pointerdown', onPointerDown);
+      viewport.removeEventListener('pointerdown', onPointerDown, { capture: true });
       viewport.removeEventListener('pointermove', onPointerMove);
       viewport.removeEventListener('pointerup', onPointerUp);
       viewport.removeEventListener('pointercancel', onPointerUp);
-      setDragPan(true);
+      cancelAnimationFrame(frame);
       plannerModifyRef.current?.setActive(true);
     };
   }, [rotateActive]);

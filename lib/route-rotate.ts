@@ -22,7 +22,16 @@ export interface RouteLoop {
  */
 export function buildLoop(state: RouteState, closed: boolean, closeSnap: boolean): RouteLoop {
   if (closed) {
-    return { waypoints: state.waypoints.slice(0, -1), segments: state.segments };
+    // The final waypoint is merged into the first, so the last segment now ends at the
+    // start waypoint — extend its routed geometry to meet it (the two were up to the
+    // closed-loop tolerance apart) rather than leaving a gap.
+    const waypoints = state.waypoints.slice(0, -1);
+    const segments = [...state.segments];
+    const last = segments[segments.length - 1];
+    if (last && last.coordinates.length >= 2) {
+      segments[segments.length - 1] = { ...last, coordinates: [...last.coordinates, waypoints[0]], distance: undefined };
+    }
+    return { waypoints, segments };
   }
   return {
     waypoints: state.waypoints,

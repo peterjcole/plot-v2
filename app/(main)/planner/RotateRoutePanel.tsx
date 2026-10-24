@@ -47,12 +47,13 @@ export default function RotateRoutePanel({
   onCancel,
 }: RotateRoutePanelProps) {
   // Enter applies / Esc cancels — unless the user is typing somewhere (e.g. place search).
+  // Enter on a focused button is left to that button (Cancel, the closing-leg toggle).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'range' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-      else if (e.key === 'Enter' && canApply) { e.preventDefault(); onApply(); }
+      else if (e.key === 'Enter' && canApply && t?.tagName !== 'BUTTON') { e.preventDefault(); onApply(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

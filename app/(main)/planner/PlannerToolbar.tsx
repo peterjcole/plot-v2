@@ -29,6 +29,8 @@ interface PlannerToolbarProps {
   onReverse: () => void;
   /** Rotate-route mode is open — other edits are locked until it's applied or cancelled. */
   rotating: boolean;
+  /** Enough waypoints, and no routing in flight (a late routing patch would end the session) */
+  canRotate: boolean;
   onToggleRotate: () => void;
   onBack?: () => void;
   onToggleLayers?: () => void;
@@ -96,6 +98,7 @@ export default function PlannerToolbar({
   onFitToRoute,
   onReverse,
   rotating,
+  canRotate,
   onToggleRotate,
   onBack,
   onToggleLayers,
@@ -203,7 +206,7 @@ export default function PlannerToolbar({
         </TbBtn>
 
         {/* Rotate route — move the start/finish around the route as a loop */}
-        <TbBtn label="Rotate" active={rotating} disabled={waypoints.length < 2} onClick={onToggleRotate}>
+        <TbBtn label="Rotate" active={rotating} disabled={!rotating && !canRotate} onClick={onToggleRotate}>
           <RotateCw size={16} />
         </TbBtn>
 
