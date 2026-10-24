@@ -107,7 +107,7 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
   const canApply = !!draft?.preview && moved;
 
   const apply = useCallback(() => {
-    if (!draft?.preview || !canApply) return;
+    if (!canApply || !draft) return;
     dispatch(draft.action);
     setSession(null);
     onApplied?.();

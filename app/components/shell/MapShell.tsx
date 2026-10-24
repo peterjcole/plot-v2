@@ -451,7 +451,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   const rotating = rotate.active;
   rotatingRef.current = rotating;
   // What the map shows — the rotated preview while rotating
-  const shownRoute = rotating && rotate.previewState ? rotate.previewState : { waypoints, segments };
+  const shownRoute = rotate.previewState ?? { waypoints, segments };
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
   // the same debounce for map-view-only changes. routeMeta.id is included so that a route

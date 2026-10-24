@@ -19,6 +19,10 @@ export function useRouteSnapping({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeCountRef = useRef(0);
   const [isRouting, setIsRouting] = useState(false);
+  // Latest route, read when a fetch resolves — results are applied by segment index, so they
+  // must be checked against what that index means *now* (see `stillPending`)
+  const routeRef = useRef({ waypoints, segments });
+  useEffect(() => { routeRef.current = { waypoints, segments }; }, [waypoints, segments]);
 
   useEffect(() => {
     // Find segments that need routing: snapped=true, coordinates=[]
@@ -48,6 +52,18 @@ export function useRouteSnapping({
         const to = waypoints[segIdx + 1];
         if (!from || !to) continue;
 
+        // The route may have changed while the fetch was in flight (undo/redo, a rotate,
+        // an insert...). Only apply the result if segment `segIdx` still joins the same two
+        // points and is still waiting to be routed — otherwise it'd land on the wrong segment.
+        const stillPending = () => {
+          const { waypoints: wps, segments: segs } = routeRef.current;
+          const a = wps[segIdx];
+          const b = wps[segIdx + 1];
+          const seg = segs[segIdx];
+          return !!a && !!b && !!seg && seg.snapped && seg.coordinates.length === 0
+            && a.lat === from.lat && a.lng === from.lng && b.lat === to.lat && b.lng === to.lng;
+        };
+
         addedCount++;
         activeCountRef.current++;
 
@@ -60,6 +76,7 @@ export function useRouteSnapping({
             return res.json();
           })
           .then((data: { coordinates: Waypoint[]; distance: number }) => {
+            if (!stillPending()) return;
             if (data.coordinates.length > 0) {
               dispatch({
                 type: 'UPDATE_SEGMENT',
@@ -78,7 +95,7 @@ export function useRouteSnapping({
             }
           })
           .catch((err) => {
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError' || !stillPending()) return;
             // Routing failed — fall back to straight line
             dispatch({
               type: 'UPDATE_SEGMENT',

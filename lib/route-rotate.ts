@@ -28,15 +28,19 @@ export function buildLoop(state: RouteState, closed: boolean, closeSnap: boolean
     const waypoints = state.waypoints.slice(0, -1);
     // Don't lose the dropped finish waypoint's name/elevation if the start lacks them
     const finish = state.waypoints[state.waypoints.length - 1];
-    if (finish.name != null || finish.ele != null) {
-      waypoints[0] = { name: finish.name, ele: finish.ele, ...waypoints[0] };
-      if (waypoints[0].name == null) delete waypoints[0].name;
-      if (waypoints[0].ele == null) delete waypoints[0].ele;
-    }
+    // (field by field, so an explicit `undefined` behaves the same as after a JSON replay)
+    const merged: Waypoint = { ...waypoints[0] };
+    const name = merged.name ?? finish.name;
+    const ele = merged.ele ?? finish.ele;
+    delete merged.name;
+    delete merged.ele;
+    if (name != null) merged.name = name;
+    if (ele != null) merged.ele = ele;
+    waypoints[0] = merged;
     const segments = [...state.segments];
     const last = segments[segments.length - 1];
     if (last && last.coordinates.length >= 2) {
-      segments[segments.length - 1] = { ...last, coordinates: [...last.coordinates, waypoints[0]], distance: undefined };
+      segments[segments.length - 1] = { ...last, coordinates: [...last.coordinates, { lat: waypoints[0].lat, lng: waypoints[0].lng }], distance: undefined };
     }
     return { waypoints, segments };
   }
