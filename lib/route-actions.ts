@@ -1,4 +1,5 @@
 import { Waypoint, RouteSegment } from './types';
+import { type RotateStart, buildLoop, rotateLoop } from './route-rotate';
 
 export interface RouteState {
   waypoints: Waypoint[];
@@ -19,7 +20,10 @@ export type RouteContentAction =
   | { type: 'LOAD'; waypoints: Waypoint[]; segments?: RouteSegment[] }
   | { type: 'UPDATE_SEGMENT'; index: number; coordinates: Waypoint[]; distance?: number }
   | { type: 'TOGGLE_SEGMENT_SNAP'; index: number }
-  | { type: 'REVERSE' };
+  | { type: 'REVERSE' }
+  // Re-starts the route at `start`, treating it as a loop. `closed` = the route already ends
+  // where it starts (else a closing segment end → start is added, snapped per `closeSnap`).
+  | { type: 'ROTATE'; closed: boolean; closeSnap: boolean; start: RotateStart };
 
 /**
  * Pure state transition for a single content action. Returns null when the action
@@ -157,6 +161,11 @@ export function applyAction(state: RouteState, action: RouteContentAction): Rout
         coordinates: [...seg.coordinates].reverse(),
       }));
       return { waypoints, segments };
+    }
+    case 'ROTATE': {
+      if (state.waypoints.length < 2) return null;
+      if (action.closed && 'waypointIndex' in action.start && action.start.waypointIndex === 0) return null;
+      return rotateLoop(buildLoop(state, action.closed, action.closeSnap), action.start);
     }
     default:
       return null;

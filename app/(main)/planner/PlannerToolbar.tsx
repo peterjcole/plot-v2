@@ -2,7 +2,7 @@
 
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, ChevronLeft } from 'lucide-react';
+import { ArrowUp, Undo2, Redo2, MapPinPlus, Link2, Trash2, Upload, Download, ArrowRightLeft, RotateCw, ChevronLeft } from 'lucide-react';
 import { RouteAction } from './useRouteHistory';
 import { downloadGpx, parseGpx, selectGpxWaypoints } from '@/lib/gpx';
 import { Waypoint, RouteSegment } from '@/lib/types';
@@ -27,6 +27,9 @@ interface PlannerToolbarProps {
   onElevationHover?: (point: { lat: number; lng: number; ele: number; distance: number } | null) => void;
   onFitToRoute?: (waypoints: Waypoint[]) => void;
   onReverse: () => void;
+  /** Rotate-route mode is open — other edits are locked until it's applied or cancelled. */
+  rotating: boolean;
+  onToggleRotate: () => void;
   onBack?: () => void;
   onToggleLayers?: () => void;
   onExportGpx?: () => void;
@@ -92,6 +95,8 @@ export default function PlannerToolbar({
   elevGain,
   onFitToRoute,
   onReverse,
+  rotating,
+  onToggleRotate,
   onBack,
   onToggleLayers,
   onExportGpx,
@@ -152,28 +157,28 @@ export default function PlannerToolbar({
       >
 
         {/* Undo */}
-        <TbBtn label="Undo" disabled={!canUndo} onClick={handleUndo}>
+        <TbBtn label="Undo" disabled={!canUndo || rotating} onClick={handleUndo}>
           <Undo2 size={16} />
         </TbBtn>
         {/* Redo */}
-        <TbBtn label="Redo" disabled={!canRedo} onClick={handleRedo}>
+        <TbBtn label="Redo" disabled={!canRedo || rotating} onClick={handleRedo}>
           <Redo2 size={16} />
         </TbBtn>
 
         <div className="hidden sm:block">{SEP}</div>
 
         {/* Add-points toggle */}
-        <TbBtn label="Add" active={addPointsEnabled} onClick={onToggleAddPoints}>
+        <TbBtn label="Add" active={addPointsEnabled && !rotating} disabled={rotating} onClick={onToggleAddPoints}>
           <MapPinPlus size={16} />
         </TbBtn>
 
         {/* Snap toggle */}
-        <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled} onClick={onToggleSnap}>
+        <TbBtn label="Snap" active={snapEnabled} disabled={!addPointsEnabled || rotating} onClick={onToggleSnap}>
           <Link2 size={16} />
         </TbBtn>
 
         {/* Clear */}
-        <TbBtn label="Clear" disabled={waypoints.length === 0} onClick={handleClear}>
+        <TbBtn label="Clear" disabled={waypoints.length === 0 || rotating} onClick={handleClear}>
           <Trash2 size={16} />
         </TbBtn>
 
@@ -182,7 +187,7 @@ export default function PlannerToolbar({
           {SEP}
 
           {/* Import */}
-          <TbBtn label="Import" onClick={(e) => setImportAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())}>
+          <TbBtn label="Import" disabled={rotating} onClick={(e) => setImportAnchor((e.currentTarget as HTMLButtonElement).getBoundingClientRect())}>
             <Upload size={16} />
           </TbBtn>
 
@@ -193,8 +198,13 @@ export default function PlannerToolbar({
         </div>
 
         {/* Reverse route */}
-        <TbBtn label="Reverse" disabled={waypoints.length < 2} onClick={onReverse}>
+        <TbBtn label="Reverse" disabled={waypoints.length < 2 || rotating} onClick={onReverse}>
           <ArrowRightLeft size={16} />
+        </TbBtn>
+
+        {/* Rotate route — move the start/finish around the route as a loop */}
+        <TbBtn label="Rotate" active={rotating} disabled={waypoints.length < 2} onClick={onToggleRotate}>
+          <RotateCw size={16} />
         </TbBtn>
 
         {/* Spacer — desktop only; hidden on mobile so flex-1 buttons distribute evenly */}

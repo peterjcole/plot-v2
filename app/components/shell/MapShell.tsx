@@ -13,6 +13,7 @@ import { type PlannerProps, type WaypointClickInfo, type SegmentTapInfo } from '
 import LayersPanel, { type LayerState, loadLayerState, saveLayerState } from './LayersPanel';
 import { useRouteHistory } from '@/app/(main)/planner/useRouteHistory';
 import { useRouteSnapping } from '@/app/(main)/planner/useRouteSnapping';
+import { useRouteRotate } from '@/app/(main)/planner/useRouteRotate';
 import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
@@ -34,6 +35,7 @@ import UnauthPanel from './UnauthPanel';
 import MobileHeader from './MobileHeader';
 import MobileBottomSheet from './MobileBottomSheet';
 import PlannerToolbar from '@/app/(main)/planner/PlannerToolbar';
+import RotateRoutePanel from '@/app/(main)/planner/RotateRoutePanel';
 import Compass from './Compass';
 import ScaleBar from './ScaleBar';
 import MapLegend from './MapLegend';
@@ -151,7 +153,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   actionsRef.current = actions;
   cursorRef.current = cursor;
 
-  useRouteSnapping({ waypoints, segments, dispatch });
+  const { isRouting } = useRouteSnapping({ waypoints, segments, dispatch });
   const { elevationData, elevGainMeters, isLoading: isLoadingElevation } = useElevationProfile(waypoints, segments);
 
   const distance = useMemo(() => calculateDistance(waypoints, segments), [waypoints, segments]);
@@ -431,6 +433,11 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
     geocodedRouteIdRef.current = null;
     setRouteMeta((m) => ({ ...m, location: null }));
   }, [isPremium]);
+
+  // Rotate-route preview. Only the map sees the rotated preview — elevation, autosave and
+  // the stats all stay on the committed route until Apply records a single ROTATE action.
+  const rotate = useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isRouting, onApplied: handleRouteReplaced });
+  const rotating = mode === 'planner' && rotate.active;
 
   // Premium autosave — triggers on content or identity changes; moveend (below) triggers
   // the same debounce for map-view-only changes. routeMeta.id is included so that a route
@@ -904,7 +911,13 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [segments, osDark]);
 
   const plannerProps: PlannerProps | undefined = mode === 'planner'
-    ? { waypoints, segments, dispatch, addPointsEnabled, snapEnabled }
+    ? {
+        waypoints: rotating && rotate.previewState ? rotate.previewState.waypoints : waypoints,
+        segments: rotating && rotate.previewState ? rotate.previewState.segments : segments,
+        dispatch,
+        addPointsEnabled: addPointsEnabled && !rotating,
+        snapEnabled,
+      }
     : undefined;
 
   const activeTab = mode === 'planner' ? 'planner' : 'activities';
@@ -1024,6 +1037,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onActivitySelect={mode !== 'planner' ? handleSelectActivity : undefined}
           baseLayer={layerState.baseLayer}
           plannerProps={plannerProps}
+          rotateHandle={rotating && rotate.handlePoint ? { point: rotate.handlePoint, onDrag: rotate.dragTo } : null}
           onMapReady={handleMapReady}
           osDark={osDark}
           showHillshade={layerState.showHillshade}
@@ -1076,9 +1090,25 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
             isLoadingElevation={isLoadingElevation}
             onFitToRoute={handleFitToRoute}
             onReverse={() => dispatch({ type: 'REVERSE' })}
+            rotating={rotating}
+            onToggleRotate={rotating ? rotate.cancel : rotate.start}
             onToggleLayers={() => setMobilePlannerLayersOpen(v => !v)}
             onExportGpx={handleMobileExportGpx}
             onImported={handleRouteReplaced}
+          />
+        )}
+        {rotating && (
+          <RotateRoutePanel
+            draftDist={rotate.draftDist}
+            loopLength={rotate.loopLength}
+            closed={rotate.closed}
+            closeSnap={rotate.closeSnap}
+            canApply={rotate.canApply}
+            isRouting={isRouting}
+            onChange={rotate.setDraftDist}
+            onToggleCloseSnap={rotate.toggleCloseSnap}
+            onApply={rotate.apply}
+            onCancel={rotate.cancel}
           />
         )}
       </div>
@@ -1136,7 +1166,8 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
         </>
       )}
 
-      {mode === 'planner' && (
+      {/* Hidden while rotating — the rotate panel occupies this strip under the toolbar */}
+      {mode === 'planner' && !rotating && (
         <LayersPanel state={layerState} onChange={patchLayers} fixed topRight topOffset={126} forceOpen={mobilePlannerLayersOpen} isPremium={isPremium} theme={theme} onThemeChange={handleThemeChange} explorerStats={explorerStats} triggerStyle={{ borderRadius: '50%', background: 'var(--glass-hvy)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }} />
       )}
 

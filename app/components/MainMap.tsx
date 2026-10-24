@@ -93,6 +93,16 @@ interface MainMapProps {
   onPlaceSelect?: (coordinates: [number, number]) => void;
   detailRoute?: [number, number][] | null;
   elevationHoverPoint?: { lat: number; lng: number } | null;
+  /** Rotate-route mode: the draggable start/finish handle. While set, normal planner
+   * editing (waypoint drag, drag-to-insert, click-to-add, popovers) is suspended; dragging
+   * the handle or pressing/tapping the route reports the pointer via `onDrag`, and the
+   * caller re-projects it onto the route. */
+  rotateHandle?: RotateHandle | null;
+}
+
+interface RotateHandle {
+  point: Waypoint;
+  onDrag: (p: Waypoint) => void;
 }
 
 export type { WaypointClickInfo, SegmentTapInfo };
@@ -156,8 +166,21 @@ function waypointPinSvg(index: number): string {
   );
 }
 
+const rotateHandleStyle = [
+  new Style({ image: new CircleStyle({ radius: 14, fill: new Fill({ color: 'rgba(224,112,32,0.25)' }) }) }),
+  new Style({
+    image: new CircleStyle({
+      radius: 8,
+      fill: new Fill({ color: '#E07020' }),
+      stroke: new Stroke({ color: 'rgba(7,14,20,0.85)', width: 3 }),
+    }),
+  }),
+];
+
 function waypointStyle(index: number): Style {
   return new Style({
+    // Start pin above the rest, so on a loop it isn't buried under the finish pin
+    zIndex: index === 0 ? 1 : 0,
     image: new Icon({
       src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(waypointPinSvg(index))}`,
       anchor: [0.5, 1],
@@ -236,6 +259,7 @@ export default function MainMap({
   onPlaceSelect,
   detailRoute,
   elevationHoverPoint,
+  rotateHandle,
 }: MainMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -286,6 +310,10 @@ export default function MainMap({
   const plannerWpLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const plannerRouteLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const plannerModifyRef = useRef<Modify | null>(null);
+  const rotateSourceRef = useRef<VectorSource | null>(null);
+  const rotateLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const rotateHandleRef = useRef(rotateHandle);
+  useEffect(() => { rotateHandleRef.current = rotateHandle; }, [rotateHandle]);
   const plannerPropsRef = useRef(plannerProps);
   useEffect(() => { plannerPropsRef.current = plannerProps; }, [plannerProps]);
   const onSegmentTapRef = useRef(onSegmentTap);
@@ -411,6 +439,12 @@ export default function MainMap({
     const plannerWpSource = new VectorSource();
     const plannerWpLayer = new VectorLayer({ source: plannerWpSource, zIndex: 30, visible: false });
 
+    // Rotate-route start/finish handle (above the waypoint pins)
+    const rotateSource = new VectorSource();
+    const rotateLayer = new VectorLayer({ source: rotateSource, zIndex: 32 });
+    rotateSourceRef.current = rotateSource;
+    rotateLayerRef.current = rotateLayer;
+
     // Elevation chart hover marker
     const elevHoverSource = new VectorSource();
     const elevHoverLayer = new VectorLayer({ source: elevHoverSource, zIndex: 35 });
@@ -458,7 +492,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [ngdLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, elevHoverLayer],
+      layers: [ngdLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, rotateLayer, elevHoverLayer],
       view: new View({
         projection,
         center,
@@ -550,7 +584,7 @@ export default function MainMap({
 
     const onPointerDown = (e: PointerEvent) => {
       lastPointerTypeRef.current = e.pointerType;
-      if (e.pointerType === 'touch') return;
+      if (e.pointerType === 'touch' || rotateHandleRef.current) return;
       const pixel = map.getEventPixel(e);
       const wpHit = map.forEachFeatureAtPixel(pixel, () => true, {
         layerFilter: (l) => l === plannerWpLayerRef.current, hitTolerance: 12,
@@ -619,6 +653,76 @@ export default function MainMap({
       viewport.removeEventListener('pointerup', onPointerUp);
     };
   }, [!!plannerProps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Rotate-route handle position
+  const rotateActive = !!rotateHandle;
+  const rotateLat = rotateHandle?.point.lat;
+  const rotateLng = rotateHandle?.point.lng;
+  useEffect(() => {
+    const source = rotateSourceRef.current;
+    if (!source) return;
+    source.clear();
+    if (rotateLat == null || rotateLng == null) return;
+    const feature = new Feature({ geometry: new Point(fromLonLat([rotateLng, rotateLat], OS_PROJECTION.code)) });
+    feature.setStyle(rotateHandleStyle);
+    source.addFeature(feature);
+  }, [rotateLat, rotateLng]);
+
+  // Rotate-route dragging — grab the handle (mouse or touch), or press anywhere on the route
+  // with a mouse to jump the start there and keep dragging. Touch presses on the route line
+  // are left to pan the map; a touch *tap* on it is handled by the click handler instead.
+  // Waypoint Modify is suspended for the duration so pins can't be moved mid-rotate.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !rotateActive) return;
+    plannerModifyRef.current?.setActive(false);
+
+    const viewport = map.getViewport();
+    let dragging = false;
+    const setDragPan = (active: boolean) =>
+      map.getInteractions().forEach((i) => { if (i instanceof DragPan) i.setActive(active); });
+    const report = (e: PointerEvent) => {
+      const [lng, lat] = toLonLat(map.getCoordinateFromPixel(map.getEventPixel(e)), OS_PROJECTION.code);
+      rotateHandleRef.current?.onDrag({ lat, lng });
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      const pixel = map.getEventPixel(e);
+      const onHandle = map.forEachFeatureAtPixel(pixel, () => true, {
+        layerFilter: (l) => l === rotateLayerRef.current, hitTolerance: 16,
+      });
+      const onRoute = !onHandle && e.pointerType !== 'touch' && map.forEachFeatureAtPixel(pixel, () => true, {
+        layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 10,
+      });
+      if (!onHandle && !onRoute) return;
+      dragging = true;
+      setDragPan(false);
+      if (onRoute) report(e);
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      if (!e.buttons) { dragging = false; setDragPan(true); return; }
+      report(e);
+    };
+    const onPointerUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      setDragPan(true);
+    };
+
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', onPointerUp);
+    viewport.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      viewport.removeEventListener('pointerdown', onPointerDown);
+      viewport.removeEventListener('pointermove', onPointerMove);
+      viewport.removeEventListener('pointerup', onPointerUp);
+      viewport.removeEventListener('pointercancel', onPointerUp);
+      setDragPan(true);
+      plannerModifyRef.current?.setActive(true);
+    };
+  }, [rotateActive]);
 
   // Sync tile layer visibility when baseLayer prop changes
   useEffect(() => {
@@ -1441,6 +1545,20 @@ export default function MainMap({
     const onClick = (e: any) => {
       const pp = plannerPropsRef.current;
       if (pp) {
+        // Rotate mode: a tap on the route moves the start there (mouse presses are already
+        // handled on pointerdown by the rotate-drag effect)
+        const rh = rotateHandleRef.current;
+        if (rh) {
+          if (lastPointerTypeRef.current !== 'touch') return;
+          const onRoute = map.forEachFeatureAtPixel(e.pixel, () => true, {
+            layerFilter: (l) => l === plannerRouteLayerRef.current, hitTolerance: 20,
+          });
+          if (onRoute) {
+            const [lng, lat] = toLonLat(e.coordinate, OS_PROJECTION.code);
+            rh.onDrag({ lat, lng });
+          }
+          return;
+        }
         if (!pp.addPointsEnabled) return;
         // In planner mode: check for waypoint hit (open popover) otherwise add
         const wpFeature = map.forEachFeatureAtPixel(e.pixel, (f) => f, {
