@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- `npm run dev` — Start Next.js dev server (http://localhost:3000)
-- `npm run build` — Production build. **run this locally before committing to verify output.**
-- `npm run lint` — Run ESLint (flat config, core-web-vitals + typescript)
+- `pnpm run dev` — Start Next.js dev server (http://localhost:3000)
+- `pnpm run build` — Production build. **run this locally before committing to verify output.**
+- `pnpm run lint` — Run ESLint (flat config, core-web-vitals + typescript)
 
 No test framework is configured.
 
