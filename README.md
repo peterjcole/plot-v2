@@ -29,8 +29,8 @@ Rewritten version of an older VueJS app: https://github.com/peterjcole/plot
 ## Getting Started
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -39,6 +39,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Production build |
-| `npm run lint` | Run ESLint |
+| `pnpm run dev` | Start development server |
+| `pnpm run build` | Production build |
+| `pnpm run lint` | Run ESLint |

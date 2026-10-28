@@ -1,8 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
+import { isAwaitingRoute } from '@/lib/route-actions';
 import { RouteAction } from './useRouteHistory';
+
+const legKey = (from: Waypoint, to: Waypoint) => `${from.lat},${from.lng}|${to.lat},${to.lng}`;
+
+/** Indices of segments still waiting to be routed, keyed by the two points each joins. */
+function awaitingLegs(waypoints: Waypoint[], segments: RouteSegment[]): Map<string, number[]> {
+  const legs = new Map<string, number[]>();
+  segments.forEach((seg, i) => {
+    const from = waypoints[i];
+    const to = waypoints[i + 1];
+    if (!from || !to || !isAwaitingRoute(seg)) return;
+    const key = legKey(from, to);
+    const indices = legs.get(key);
+    if (indices) indices.push(i);
+    else legs.set(key, [i]);
+  });
+  return legs;
+}
 
 interface UseRouteSnappingOptions {
   waypoints: Waypoint[];
@@ -15,57 +33,54 @@ export function useRouteSnapping({
   segments,
   dispatch,
 }: UseRouteSnappingOptions) {
-  const abortControllersRef = useRef<Map<number, AbortController>>(new Map());
+  // In-flight requests keyed by the two points they route between, not by segment index —
+  // inserts, removes, reverses and rotates shift indices without changing what needs fetching.
+  const inFlightRef = useRef<Map<string, AbortController>>(new Map());
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activeCountRef = useRef(0);
-  const [isRouting, setIsRouting] = useState(false);
-  // Latest route, read when a fetch resolves — results are applied by segment index, so they
-  // must be checked against what that index means *now* (see `stillPending`)
+  // Latest committed route and dispatch, read when a fetch resolves. Results are matched to
+  // segments by endpoints at that point, so they never land on a segment that has since
+  // changed. Synced in a layout effect so they're current as of the last commit; actions
+  // dispatched but not yet rendered are still invisible, so this narrows that race rather
+  // than closing it.
   const routeRef = useRef({ waypoints, segments });
-  useEffect(() => { routeRef.current = { waypoints, segments }; }, [waypoints, segments]);
+  const dispatchRef = useRef(dispatch);
+  useLayoutEffect(() => {
+    routeRef.current = { waypoints, segments };
+    dispatchRef.current = dispatch;
+  }, [waypoints, segments, dispatch]);
+
+  const legs = useMemo(() => awaitingLegs(waypoints, segments), [waypoints, segments]);
 
   useEffect(() => {
-    // Find segments that need routing: snapped=true, coordinates=[]
-    const pending: number[] = [];
-    segments.forEach((seg, i) => {
-      if (seg.snapped && seg.coordinates.length === 0) {
-        pending.push(i);
+    // Drop requests for legs no segment is waiting on any more (undone, edited, routed).
+    // Everything else keeps running, even if its segment's index has moved.
+    for (const [key, controller] of inFlightRef.current) {
+      if (!legs.has(key)) {
+        controller.abort();
+        inFlightRef.current.delete(key);
       }
-    });
+    }
 
-    if (pending.length === 0) return;
+    if (legs.size === 0) return;
 
     // Debounce to batch rapid changes
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
-      let addedCount = 0;
-
-      for (const segIdx of pending) {
-        // Cancel any existing request for this segment
-        const existing = abortControllersRef.current.get(segIdx);
-        if (existing) existing.abort();
+      for (const [key, [firstIdx]] of legs) {
+        if (inFlightRef.current.has(key)) continue;
+        const from = waypoints[firstIdx];
+        const to = waypoints[firstIdx + 1];
 
         const controller = new AbortController();
-        abortControllersRef.current.set(segIdx, controller);
+        inFlightRef.current.set(key, controller);
 
-        const from = waypoints[segIdx];
-        const to = waypoints[segIdx + 1];
-        if (!from || !to) continue;
-
-        // The route may have changed while the fetch was in flight (undo/redo, a rotate,
-        // an insert...). Only apply the result if segment `segIdx` still joins the same two
-        // points and is still waiting to be routed — otherwise it'd land on the wrong segment.
-        const stillPending = () => {
+        // Apply to whichever segments join these points and are still waiting *now*
+        const apply = (coordinates: Waypoint[], distance: number | undefined) => {
           const { waypoints: wps, segments: segs } = routeRef.current;
-          const a = wps[segIdx];
-          const b = wps[segIdx + 1];
-          const seg = segs[segIdx];
-          return !!a && !!b && !!seg && seg.snapped && seg.coordinates.length === 0
-            && a.lat === from.lat && a.lng === from.lng && b.lat === to.lat && b.lng === to.lng;
+          for (const index of awaitingLegs(wps, segs).get(key) ?? []) {
+            dispatchRef.current({ type: 'UPDATE_SEGMENT', index, coordinates, distance });
+          }
         };
-
-        addedCount++;
-        activeCountRef.current++;
 
         fetch(
           `/api/route?from=${from.lat},${from.lng}&to=${to.lat},${to.lng}`,
@@ -76,61 +91,44 @@ export function useRouteSnapping({
             return res.json();
           })
           .then((data: { coordinates: Waypoint[]; distance: number }) => {
-            if (!stillPending()) return;
             if (data.coordinates.length > 0) {
-              dispatch({
-                type: 'UPDATE_SEGMENT',
-                index: segIdx,
-                coordinates: data.coordinates,
-                distance: data.distance,
-              });
+              apply(data.coordinates, data.distance);
             } else {
               // No route found — fall back to straight line (leave unrouted)
-              dispatch({
-                type: 'UPDATE_SEGMENT',
-                index: segIdx,
-                coordinates: [from, to],
-                distance: undefined,
-              });
+              apply([from, to], undefined);
             }
           })
           .catch((err) => {
-            if (err.name === 'AbortError' || !stillPending()) return;
+            if (err.name === 'AbortError') return;
             // Routing failed — fall back to straight line
-            dispatch({
-              type: 'UPDATE_SEGMENT',
-              index: segIdx,
-              coordinates: [from, to],
-              distance: undefined,
-            });
+            apply([from, to], undefined);
           })
           .finally(() => {
-            abortControllersRef.current.delete(segIdx);
-            activeCountRef.current--;
-            if (activeCountRef.current <= 0) {
-              activeCountRef.current = 0;
-              setIsRouting(false);
-            }
+            // Only if it's still ours — a newer request for this leg may have replaced it
+            if (inFlightRef.current.get(key) === controller) inFlightRef.current.delete(key);
           });
       }
-
-      if (addedCount > 0) setIsRouting(true);
     }, 150);
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [waypoints, segments, dispatch]);
+  }, [legs, waypoints]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount. Clear the map too, so a remount on the same instance (Fast Refresh)
+  // refetches instead of skipping legs whose aborted requests are still listed.
   useEffect(() => {
-    const controllers = abortControllersRef.current;
+    const inFlight = inFlightRef.current;
     return () => {
-      for (const controller of controllers.values()) {
+      for (const controller of inFlight.values()) {
         controller.abort();
       }
+      inFlight.clear();
     };
   }, []);
 
-  return { isRouting };
+  // Every awaiting leg has a request queued or in flight, and every request ends by
+  // patching its segments (routed or straight-line fallback) — so this is exactly "routing".
+  // Counted from `legs`, not segments, so a segment with no endpoints can't stick it on.
+  return { isRouting: legs.size > 0 };
 }

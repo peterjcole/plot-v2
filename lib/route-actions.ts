@@ -8,6 +8,11 @@ export interface RouteState {
 
 export const EMPTY_ROUTE_STATE: RouteState = { waypoints: [], segments: [] };
 
+/** A snapped segment with no routed geometry yet — useRouteSnapping will fetch it. */
+export function isAwaitingRoute(seg: RouteSegment): boolean {
+  return seg.snapped && seg.coordinates.length === 0;
+}
+
 // Content-changing actions — the only things ever appended to a route's persisted
 // action log. UNDO/REDO/RESTORE (in useRouteHistory.ts) move the cursor over this
 // log but are never themselves logged.
