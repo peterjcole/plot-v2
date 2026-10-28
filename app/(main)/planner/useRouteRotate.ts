@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { Waypoint, RouteSegment } from '@/lib/types';
-import { applyAction, isAwaitingRoute, type RouteContentAction } from '@/lib/route-actions';
+import { applyAction, type RouteContentAction } from '@/lib/route-actions';
 import type { RotateStart } from '@/lib/route-rotate';
 import { RouteAction } from './useRouteHistory';
 import { buildLoopPath, isClosedLoop, positionAtDistance, projectOntoPath } from './route-utils';
@@ -75,10 +75,8 @@ export function useRouteRotate({ waypoints, segments, dispatch, snapEnabled, isR
     return { action, start, preview: applyAction({ waypoints, segments }, action) };
   }, [wi, si, ci, lat, lng, closed, closeSnap, waypoints, segments]);
 
-  // Also wait out snapped segments still queued for routing (useRouteSnapping debounces
-  // before isRouting flips) — their patch landing would end the session.
-  const canStart = waypoints.length >= 2 && !isRouting
-    && !segments.some(isAwaitingRoute);
+  // Wait out snapped segments still routing — their patch landing would end the session.
+  const canStart = waypoints.length >= 2 && !isRouting;
 
   const start = useCallback(() => {
     if (!canStart) return;
