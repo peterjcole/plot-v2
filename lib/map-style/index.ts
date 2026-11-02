@@ -35,4 +35,16 @@ export function getVectorStyle(dark: boolean): VectorStyle {
   };
 }
 
+// Field boundaries and walls alone, for the layer that loads ngd-base's z16
+// tiles below street zoom (see lib/map-layers/vector.ts)
+export function getFieldBoundaryStyle(dark: boolean): Omit<VectorStyle, 'sprite'> {
+  return {
+    version: 8,
+    sources: {
+      [NGD_SOURCE]: { type: 'vector', tiles: [NGD_TILE_URL], minzoom: 16, maxzoom: 16 },
+    },
+    layers: boundaryLayers(palette(dark), {}),
+  };
+}
+
 export { NGD_SOURCE };

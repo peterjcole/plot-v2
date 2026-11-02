@@ -19,6 +19,6 @@ export const TOPO_DARK_TILE_URL  = '/api/maps/topo?z={z}&x={x}&y={y}&dark=1';
 export const HILLSHADE_TILE_URL  = '/api/hillshade27700?z={z}&x={x}&y={y}';
 export const NGD_TILE_URL        = '/api/maps/ngd?z={z}&x={x}&y={y}';
 // `v` busts browser/CDN caches (tiles are cached for 90 days); bump it whenever
-// tile-provider's PROW_EXT_KEY (the council rights-of-way build) changes.
-export const PROW_TILE_URL       = '/api/prow-tiles?z={z}&x={x}&y={y}&v=20261102';
+// tile-provider's DETAIL_TILES_KEY (the scripts/prow build) changes.
+export const PROW_TILE_URL       = '/api/prow-tiles?z={z}&x={x}&y={y}&v=detail-20261102';
 export type BaseMap = 'os' | 'os-vector' | 'satellite';

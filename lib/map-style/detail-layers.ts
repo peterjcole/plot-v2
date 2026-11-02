@@ -1,13 +1,13 @@
 import { palette, type Palette } from './palette';
 
-// Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
-// council rights of way where OS has none (`prow_ext`), the OS path network
-// (`path`), tracks (`track`) and field boundaries (`fieldboundary`).
+// Styles for tile-provider's /prow detail tiles, built from open data by
+// scripts/prow: OpenStreetMap rights of way (`prow`), council rights of way
+// where they replace OSM's (`prow_ext`), OSM paths (`path`) and tracks (`track`).
 //
-// OS's own ngd-base vector tiles carry no paths or field boundaries below z16,
-// so on the OS Vector base map these layers fill that gap, handing over to
-// ngd-base's own path/field-boundary layers at DETAIL_HANDOVER_ZOOM. Over other
-// base maps they're an optional overlay (paths + rights of way only).
+// OS's own ngd-base vector tiles carry no paths below z16, so on the OS Vector
+// base map these layers fill that gap, handing over to ngd-base's own path
+// layers at DETAIL_HANDOVER_ZOOM. Over other base maps they're an optional
+// overlay (paths + rights of way only).
 
 export const DETAIL_SOURCE = 'detail';
 
@@ -26,6 +26,14 @@ export const DETAIL_MAX_RESOLUTION = 4;
 export const OVERVIEW_TILE_ZOOM = 13;
 export const OVERVIEW_MAX_RESOLUTION = 16;
 
+// Field boundaries only exist in ngd-base's z16 tiles; a separate layer loads
+// those from view zoom 8.5 (each view needs ~4x the tiles it would at z15),
+// until the base layer's own z16 tiles take over at about view zoom 9.8.
+// The small overlap draws the same lines twice, which doesn't show.
+export const FIELD_BOUNDARY_TILE_ZOOM = 16;
+export const FIELD_BOUNDARY_MAX_RESOLUTION = 2.5;
+export const FIELD_BOUNDARY_MIN_RESOLUTION = 0.8;
+
 export interface DetailStyleOptions {
   dark: boolean;
   // Over satellite rather than as part of the OS Vector base map
@@ -34,7 +42,8 @@ export interface DetailStyleOptions {
   overview?: boolean;
 }
 
-// Highway dedication descriptions from OS NGD trn-rami-highwaydedication
+// OS NGD highway dedication descriptions, which scripts/prow maps OSM's
+// `designation` and the council datasets onto
 const FOOTPATH = ['Pedestrian Way Or Footpath'];
 const BRIDLEWAY = ['Bridleway', 'Cycle Track Or Cycle Way'];
 const BYWAY = ['Restricted Byway', 'Byway Open To All Traffic'];
@@ -87,8 +96,8 @@ function line(
   };
 }
 
-// OS NGD's rights of way, and council data filling the authorities where OS has
-// none (`prow_ext`, normalised to the same descriptions; see scripts/prow).
+// OSM's rights of way, and council data replacing them where we have it
+// (`prow_ext`); both normalised to the same descriptions by scripts/prow.
 const PROW_LAYERS = ['prow', 'prow_ext'];
 
 function prowLayers(sourceLayer: string, c: Palette, overlay: boolean, overview: boolean): LineLayer[] {
@@ -121,17 +130,6 @@ function prowLayers(sourceLayer: string, c: Palette, overlay: boolean, overview:
 export function getDetailStyle(tileUrl: string, { dark, overlay, overview = false }: DetailStyleOptions): DetailStyle {
   const c = palette(dark);
   const layers: LineLayer[] = [];
-
-  // Field boundaries and plain paths are part of the base map below the handover;
-  // as an overlay only paths are drawn (field boundaries add noise over imagery).
-  if (!overlay && !overview) {
-    layers.push(
-      line('detail-fieldboundary', 'fieldboundary', {
-        'line-color': c.fieldBoundary,
-        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.1, 16, 1.6],
-      }, { maxzoom: DETAIL_HANDOVER_ZOOM }),
-    );
-  }
 
   // Tracks: a pale strip between dashed dark edges, as Explorer draws them.
   // At street zoom ngd-base's own track surfaces take over.

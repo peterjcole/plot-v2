@@ -7,13 +7,15 @@ import { applyStyle } from 'ol-mapbox-style';
 import { NGD_TILE_URL, PROW_TILE_URL } from '@/lib/map-config';
 import {
   DETAIL_MAX_RESOLUTION, DETAIL_SOURCE, DETAIL_TILE_ZOOM, OVERVIEW_MAX_RESOLUTION, OVERVIEW_TILE_ZOOM,
+  FIELD_BOUNDARY_MAX_RESOLUTION, FIELD_BOUNDARY_MIN_RESOLUTION, FIELD_BOUNDARY_TILE_ZOOM,
   getDetailStyle, type DetailStyleOptions,
 } from '@/lib/map-style/detail-layers';
-import { getVectorStyle, NGD_SOURCE } from '@/lib/map-style';
+import { getFieldBoundaryStyle, getVectorStyle, NGD_SOURCE } from '@/lib/map-style';
 
-// The OS Vector base map is two vector tile layers: OS's ngd-base tiles, and
-// tile-provider's detail tiles (paths, rights of way, field boundaries) that
-// fill in what ngd-base lacks below z16. Shared by MainMap and the style lab.
+// The OS Vector base map is OS's ngd-base tiles plus a detail group that fills
+// in what they lack below z16: tile-provider's detail tiles (paths, tracks,
+// rights of way) and ngd-base's own z16 field boundaries loaded early. Shared
+// by MainMap and the style lab.
 //
 // Sources are built here rather than by ol-mapbox-style, so (re)styling only
 // ever swaps style functions and can't race an async source setup.
@@ -39,9 +41,16 @@ export function createBaseLayer(): OlVectorTileLayer {
 }
 
 // Detail tiles exist at only two zooms, so each layer's grid has that single
-// zoom and OL reuses the tiles across view zooms: z15 (paths, field boundaries,
-// rights of way) close in, z13 (rights of way only) further out.
+// zoom and OL reuses the tiles across view zooms: z15 (paths, tracks, rights
+// of way) close in, z13 (rights of way only) further out. Field boundaries
+// likewise come from a single-zoom grid of ngd-base's z16 tiles.
 export function createDetailLayer(): LayerGroup {
+  const fieldBoundaries = new OlVectorTileLayer({
+    source: mvtSource(NGD_TILE_URL, FIELD_BOUNDARY_TILE_ZOOM, FIELD_BOUNDARY_TILE_ZOOM),
+    minResolution: FIELD_BOUNDARY_MIN_RESOLUTION,
+    maxResolution: FIELD_BOUNDARY_MAX_RESOLUTION,
+    properties: { fieldBoundaries: true },
+  });
   const detail = new OlVectorTileLayer({
     source: mvtSource(PROW_TILE_URL, DETAIL_TILE_ZOOM, DETAIL_TILE_ZOOM),
     maxResolution: DETAIL_MAX_RESOLUTION,
@@ -52,7 +61,7 @@ export function createDetailLayer(): LayerGroup {
     maxResolution: OVERVIEW_MAX_RESOLUTION,
     properties: { overview: true },
   });
-  return new LayerGroup({ layers: [overview, detail], visible: false, zIndex: 0.5 });
+  return new LayerGroup({ layers: [fieldBoundaries, overview, detail], visible: false, zIndex: 0.5 });
 }
 
 export function styleBaseLayer(layer: OlVectorTileLayer, dark: boolean): Promise<unknown> {
@@ -60,9 +69,17 @@ export function styleBaseLayer(layer: OlVectorTileLayer, dark: boolean): Promise
 }
 
 export function styleDetailLayer(group: LayerGroup, options: DetailStyleOptions): Promise<unknown> {
-  return Promise.all(group.getLayers().getArray().map((layer) => applyStyle(
-    layer as OlVectorTileLayer,
-    getDetailStyle(PROW_TILE_URL, { ...options, overview: layer.get('overview') === true }),
-    { source: DETAIL_SOURCE, updateSource: false },
-  )));
+  return Promise.all(group.getLayers().getArray().map((layer) => {
+    const vt = layer as OlVectorTileLayer;
+    if (layer.get('fieldBoundaries')) {
+      // Part of the base map only; over imagery they're noise
+      vt.setVisible(!options.overlay);
+      return applyStyle(vt, getFieldBoundaryStyle(options.dark), { source: NGD_SOURCE, updateSource: false });
+    }
+    return applyStyle(
+      vt,
+      getDetailStyle(PROW_TILE_URL, { ...options, overview: layer.get('overview') === true }),
+      { source: DETAIL_SOURCE, updateSource: false },
+    );
+  }));
 }
