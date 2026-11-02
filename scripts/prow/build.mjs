@@ -1,30 +1,34 @@
 /**
- * Build the council rights-of-way tileset that fills gaps in OS NGD's
- * highway-dedication data (see sources.json for what goes in and why).
+ * Build the detail tileset tile-provider serves at /prow: rights of way, paths
+ * and tracks, all from open data, so serving tiles makes no OS API calls.
  *
- * Downloads each source, normalises its path types onto the OS `description`
- * values plot already styles, keeps each feature only inside the area its
- * source is authoritative for (so overlapping datasets don't double-draw), and
- * tiles the result with tippecanoe at the two zooms tile-provider serves.
+ *   prow_ext  council rights of way (see sources.json), normalised onto the OS
+ *             `description` values plot already styles, each kept only inside
+ *             the area its source is authoritative for
+ *   prow      OpenStreetMap rights of way (`designation=*`), everywhere the
+ *             council data doesn't replace them (manifest `replaces`)
+ *   path      OpenStreetMap footways, paths, bridleways, steps and cycleways,
+ *             minus pavements and crossings (z15 only)
+ *   track     OpenStreetMap tracks (z15 only)
  *
- * Outputs, in --out:
- *   prow-ext.pmtiles  layer `prow_ext`, properties { description, source }, z13–z15
- *   areas.json        authorities where these sources replace OS's rights of way;
- *                     tile-provider drops OS `prow` features inside them
+ * Output, in --out: detail.pmtiles (z13–z15; tile-provider only requests z13
+ * and z15).
  *
  * Usage:
- *   node scripts/prow/build.mjs --src <download dir> --out <output dir>
+ *   node scripts/prow/build.mjs --src <download dir> --out <output dir> \
+ *     --osm england-latest.osm.pbf,wales-latest.osm.pbf
  *
- * Then upload both under one version (tile-provider's PROW_EXT_KEY):
- *   wrangler r2 object put plot-hillshade/prow-ext/<version>.pmtiles --file <out>/prow-ext.pmtiles --remote
- *   wrangler r2 object put plot-hillshade/prow-ext/<version>.areas.json --file <out>/areas.json --remote
+ * The .osm.pbf extracts come from https://download.geofabrik.de/europe/united-kingdom.html
+ * Then upload under a new version and point tile-provider's DETAIL_TILES_KEY at it:
+ *   wrangler r2 object put plot-hillshade/detail/<version>.pmtiles --file <out>/detail.pmtiles --remote
  *
- * Needs `unzip` and `tippecanoe` on PATH.
+ * Needs `unzip`, `osmium` and `tippecanoe` on PATH.
  */
 
 import { createHash } from 'crypto';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, createWriteStream } from 'fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, createWriteStream } from 'fs';
+import { createInterface } from 'readline';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import proj4 from 'proj4';
@@ -47,6 +51,7 @@ function argValue(name) {
 
 const srcDir = argValue('--src');
 const outDir = argValue('--out');
+const osmExtracts = argValue('--osm').split(',');
 mkdirSync(outDir, { recursive: true });
 
 const toWgs84 = proj4(OS_PROJECTION.proj4, 'EPSG:4326');
@@ -139,6 +144,7 @@ async function* readSource(source, shpPath, areas) {
         ? { type: 'LineString', coordinates: lines[0] }
         : { type: 'MultiLineString', coordinates: lines },
       properties: { description, source: source.id },
+      tippecanoe: { layer: 'prow_ext' },
     };
   }
 }
@@ -157,79 +163,103 @@ const areas = {
   park: await fetchBoundaries('park', [...parkCodes]),
 };
 
-const geojsonl = join(outDir, 'prow-ext.geojsonl');
+const geojsonl = join(outDir, 'detail.geojsonl');
 const out = createWriteStream(geojsonl);
+const write = (feature) => out.write(`${JSON.stringify(feature)}\n`);
 const report = [];
 for (const source of manifest.sources) {
   const { shp, sha256 } = await download(source);
   const counts = {};
   for await (const feature of readSource(source, shp, areas)) {
-    out.write(`${JSON.stringify(feature)}\n`);
+    write(feature);
     counts[feature.properties.description] = (counts[feature.properties.description] ?? 0) + 1;
   }
   report.push({ id: source.id, sha256, counts });
   console.log(source.id, counts);
 }
-await new Promise((resolve) => out.end(resolve));
 
-// Douglas–Peucker. tile-provider runs point-in-polygon tests against these
-// areas inside a 10ms CPU budget, so they're simplified to ~50m; an OS feature
-// within that of a boundary may be kept or dropped, which is harmless.
-const AREA_TOLERANCE = 0.0005;
+// --- OpenStreetMap ----------------------------------------------------------
 
-function simplify(ring) {
-  if (ring.length <= 4) return ring;
-  const keep = new Uint8Array(ring.length);
-  // Rings are closed (first = last), so seed with the vertex farthest from the
-  // start to give the first split a real baseline
-  let far = 1;
-  for (let i = 1; i < ring.length - 1; i++) {
-    if (Math.hypot(ring[i][0] - ring[0][0], ring[i][1] - ring[0][1])
-      > Math.hypot(ring[far][0] - ring[0][0], ring[far][1] - ring[0][1])) far = i;
-  }
-  keep[0] = keep[far] = keep[ring.length - 1] = 1;
-  const stack = [[0, far], [far, ring.length - 1]];
-  while (stack.length) {
-    const [a, b] = stack.pop();
-    const [ax, ay] = ring[a];
-    const [bx, by] = ring[b];
-    const len = Math.hypot(bx - ax, by - ay) || 1e-12;
-    let maxD = 0;
-    let idx = -1;
-    for (let i = a + 1; i < b; i++) {
-      const d = Math.abs((bx - ax) * (ay - ring[i][1]) - (ax - ring[i][0]) * (by - ay)) / len;
-      if (d > maxD) { maxD = d; idx = i; }
-    }
-    if (maxD > AREA_TOLERANCE) {
-      keep[idx] = 1;
-      stack.push([a, idx], [idx, b]);
-    }
-  }
-  return ring.filter((_, i) => keep[i]);
-}
+const OSM_PROW = {
+  public_footpath: 'Pedestrian Way Or Footpath',
+  public_bridleway: 'Bridleway',
+  restricted_byway: 'Restricted Byway',
+  byway_open_to_all_traffic: 'Byway Open To All Traffic',
+};
+const OSM_PATHS = new Set(['footway', 'path', 'bridleway', 'steps', 'cycleway']);
+// Pavements and crossings run alongside roads; OS's path network leaves them out
+const ROADSIDE = new Set(['sidewalk', 'crossing', 'traffic_island']);
 
-const areaFeatures = manifest.replaces.map((code) => {
-  const polygons = areas.authority.get(code)
-    .map((rings) => rings.map((r) => simplify(r).map(([x, y]) => [round(x), round(y)])))
-    .filter((rings) => rings[0].length >= 4);
+const replaced = manifest.replaces.map((code) => {
+  const polygons = areas.authority.get(code);
   const xs = polygons.flat(2).map((c) => c[0]);
   const ys = polygons.flat(2).map((c) => c[1]);
-  return {
-    type: 'Feature',
-    properties: { code },
-    bbox: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)],
-    geometry: { type: 'MultiPolygon', coordinates: polygons },
-  };
+  return { polygons, bbox: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] };
 });
-writeFileSync(join(outDir, 'areas.json'), JSON.stringify({ type: 'FeatureCollection', features: areaFeatures }));
+const isReplaced = ([x, y]) => replaced.some(({ polygons, bbox: [w, s, e, n] }) =>
+  x >= w && x <= e && y >= s && y <= n && inPolygons([x, y], polygons));
+
+function osmExport() {
+  const dir = join(outDir, 'osm');
+  mkdirSync(dir, { recursive: true });
+  const merged = join(dir, 'merged.osm.pbf');
+  const filtered = join(dir, 'filtered.osm.pbf');
+  const lines = join(dir, 'ways.geojsonl');
+  // Geofabrik extracts overlap at their borders; merge drops the duplicates
+  execFileSync('osmium', ['merge', ...osmExtracts.map((f) => join(srcDir, f)), '-o', merged, '--overwrite'], { stdio: 'inherit' });
+  execFileSync('osmium', [
+    'tags-filter', merged, '-o', filtered, '--overwrite',
+    `w/highway=${[...OSM_PATHS, 'track'].join(',')}`,
+    `w/designation=${Object.keys(OSM_PROW).join(',')}`,
+  ], { stdio: 'inherit' });
+  execFileSync('osmium', [
+    'export', filtered, '-o', lines, '--overwrite', '-f', 'geojsonseq',
+    '--geometry-types=linestring', '-x', 'print_record_separator=false',
+  ], { stdio: 'inherit' });
+  return lines;
+}
+
+const osmCounts = { prow: {}, path: 0, track: 0, replaced: 0 };
+for await (const text of createInterface({ input: createReadStream(osmExport()) })) {
+  if (!text) continue;
+  const { geometry, properties: tags } = JSON.parse(text);
+  const coordinates = geometry.coordinates.map(([x, y]) => [round(x), round(y)]);
+  const feature = (layer, properties = {}, minzoom) => write({
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates },
+    properties,
+    tippecanoe: minzoom ? { layer, minzoom } : { layer },
+  });
+
+  if (tags.highway === 'track') {
+    feature('track', {}, 15);
+    osmCounts.track++;
+  } else if (OSM_PATHS.has(tags.highway) && !ROADSIDE.has(tags.footway)) {
+    feature('path', {}, 15);
+    osmCounts.path++;
+  }
+
+  const description = OSM_PROW[tags.designation];
+  if (!description) continue;
+  if (isReplaced(midVertex([coordinates]))) {
+    osmCounts.replaced++;
+    continue;
+  }
+  feature('prow', { description, source: 'osm' });
+  osmCounts.prow[description] = (osmCounts.prow[description] ?? 0) + 1;
+}
+report.push({ id: 'osm', extracts: osmExtracts, counts: osmCounts });
+console.log('osm', osmCounts);
+
+await new Promise((resolve) => out.end(resolve));
 writeFileSync(join(outDir, 'build-report.json'), JSON.stringify(report, null, 2));
 
-// Only z13 and z15 are ever requested; tile-provider concatenates these tiles
-// with its own uncompressed MVT, so they're stored uncompressed too.
+// Layers come from each feature's `tippecanoe.layer`; paths and tracks only
+// reach the z15 detail tiles, so the z13 overview tiles stay small.
 execFileSync('tippecanoe', [
-  '-q', '-o', join(outDir, 'prow-ext.pmtiles'), '--force',
-  '-l', 'prow_ext', '-Z13', '-z15',
-  '--no-tile-compression', '--no-feature-limit', '--no-tile-size-limit',
-  '--attribution', manifest.sources.map((s) => s.attribution).join(', '),
+  '-q', '-o', join(outDir, 'detail.pmtiles'), '--force',
+  '-Z13', '-z15',
+  '--no-feature-limit', '--no-tile-size-limit',
+  '--attribution', ['© OpenStreetMap contributors', ...manifest.sources.map((s) => s.attribution)].join(', '),
   geojsonl,
 ], { stdio: 'inherit' });

@@ -92,10 +92,13 @@ export default function AboutSection({ onBack }: AboutSectionProps) {
 
         <div style={{ marginTop: 20 }}>
           <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)', marginBottom: 8 }}>
-            Rights of way
+            Paths and rights of way
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {prowSources.sources.map(({ id, attribution, licence }) => (
+            {[
+              { id: 'osm', attribution: '© OpenStreetMap contributors', licence: 'ODbL' },
+              ...prowSources.sources,
+            ].map(({ id, attribution, licence }) => (
               <div key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ fontSize: 10, color: 'var(--fog)', fontFamily: 'var(--mono)' }}>{attribution}</span>
                 <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', flexShrink: 0 }}>{licence.replace('OGL-', 'OGL v')}</span>

@@ -105,10 +105,12 @@ export function reliefLayers(c: Palette): StyleLayer[] {
   ];
 }
 
-export function boundaryLayers(c: Palette): StyleLayer[] {
+// Also drawn below NGD_MIN_ZOOM by the separate field boundary layer, which
+// passes no zoom limits.
+export function boundaryLayers(c: Palette, extra: { minzoom?: number } = NGD_FROM): StyleLayer[] {
   return [
-    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(16, 1.6, 19, 2.6) }, NGD_FROM),
-    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(16, 1.1, 19, 2) }, NGD_FROM),
+    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(14, 1.1, 16, 1.6, 19, 2.6) }, extra),
+    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(14, 0.8, 16, 1.1, 19, 2) }, extra),
   ];
 }
 
