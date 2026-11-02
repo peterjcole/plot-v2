@@ -1058,6 +1058,7 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
           onMapReady={handleMapReady}
           osDark={osDark}
           showHillshade={layerState.showHillshade}
+          showProw={layerState.showProw}
           dimBaseMap={layerState.dimBaseMap}
           showPersonalHeatmap={layerState.showPersonalHeatmap}
           showGlobalHeatmap={layerState.showGlobalHeatmap}

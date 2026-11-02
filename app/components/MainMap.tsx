@@ -7,6 +7,7 @@ import View from 'ol/View';
 import { defaults as defaultControls } from 'ol/control';
 import TileLayer from 'ol/layer/Tile';
 import TileGrid from 'ol/tilegrid/TileGrid';
+import { createXYZ } from 'ol/tilegrid';
 import XYZ from 'ol/source/XYZ';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -27,9 +28,10 @@ import { boundingExtent } from 'ol/extent';
 import Supercluster from 'supercluster';
 import {
   OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
-  HILLSHADE_TILE_URL, NGD_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
+  HILLSHADE_TILE_URL, NGD_TILE_URL, PROW_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
 import { getNgdStyle } from '@/lib/ngd-style';
+import { DETAIL_MAX_RESOLUTION, DETAIL_SOURCE, DETAIL_TILE_ZOOM, getDetailStyle } from '@/lib/map-style/detail-layers';
 import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
 import { isAwaitingRoute } from '@/lib/route-actions';
 import { getActivityColor } from '@/lib/activity-categories';
@@ -77,6 +79,8 @@ interface MainMapProps {
   onMapReady?: (map: Map) => void;
   osDark?: boolean;
   showHillshade?: boolean;
+  /** Paths & rights of way over satellite (always drawn on OS Vector; printed on the OS raster) */
+  showProw?: boolean;
   dimBaseMap?: boolean;
   showPersonalHeatmap?: boolean;
   showGlobalHeatmap?: boolean;
@@ -258,6 +262,7 @@ export default function MainMap({
   onMapReady,
   osDark = true,
   showHillshade = false,
+  showProw = false,
   dimBaseMap = false,
   showPersonalHeatmap = false,
   showGlobalHeatmap = false,
@@ -291,6 +296,7 @@ export default function MainMap({
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const ngdLayerRef = useRef<OlVectorTileLayer | null>(null);
+  const detailLayerRef = useRef<OlVectorTileLayer | null>(null);
   const dimLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
@@ -415,6 +421,23 @@ export default function MainMap({
     applyStyle(ngdLayer, getNgdStyle(false, NGD_TILE_URL), { updateSource: true }).catch(() => {});
     ngdLayerRef.current = ngdLayer;
 
+    // Paths, rights of way & field boundaries from tile-provider (OS NGD Features API).
+    // Only z15 tiles exist, so the grid has that single zoom and OL reuses them at every
+    // view zoom. Styled by the syncing effect below; source built here so restyling
+    // never has to wait on ol-mapbox-style's async source setup.
+    const detailLayer = new OlVectorTileLayer({
+      source: new OlVectorTileSource({
+        format: new MVT(),
+        url: PROW_TILE_URL,
+        projection: 'EPSG:3857',
+        tileGrid: createXYZ({ minZoom: DETAIL_TILE_ZOOM, maxZoom: DETAIL_TILE_ZOOM, tileSize: 512 }),
+      }),
+      maxResolution: DETAIL_MAX_RESOLUTION,
+      visible: false,
+      zIndex: 0.5,
+    });
+    detailLayerRef.current = detailLayer;
+
     // Dim overlay: semi-transparent dark fill sitting between base tiles (zIndex 0)
     // and all overlay layers (zIndex 3.4+). Toggled visible by dimBaseMap prop.
     const dimSource = new VectorSource();
@@ -509,7 +532,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [ngdLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, rotateLayer, elevHoverLayer],
+      layers: [ngdLayer, detailLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, rotateLayer, elevHoverLayer],
       view: new View({
         projection,
         center,
@@ -542,6 +565,7 @@ export default function MainMap({
       satelliteLayerRef.current = null;
       hillshadeLayerRef.current = null;
       ngdLayerRef.current = null;
+      detailLayerRef.current = null;
       dimLayerRef.current = null;
       photoLayerRef.current = null;
       plannerWpSourceRef.current = null;
@@ -793,6 +817,21 @@ export default function MainMap({
   useEffect(() => {
     hillshadeLayerRef.current?.setVisible(showHillshade);
   }, [showHillshade]);
+
+  // Detail layer: part of the OS Vector base map (below the dim layer), or an
+  // optional paths & rights-of-way overlay on satellite, above hillshading.
+  // The OS raster base already prints rights of way, so it never gets one.
+  useEffect(() => {
+    const layer = detailLayerRef.current;
+    if (!layer) return;
+    const isVec = baseLayer === 'os-vector';
+    layer.setVisible(isVec || (baseLayer === 'satellite' && showProw));
+    layer.setZIndex(isVec ? 0.5 : 6);
+    applyStyle(layer, getDetailStyle(PROW_TILE_URL, { dark: osDark, overlay: !isVec }), {
+      source: DETAIL_SOURCE,
+      updateSource: false,
+    }).catch(() => {});
+  }, [baseLayer, showProw, osDark]);
 
   // Owner photos — SuperCluster-based circular thumbnail layer
   useEffect(() => {

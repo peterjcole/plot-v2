@@ -8,6 +8,7 @@ import { type Theme } from '@/lib/theme';
 export interface LayerState {
   baseLayer: MapLayer;
   showHillshade: boolean;
+  showProw: boolean;
   showPhotos: boolean;
   dimBaseMap: boolean;
   showPersonalHeatmap: boolean;
@@ -22,6 +23,7 @@ export interface LayerState {
 export const DEFAULT_LAYER_STATE: LayerState = {
   baseLayer: 'topo',
   showHillshade: true,
+  showProw: false,
   showPhotos: true,
   dimBaseMap: false,
   showPersonalHeatmap: false,
@@ -229,6 +231,8 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
 
           {/* Hillshading */}
           <Row label="Hillshading" on={state.showHillshade} onChange={(v) => onChange({ showHillshade: v })} />
+          {/* OS raster and OS Vector already show paths and rights of way */}
+          <Row label="Paths & rights of way" on={state.showProw} onChange={(v) => onChange({ showProw: v })} hidden={state.baseLayer !== 'satellite'} />
 
           <Divider />
 
