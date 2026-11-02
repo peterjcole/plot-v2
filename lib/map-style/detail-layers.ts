@@ -1,7 +1,8 @@
 import { palette, type Palette } from './palette';
 
 // Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
-// the OS path network (`path`), tracks (`track`) and field boundaries (`fieldboundary`).
+// council rights of way where OS has none (`prow_ext`), the OS path network
+// (`path`), tracks (`track`) and field boundaries (`fieldboundary`).
 //
 // OS's own ngd-base vector tiles carry no paths or field boundaries below z16,
 // so on the OS Vector base map these layers fill that gap, handing over to
@@ -86,6 +87,37 @@ function line(
   };
 }
 
+// OS NGD's rights of way, and council data filling the authorities where OS has
+// none (`prow_ext`, normalised to the same descriptions; see scripts/prow).
+const PROW_LAYERS = ['prow', 'prow_ext'];
+
+function prowLayers(sourceLayer: string, c: Palette, overlay: boolean, overview: boolean): LineLayer[] {
+  const id = (name: string) => `detail-${sourceLayer}-${name}`;
+  const layers: LineLayer[] = [];
+  if (overlay) {
+    layers.push(line(id('casing'), sourceLayer, { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
+  }
+  const width = (overlay ? 2.4 : 2) - (overview ? 0.4 : 0);
+  layers.push(
+    line(id('footpath'), sourceLayer, {
+      'line-color': c.footpath,
+      'line-width': width,
+      'line-dasharray': [2, 1.4],
+    }, { filter: descIn(FOOTPATH) }),
+    line(id('bridleway'), sourceLayer, {
+      'line-color': c.bridleway,
+      'line-width': width,
+      'line-dasharray': [5, 1.5],
+    }, { filter: descIn(BRIDLEWAY) }),
+    line(id('byway'), sourceLayer, {
+      'line-color': c.byway,
+      'line-width': width + 0.2,
+      'line-dasharray': [5, 1.5, 1, 1.5],
+    }, { filter: descIn(BYWAY) }),
+  );
+  return layers;
+}
+
 export function getDetailStyle(tileUrl: string, { dark, overlay, overview = false }: DetailStyleOptions): DetailStyle {
   const c = palette(dark);
   const layers: LineLayer[] = [];
@@ -125,27 +157,7 @@ export function getDetailStyle(tileUrl: string, { dark, overlay, overview = fals
   if (!overview) layers.push(line('detail-path', 'path', getPathPaint(c), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
-  if (overlay) {
-    layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
-  }
-  const prowWidth = (overlay ? 2.4 : 2) - (overview ? 0.4 : 0);
-  layers.push(
-    line('detail-prow-footpath', 'prow', {
-      'line-color': c.footpath,
-      'line-width': prowWidth,
-      'line-dasharray': [2, 1.4],
-    }, { filter: descIn(FOOTPATH) }),
-    line('detail-prow-bridleway', 'prow', {
-      'line-color': c.bridleway,
-      'line-width': prowWidth,
-      'line-dasharray': [5, 1.5],
-    }, { filter: descIn(BRIDLEWAY) }),
-    line('detail-prow-byway', 'prow', {
-      'line-color': c.byway,
-      'line-width': prowWidth + 0.2,
-      'line-dasharray': [5, 1.5, 1, 1.5],
-    }, { filter: descIn(BYWAY) }),
-  );
+  for (const sourceLayer of PROW_LAYERS) layers.push(...prowLayers(sourceLayer, c, overlay, overview));
 
   return {
     version: 8,
