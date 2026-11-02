@@ -92,13 +92,13 @@ export function reliefLayers(c: Palette): StyleLayer[] {
   return [
     line('contour', 'Contours', {
       'line-color': c.contour,
-      'line-width': zoom(11, 0.3, 15, 0.75, 18, 1),
-      'line-opacity': zoom(11, 0.5, 15, 0.95),
+      'line-width': zoom(11, 0.5, 14, 0.9, 16, 1.1, 18, 1.3),
+      'line-opacity': zoom(11, 0.7, 14, 1),
     }, { minzoom: 11, filter: sym(ZS.contours.normal) }),
     line('contour-index', 'Contours', {
       'line-color': c.contourIndex,
-      'line-width': zoom(9, 0.4, 15, 1.1, 18, 1.5),
-      'line-opacity': zoom(9, 0.5, 15, 0.9),
+      'line-width': zoom(9, 0.6, 14, 1.5, 16, 1.8, 18, 2.2),
+      'line-opacity': zoom(9, 0.7, 13, 1),
     }, { minzoom: 9, filter: sym(ZS.contours.index) }),
     line('ngd-cliff', 'lnd_fts_landformline', { 'line-color': c.slope, 'line-width': 1.2 }, { ...NGD_FROM, filter: descHas('Cliff', 'Ridge Or Rock Line') }),
     line('ngd-slope', 'lnd_fts_landformline', { 'line-color': c.slope, 'line-width': 0.6, 'line-dasharray': [3, 2] }, { ...NGD_FROM, filter: descHas('Slope') }),
