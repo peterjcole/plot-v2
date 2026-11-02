@@ -1,3 +1,5 @@
+import { palette, type Palette } from './palette';
+
 // Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
 // the OS path network (`path`) and field boundaries (`fieldboundary`).
 //
@@ -18,38 +20,18 @@ export const DETAIL_HANDOVER_ZOOM = 16;
 // One step coarser (7 m/px) needs ~4x as many z15 tiles for the same viewport.
 export const DETAIL_MAX_RESOLUTION = 4;
 
+// Zoomed out beyond that, rights of way alone come from z13 overview tiles,
+// down to view zoom 6 (14 m/px).
+export const OVERVIEW_TILE_ZOOM = 13;
+export const OVERVIEW_MAX_RESOLUTION = 16;
+
 export interface DetailStyleOptions {
   dark: boolean;
-  // Over satellite/topo rather than as part of the OS Vector base map
+  // Over satellite rather than as part of the OS Vector base map
   overlay: boolean;
+  // Style for the z13 overview tiles, which only carry rights of way
+  overview?: boolean;
 }
-
-interface DetailPalette {
-  footpath: string;
-  bridleway: string;
-  byway: string;
-  path: string;
-  fieldBoundary: string;
-  casing: string;
-}
-
-const LIGHT: DetailPalette = {
-  footpath: '#2a8c2a',
-  bridleway: '#2a8c2a',
-  byway: '#7a5a18',
-  path: '#45453a',
-  fieldBoundary: '#9a9a88',
-  casing: 'rgba(255,255,255,0.55)',
-};
-
-const DARK: DetailPalette = {
-  footpath: '#44cc44',
-  bridleway: '#44cc44',
-  byway: '#c89848',
-  path: '#c8c0b0',
-  fieldBoundary: '#5a5448',
-  casing: 'rgba(14,21,32,0.8)',
-};
 
 // Highway dedication descriptions from OS NGD trn-rami-highwaydedication
 const FOOTPATH = ['Pedestrian Way Or Footpath'];
@@ -59,11 +41,11 @@ const BYWAY = ['Restricted Byway', 'Byway Open To All Traffic'];
 type Filter = unknown[];
 
 // Shared with ngd-base's own path layer above the handover so the two match
-export function getPathPaint(dark: boolean): Record<string, unknown> {
+export function getPathPaint(c: Palette): Record<string, unknown> {
   return {
-    'line-color': (dark ? DARK : LIGHT).path,
-    'line-width': 1,
-    'line-dasharray': [2, 2],
+    'line-color': c.path,
+    'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 16, 1.7, 19, 2.2],
+    'line-dasharray': [2.5, 1.6],
   };
 }
 
@@ -104,37 +86,37 @@ function line(
   };
 }
 
-export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOptions): DetailStyle {
-  const c = dark ? DARK : LIGHT;
+export function getDetailStyle(tileUrl: string, { dark, overlay, overview = false }: DetailStyleOptions): DetailStyle {
+  const c = palette(dark);
   const layers: LineLayer[] = [];
 
   // Field boundaries and plain paths are part of the base map below the handover;
   // as an overlay only paths are drawn (field boundaries add noise over imagery).
-  if (!overlay) {
+  if (!overlay && !overview) {
     layers.push(
       line('detail-fieldboundary', 'fieldboundary', {
         'line-color': c.fieldBoundary,
-        'line-width': 0.7,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.1, 16, 1.6],
       }, { maxzoom: DETAIL_HANDOVER_ZOOM }),
     );
   }
 
   const pathExtra = overlay ? {} : { maxzoom: DETAIL_HANDOVER_ZOOM };
-  if (overlay) {
-    layers.push(line('detail-path-casing', 'path', { 'line-color': c.casing, 'line-width': 2.5 }));
+  if (overlay && !overview) {
+    layers.push(line('detail-path-casing', 'path', { 'line-color': c.overlayCasing, 'line-width': 2.5 }));
   }
-  layers.push(line('detail-path', 'path', getPathPaint(dark), pathExtra));
+  if (!overview) layers.push(line('detail-path', 'path', getPathPaint(c), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
   if (overlay) {
-    layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.casing, 'line-width': 3.5 }));
+    layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
   }
-  const prowWidth = overlay ? 2.2 : 1.6;
+  const prowWidth = (overlay ? 2.4 : 2) - (overview ? 0.4 : 0);
   layers.push(
     line('detail-prow-footpath', 'prow', {
       'line-color': c.footpath,
       'line-width': prowWidth,
-      'line-dasharray': [2, 1.5],
+      'line-dasharray': [2, 1.4],
     }, { filter: descIn(FOOTPATH) }),
     line('detail-prow-bridleway', 'prow', {
       'line-color': c.bridleway,
@@ -154,8 +136,8 @@ export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOp
       [DETAIL_SOURCE]: {
         type: 'vector',
         tiles: [tileUrl],
-        minzoom: DETAIL_TILE_ZOOM,
-        maxzoom: DETAIL_TILE_ZOOM,
+        minzoom: overview ? OVERVIEW_TILE_ZOOM : DETAIL_TILE_ZOOM,
+        maxzoom: overview ? OVERVIEW_TILE_ZOOM : DETAIL_TILE_ZOOM,
       },
     },
     layers,

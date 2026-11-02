@@ -5,6 +5,9 @@ export const OS_PROJECTION = {
   origin: [-238375.0, 1376256.0] as [number, number],
 };
 
+// The map view adds three finer zoom levels beyond the OS raster's deepest (1.75 m/px)
+export const OS_VIEW_RESOLUTIONS = [...OS_PROJECTION.resolutions, 0.875, 0.4375, 0.21875];
+
 export const OS_TILE_URL = '/api/maps?z={z}&x={x}&y={y}';
 export const OS_DARK_TILE_URL = '/api/maps/dark?z={z}&x={x}&y={y}';
 export const OS_DEFAULT_CENTER = { lat: 54.4, lng: -2.9 };
