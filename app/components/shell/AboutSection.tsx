@@ -1,5 +1,7 @@
 'use client';
 
+import prowSources from '@/scripts/prow/sources.json';
+
 interface AboutSectionProps {
   onBack: () => void;
 }
@@ -86,6 +88,23 @@ export default function AboutSection({ onBack }: AboutSectionProps) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fog-dim)', fontFamily: 'var(--mono)', marginBottom: 8 }}>
+            Rights of way
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {prowSources.sources.map(({ id, attribution, licence }) => (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--fog)', fontFamily: 'var(--mono)' }}>{attribution}</span>
+                <span style={{ fontSize: 9, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', letterSpacing: '0.06em', flexShrink: 0 }}>{licence.replace('OGL-', 'OGL v')}</span>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 9, lineHeight: 1.5, color: 'var(--fog-dim)', fontFamily: 'var(--mono)', margin: '8px 0 0' }}>
+            Contains public sector information licensed under the Open Government Licence v3.0. Contains OS data © Crown copyright and database right {new Date().getFullYear()}. Not the legal Definitive Map.
+          </p>
         </div>
       </div>
     </div>

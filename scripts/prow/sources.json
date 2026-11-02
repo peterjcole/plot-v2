@@ -1,0 +1,60 @@
+{
+  "boundaries": {
+    "authority": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Counties_and_Unitary_Authorities_December_2024_Boundaries_UK_BGC/FeatureServer/0/query?where=CTYUA24CD+IN+({codes})&outFields=CTYUA24CD,CTYUA24NM&outSR=4326&f=geojson",
+    "park": "https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/National_Parks_December_2022_Boundaries_GB_BGC_V4/FeatureServer/0/query?where=NPARK22CD+IN+({codes})&outFields=NPARK22CD,NPARK22NM&outSR=4326&f=geojson"
+  },
+  "replaces": ["E10000016", "E06000063", "E06000064"],
+  "sources": [
+    {
+      "id": "kcc",
+      "name": "Kent County Council",
+      "url": "https://www.rowmaps.com/datasets/KT/prows.zip",
+      "date": "2026-05-21",
+      "licence": "OGL-3.0",
+      "attribution": "Kent County Council",
+      "typeField": "StatusDesc",
+      "types": {
+        "Public Footpath": "Pedestrian Way Or Footpath",
+        "Public Bridleway": "Bridleway",
+        "Restricted Byway": "Restricted Byway",
+        "Byway open to all traffic": "Byway Open To All Traffic"
+      },
+      "within": { "authority": ["E10000016"] }
+    },
+    {
+      "id": "ldnpa",
+      "name": "Lake District National Park Authority",
+      "url": "https://volunteering.lake-district.gov.uk/PublishedGIS/LDNPA_PROW.shz",
+      "date": "2024-01-18",
+      "licence": "OGL-3.0",
+      "attribution": "Lake District National Park Authority",
+      "typeField": "Type_Text",
+      "types": { "FP": "Pedestrian Way Or Footpath", "BW": "Bridleway", "RB": "Restricted Byway", "BOAT": "Byway Open To All Traffic" },
+      "within": { "park": ["E26000011"] }
+    },
+    {
+      "id": "wfc",
+      "name": "Westmorland and Furness Council",
+      "url": "https://www.rowmaps.com/datasets/W1/prows.zip",
+      "date": "2025-09-16",
+      "licence": "OGL-3.0",
+      "attribution": "Westmorland and Furness Council",
+      "typeField": "type_text",
+      "types": { "FP": "Pedestrian Way Or Footpath", "BW": "Bridleway", "RB": "Restricted Byway", "BOAT": "Byway Open To All Traffic" },
+      "within": { "authority": ["E06000064"] },
+      "outside": { "park": ["E26000011"] }
+    },
+    {
+      "id": "ccc",
+      "name": "Cumbria County Council (for Cumberland, pre-2023 data)",
+      "url": "https://www.rowmaps.com/datasets/CU/prows.zip",
+      "date": "2017",
+      "licence": "OGL-3.0",
+      "attribution": "Cumbria County Council",
+      "typeField": "TYPE_TEXT",
+      "types": { "FP": "Pedestrian Way Or Footpath", "BW": "Bridleway", "Restricted Byway": "Restricted Byway", "BOAT": "Byway Open To All Traffic" },
+      "within": { "authority": ["E06000063"] },
+      "outside": { "park": ["E26000011"] }
+    }
+  ]
+}
