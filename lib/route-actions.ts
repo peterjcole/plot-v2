@@ -195,7 +195,7 @@ export function replayAll(actions: RouteContentAction[]): RouteState[] {
 }
 
 /** One-off, uncached replay to a given cursor — for callers outside the live
- * history hook (e.g. duplicating a route that isn't the currently-open one). */
+ * history hook (e.g. the mobile route API flattening a saved route). */
 export function replayToCursor(actions: RouteContentAction[], cursor: number): RouteState {
   let state = EMPTY_ROUTE_STATE;
   for (let i = 0; i < cursor; i++) {

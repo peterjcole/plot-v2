@@ -1,4 +1,3 @@
-import type { Waypoint, RouteSegment } from './types';
 import type { RouteContentAction } from './route-actions';
 
 export interface RouteSummary {
@@ -107,16 +106,22 @@ export async function updateRoute(id: string, patch: RouteUpdatePatch): Promise<
   return parseOrNull<RouteSummary>(res);
 }
 
+// Live editing state of the currently-open route, which may be ahead of what's saved (autosave
+// debounce). Omit it to have the server copy the source's stored action log + view as-is.
+export type DuplicateSnapshot = Pick<
+  RouteUpdatePatch,
+  'actions' | 'cursor' | 'mapCenter' | 'mapZoom' | 'distanceM' | 'waypointCount'
+>;
+
 export async function duplicateRoute(
   id: string,
   name: string,
-  waypoints: Waypoint[],
-  segments: RouteSegment[],
+  snapshot?: DuplicateSnapshot,
 ): Promise<RouteSummary | null> {
   const res = await fetch(`/api/routes/${id}/duplicate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, waypoints, segments }),
+    body: JSON.stringify({ name, ...snapshot }),
   });
   return parseOrNull<RouteSummary>(res);
 }

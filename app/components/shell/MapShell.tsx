@@ -18,7 +18,6 @@ import { useElevationProfile } from '@/app/(main)/planner/useElevationProfile';
 import { calculateDistance } from '@/app/(main)/planner/route-utils';
 import { saveRoute, loadRoute } from '@/lib/route-storage';
 import { getActiveRouteId, setActiveRouteId } from '@/lib/active-route';
-import { replayToCursor } from '@/lib/route-actions';
 import {
   listRoutes, createRoute, getRoute, updateRoute, duplicateRoute, deleteRoute,
   displayRouteLabel, routeExportName, routeLabelStyle, UNTITLED_ROUTE_NAME, type RouteSummary,
@@ -520,22 +519,14 @@ export default function MapShell({ activities, avatarInitials, isLoggedIn = fals
   }, [refreshRoutesList]);
 
   const handleDuplicateRoute = useCallback((id: string) => {
-    (async () => {
-      let wps = waypointsRef.current;
-      let segs = segmentsRef.current;
-      let baseName = routeMetaRef.current.name;
-      if (id !== routeMetaRef.current.id) {
-        const detail = await getRoute(id);
-        if (!detail) return;
-        const replayed = replayToCursor(detail.actions, detail.cursor);
-        wps = replayed.waypoints;
-        segs = replayed.segments;
-        baseName = detail.name;
-      }
-      await duplicateRoute(id, `${baseName} (copy)`, wps, segs);
-      refreshRoutesList();
-    })();
-  }, [refreshRoutesList]);
+    // Active route: send the live history (may be ahead of the last autosave). Any other
+    // route: the server copies its stored action log as-is, so undo history carries over.
+    const isActive = id === routeMetaRef.current.id;
+    const baseName = isActive ? routeMetaRef.current.name : routesList.find((r) => r.id === id)?.name;
+    if (baseName == null) return;
+    const snapshot = isActive ? buildSavePayload() : undefined;
+    duplicateRoute(id, `${baseName} (copy)`, snapshot).then(() => refreshRoutesList());
+  }, [routesList, buildSavePayload, refreshRoutesList]);
 
   const handleDeleteRoute = useCallback((id: string) => {
     deleteRoute(id).then((ok) => {
