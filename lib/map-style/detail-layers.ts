@@ -1,7 +1,7 @@
 import { palette, type Palette } from './palette';
 
 // Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
-// the OS path network (`path`) and field boundaries (`fieldboundary`).
+// the OS path network (`path`), tracks (`track`) and field boundaries (`fieldboundary`).
 //
 // OS's own ngd-base vector tiles carry no paths or field boundaries below z16,
 // so on the OS Vector base map these layers fill that gap, handing over to
@@ -98,6 +98,23 @@ export function getDetailStyle(tileUrl: string, { dark, overlay, overview = fals
         'line-color': c.fieldBoundary,
         'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.1, 16, 1.6],
       }, { maxzoom: DETAIL_HANDOVER_ZOOM }),
+    );
+  }
+
+  // Tracks: a pale strip between dashed dark edges, as Explorer draws them.
+  // At street zoom ngd-base's own track surfaces take over.
+  if (!overview) {
+    const trackExtra = overlay ? {} : { maxzoom: DETAIL_HANDOVER_ZOOM };
+    layers.push(
+      line('detail-track-edges', 'track', {
+        'line-color': c.track,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 16, 4.8],
+        'line-dasharray': [1.4, 0.7],
+      }, trackExtra),
+      line('detail-track', 'track', {
+        'line-color': c.local[1],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 16, 2.6],
+      }, trackExtra),
     );
   }
 

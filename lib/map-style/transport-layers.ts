@@ -18,8 +18,9 @@ interface RoadClass {
 function roadClasses(c: Palette): RoadClass[] {
   // Lowest first so major roads draw over minor ones at junctions
   return [
-    { id: 'restricted', codes: ZS.roads.restricted, colors: c.local, minzoom: 13, casing: zoom(13, 1.2, 15, 3.4, 17, 8), fill: zoom(13, 0.5, 15, 2.2, 17, 6.6), dashed: true },
-    { id: 'local', codes: ZS.roads.local, colors: c.local, minzoom: 12, casing: zoom(12, 0.8, 14, 2.6, 15.5, 5, 17, 9), fill: zoom(12, 0.3, 14, 1.5, 15.5, 3.7, 17, 7.5) },
+    // Mostly tracks and private access roads: dashed dark edges either side, like Explorer
+    { id: 'restricted', codes: ZS.roads.restricted, colors: [c.track, c.local[1]], minzoom: 13, casing: zoom(13, 1.8, 15, 4.6, 17, 9.4), fill: zoom(13, 0.5, 15, 2.2, 17, 6.6), dashed: true },
+    { id: 'local', codes: ZS.roads.local, colors: c.local, minzoom: 12, casing: zoom(12, 1, 14, 3, 15.5, 5.6, 17, 9.6), fill: zoom(12, 0.3, 14, 1.5, 15.5, 3.7, 17, 7.5) },
     { id: 'minor', codes: ZS.roads.minor, colors: c.minor, minzoom: 10, casing: zoom(10, 0.8, 13, 3, 15.5, 7.4, 17, 11), fill: zoom(10, 0.4, 13, 1.9, 15.5, 5.8, 17, 9.4) },
     { id: 'b', codes: ZS.roads.bRoad, colors: c.bRoad, minzoom: 9, casing: zoom(9, 1, 12, 3.2, 15.5, 8.4, 17, 12.5), fill: zoom(9, 0.5, 12, 2.1, 15.5, 6.8, 17, 10.8) },
     { id: 'a', codes: ZS.roads.aRoad, colors: c.aRoad, minzoom: 7, casing: zoom(7, 1, 12, 3.8, 15.5, 9.4, 17, 14), fill: zoom(7, 0.5, 12, 2.6, 15.5, 7.6, 17, 12.2) },
@@ -45,7 +46,7 @@ export function transportLayers(c: Palette): StyleLayer[] {
     ...classes.map((r) => line(`road-${r.id}-casing`, 'Roads', {
       'line-color': r.colors[0],
       'line-width': r.casing,
-      ...(r.dashed ? { 'line-dasharray': [2, 1] } : {}),
+      ...(r.dashed ? { 'line-dasharray': [3, 1.5] } : {}),
     }, { ...zs(r), layout: { 'line-cap': 'round' } })),
     ...classes.map((r) => line(`road-${r.id}`, 'Roads', { 'line-color': r.colors[1], 'line-width': r.fill }, { ...zs(r), layout: { 'line-cap': 'round' } })),
 
