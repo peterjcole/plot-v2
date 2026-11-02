@@ -109,8 +109,9 @@ export function reliefLayers(c: Palette): StyleLayer[] {
 // passes no zoom limits.
 export function boundaryLayers(c: Palette, extra: { minzoom?: number } = NGD_FROM): StyleLayer[] {
   return [
-    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(14, 1.1, 16, 1.6, 19, 2.6) }, extra),
-    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(14, 0.8, 16, 1.1, 19, 2) }, extra),
+    // Explorer's field boundaries are hairlines: present, but quieter than paths and rights of way
+    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(14, 0.7, 16, 0.9, 19, 1.6) }, extra),
+    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(14, 0.8, 16, 1, 19, 1.8) }, extra),
   ];
 }
 

@@ -11,6 +11,7 @@ import {
   getDetailStyle, type DetailStyleOptions,
 } from '@/lib/map-style/detail-layers';
 import { getFieldBoundaryStyle, getVectorStyle, NGD_SOURCE } from '@/lib/map-style';
+import { palette } from '@/lib/map-style/palette';
 
 // The OS Vector base map is OS's ngd-base tiles plus a detail group that fills
 // in what they lack below z16: tile-provider's detail tiles (paths, tracks,
@@ -65,6 +66,9 @@ export function createDetailLayer(): LayerGroup {
 }
 
 export function styleBaseLayer(layer: OlVectorTileLayer, dark: boolean): Promise<unknown> {
+  // applyStyle skips the style's `background` layer for a single layer, which
+  // left open sea and tidal channels showing whatever was behind the map
+  layer.setBackground(palette(dark).sea);
   return applyStyle(layer, getVectorStyle(dark), { source: NGD_SOURCE, updateSource: false });
 }
 
