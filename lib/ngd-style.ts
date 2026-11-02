@@ -1,3 +1,5 @@
+import { DETAIL_HANDOVER_ZOOM, getPathPaint } from './map-style/detail-layers';
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const baseStyle = require('./ngd-outdoor-style.json') as StyleSpec;
 
@@ -274,15 +276,6 @@ function applyExplorerAdjustments(layer: StyleLayer): void {
       paint['line-color'] = isCasing ? '#888480' : '#ffffff';
     }
   }
-
-  // PRoW paths: green dashes (bridleway convention; NGD _symbol doesn't expose
-  // footpath vs bridleway distinction so we use a single colour for all paths).
-  if (sl === 'trn_ntwk_pathlink' && layer.type === 'line') {
-    paint['line-color'] = '#2a8c2a';
-    paint['line-opacity'] = 0.9;
-    paint['line-dasharray'] = [5, 4];
-    paint['line-width'] = 1.4;
-  }
 }
 
 function applyDarkAdjustments(layer: StyleLayer): void {
@@ -314,14 +307,6 @@ function applyDarkAdjustments(layer: StyleLayer): void {
     } else {
       paint['line-color'] = isCasing ? '#3a322a' : '#2e2820';
     }
-  }
-
-  // PRoW paths: bright green on dark bg — algorithm F on #2a8c2a gives ~#44cc44
-  if (sl === 'trn_ntwk_pathlink' && layer.type === 'line') {
-    paint['line-color'] = '#44cc44';
-    paint['line-opacity'] = 0.9;
-    paint['line-dasharray'] = [5, 4];
-    paint['line-width'] = 1.4;
   }
 
   // Labels: light text on dark background
@@ -359,10 +344,12 @@ export function getNgdStyle(dark: boolean, tileUrl: string): StyleSpec {
   const colorMap = dark ? DARK_SWAP : EXPLORER_SWAP;
 
   for (const layer of style.layers) {
-    // Lower minzoom for PRoW path links so they appear at walking-map zoom levels.
-    // The NGD base style sets these to zoom 16 (street-level only).
-    if (layer['source-layer'] === 'trn_ntwk_pathlink' && (layer.minzoom ?? 0) > 13) {
-      layer.minzoom = 13;
+    // ngd-base only has path links from z16; below that they come from the
+    // detail layer, so draw them identically for a seamless handover.
+    if (layer['source-layer'] === 'trn_ntwk_pathlink' && layer.type === 'line') {
+      layer.minzoom = DETAIL_HANDOVER_ZOOM;
+      layer.paint = getPathPaint(dark);
+      continue;
     }
 
     if (!layer.paint) continue;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseTileParams } from '@/lib/tile-params';
 import sharp from 'sharp';
 import booleanIntersects from '@turf/boolean-intersects';
 import { polygon } from '@turf/helpers';
@@ -196,23 +197,11 @@ const CACHE = 'public, max-age=1209600, s-maxage=1209600';
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
-  const xStr = sp.get('x');
-  const yStr = sp.get('y');
-  const zStr = sp.get('z');
   const dark = sp.get('dark') === '1';
   const gbFill = sp.get('gb') === 'os';
-
-  if (!xStr || !yStr || !zStr) {
-    return NextResponse.json({ error: 'x, y, z are required' }, { status: 400 });
-  }
-
-  const x = parseInt(xStr, 10);
-  const y = parseInt(yStr, 10);
-  const z = parseInt(zStr, 10);
-
-  if (isNaN(x) || isNaN(y) || isNaN(z)) {
-    return NextResponse.json({ error: 'x, y, z must be integers' }, { status: 400 });
-  }
+  const tile = parseTileParams(sp);
+  if (tile instanceof NextResponse) return tile;
+  const { x, y, z } = tile;
 
   if (sp.get('scale') === '2') {
     const buf = await stitchRetinaTile((tz, tx, ty) => fetchTileBuffer(dark, tz, tx, ty, gbFill), z, x, y);
