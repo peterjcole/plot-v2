@@ -231,8 +231,8 @@ export default function LayersPanel({ state, onChange, bottom = 16, fixed = fals
 
           {/* Hillshading */}
           <Row label="Hillshading" on={state.showHillshade} onChange={(v) => onChange({ showHillshade: v })} />
-          {/* OS Vector draws paths and rights of way itself */}
-          <Row label="Paths & rights of way" on={state.showProw} onChange={(v) => onChange({ showProw: v })} hidden={state.baseLayer === 'os-vector'} />
+          {/* OS raster and OS Vector already show paths and rights of way */}
+          <Row label="Paths & rights of way" on={state.showProw} onChange={(v) => onChange({ showProw: v })} hidden={state.baseLayer !== 'satellite'} />
 
           <Divider />
 

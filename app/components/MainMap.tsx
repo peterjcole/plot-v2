@@ -79,7 +79,7 @@ interface MainMapProps {
   onMapReady?: (map: Map) => void;
   osDark?: boolean;
   showHillshade?: boolean;
-  /** Paths & rights of way over non-vector base maps (always drawn on OS Vector) */
+  /** Paths & rights of way over satellite (always drawn on OS Vector; printed on the OS raster) */
   showProw?: boolean;
   dimBaseMap?: boolean;
   showPersonalHeatmap?: boolean;
@@ -819,12 +819,13 @@ export default function MainMap({
   }, [showHillshade]);
 
   // Detail layer: part of the OS Vector base map (below the dim layer), or an
-  // optional paths & rights-of-way overlay above other base maps and hillshading.
+  // optional paths & rights-of-way overlay on satellite, above hillshading.
+  // The OS raster base already prints rights of way, so it never gets one.
   useEffect(() => {
     const layer = detailLayerRef.current;
     if (!layer) return;
     const isVec = baseLayer === 'os-vector';
-    layer.setVisible(isVec || showProw);
+    layer.setVisible(isVec || (baseLayer === 'satellite' && showProw));
     layer.setZIndex(isVec ? 0.5 : 6);
     applyStyle(layer, getDetailStyle(PROW_TILE_URL, { dark: osDark, overlay: !isVec }), {
       source: DETAIL_SOURCE,
