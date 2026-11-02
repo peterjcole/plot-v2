@@ -54,7 +54,7 @@ type Filter = unknown[];
 export function getPathPaint(c: Palette): Record<string, unknown> {
   return {
     'line-color': c.path,
-    'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 16, 1.7, 19, 2.2],
+    'line-width': zoom(13, 1.1, 16, 1.5, 19, 2),
     'line-dasharray': [2.5, 1.6],
   };
 }
@@ -78,6 +78,7 @@ export interface DetailStyle {
 }
 
 const descIn = (values: string[]): Filter => ['in', ['get', 'description'], ['literal', values]];
+const zoom = (...stops: number[]) => ['interpolate', ['linear'], ['zoom'], ...stops];
 
 function line(
   id: string,
@@ -100,31 +101,29 @@ function line(
 // (`prow_ext`); both normalised to the same descriptions by scripts/prow.
 const PROW_LAYERS = ['prow', 'prow_ext'];
 
-function prowLayers(sourceLayer: string, c: Palette, overlay: boolean, overview: boolean): LineLayer[] {
+function prowLayers(sourceLayer: string, c: Palette, overlay: boolean): LineLayer[] {
   const id = (name: string) => `detail-${sourceLayer}-${name}`;
-  const layers: LineLayer[] = [];
-  if (overlay) {
-    layers.push(line(id('casing'), sourceLayer, { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
-  }
-  const width = (overlay ? 2.4 : 2) - (overview ? 0.4 : 0);
-  layers.push(
+  // Bold, like Explorer's: wider than paths and tracks at every zoom
+  const width = (extra = 0) => zoom(12, 1.7 + extra, 14, 2.6 + extra, 16, 3.2 + extra, 18, 3.8 + extra);
+  const halo = overlay ? c.overlayCasing : c.prowHalo;
+  return [
+    line(id('halo'), sourceLayer, { 'line-color': halo, 'line-width': width(overlay ? 2.4 : 2) }),
     line(id('footpath'), sourceLayer, {
       'line-color': c.footpath,
-      'line-width': width,
-      'line-dasharray': [2, 1.4],
+      'line-width': width(),
+      'line-dasharray': [2, 1.2],
     }, { filter: descIn(FOOTPATH) }),
     line(id('bridleway'), sourceLayer, {
       'line-color': c.bridleway,
-      'line-width': width,
-      'line-dasharray': [5, 1.5],
+      'line-width': width(),
+      'line-dasharray': [5, 1.4],
     }, { filter: descIn(BRIDLEWAY) }),
     line(id('byway'), sourceLayer, {
       'line-color': c.byway,
-      'line-width': width + 0.2,
-      'line-dasharray': [5, 1.5, 1, 1.5],
+      'line-width': width(0.2),
+      'line-dasharray': [5, 1.2, 1, 1.2],
     }, { filter: descIn(BYWAY) }),
-  );
-  return layers;
+  ];
 }
 
 export function getDetailStyle(tileUrl: string, { dark, overlay, overview = false }: DetailStyleOptions): DetailStyle {
@@ -138,12 +137,12 @@ export function getDetailStyle(tileUrl: string, { dark, overlay, overview = fals
     layers.push(
       line('detail-track-edges', 'track', {
         'line-color': c.track,
-        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 2.6, 16, 4.8],
+        'line-width': zoom(13, 2.6, 16, 4.8),
         'line-dasharray': [1.4, 0.7],
       }, trackExtra),
       line('detail-track', 'track', {
         'line-color': c.local[1],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 16, 2.6],
+        'line-width': zoom(13, 1.2, 16, 2.6),
       }, trackExtra),
     );
   }
@@ -155,7 +154,7 @@ export function getDetailStyle(tileUrl: string, { dark, overlay, overview = fals
   if (!overview) layers.push(line('detail-path', 'path', getPathPaint(c), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
-  for (const sourceLayer of PROW_LAYERS) layers.push(...prowLayers(sourceLayer, c, overlay, overview));
+  for (const sourceLayer of PROW_LAYERS) layers.push(...prowLayers(sourceLayer, c, overlay));
 
   return {
     version: 8,

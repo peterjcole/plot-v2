@@ -19,7 +19,7 @@ export function getVectorStyle(dark: boolean): VectorStyle {
   return {
     version: 8,
     // ol-mapbox-style resolves the sprite against the page; built by tools/build-map-sprite.mjs
-    sprite: `${typeof window === 'undefined' ? '' : window.location.origin}/map-style/sprite`,
+    sprite: `${typeof window === 'undefined' ? '' : window.location.origin}/map-style/sprite${dark ? '-dark' : ''}`,
     sources: {
       [NGD_SOURCE]: { type: 'vector', tiles: [NGD_TILE_URL], minzoom: 6, maxzoom: 19 },
     },

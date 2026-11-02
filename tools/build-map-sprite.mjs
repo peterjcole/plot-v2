@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Builds the OS Vector style's sprite (fill patterns for land cover) from the
-// inline SVG symbols below: public/map-style/sprite{,@2x}.{png,json}.
+// Builds the OS Vector style's sprites (fill patterns for land cover) from the
+// inline SVG symbols below, one per theme:
+// public/map-style/sprite{,-dark}{,@2x}.{png,json}.
 // Symbols are drawn on transparent tiles and layered over a flat fill colour.
 //
 // Usage: node tools/build-map-sprite.mjs
@@ -11,12 +12,12 @@ import sharp from 'sharp';
 
 const OUT = path.join(import.meta.dirname, '..', 'public', 'map-style');
 
-const TREE = '#5f8a2e';
-const GRASS = '#7f9a52';
-const MARSH = '#3c9fd6';
-const ROCK = '#8a857c';
-const SCRUB = '#a3bb83';
-const HEATH = '#9a7f62';
+// Symbol colours per theme; dark ones stay quiet on the night palette's fills
+const THEMES = {
+  '': { TREE: '#6d9a4e', GRASS: '#86a060', MARSH: '#1fa3dd', ROCK: '#8a857c', SCRUB: '#a3bb83', HEATH: '#9a7f62' },
+  '-dark': { TREE: '#3f8a66', GRASS: '#3f6a5c', MARSH: '#2f7fb4', ROCK: '#5d717a', SCRUB: '#33604f', HEATH: '#6a5a66' },
+};
+let TREE, GRASS, MARSH, ROCK, SCRUB, HEATH;
 
 // Deciduous: round canopy on a short trunk
 const deciduous = (x, y, s = 1) => `
@@ -39,7 +40,7 @@ const marshMark = (x, y) => `
 const dot = (x, y, r, color) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}"/>`;
 
 // name: [size, svg body] — patterns tile seamlessly, so keep marks off the edges
-const SYMBOLS = {
+const symbols = () => ({
   'pattern-deciduous': [32, deciduous(8, 9) + deciduous(24, 25)],
   'pattern-conifer': [32, conifer(8, 9) + conifer(24, 25)],
   'pattern-mixed': [32, deciduous(8, 9) + conifer(24, 25)],
@@ -50,10 +51,10 @@ const SYMBOLS = {
   'pattern-marsh': [24, marshMark(6, 8) + marshMark(18, 20)],
   'pattern-rock': [16, dot(4, 4, 0.8, ROCK) + dot(12, 12, 0.8, ROCK) + dot(10, 5, 0.5, ROCK) + dot(5, 11, 0.5, ROCK)],
   'pattern-orchard': [16, dot(4, 4, 1.4, TREE) + dot(12, 12, 1.4, TREE)],
-};
+});
 
-async function build(pixelRatio) {
-  const images = await Promise.all(Object.entries(SYMBOLS).map(async ([name, [size, body]]) => {
+async function build(theme, pixelRatio) {
+  const images = await Promise.all(Object.entries(symbols()).map(async ([name, [size, body]]) => {
     const px = size * pixelRatio;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${size} ${size}">${body}</svg>`;
     return { name, px, buffer: await sharp(Buffer.from(svg)).png().toBuffer() };
@@ -68,7 +69,7 @@ async function build(pixelRatio) {
     x += img.px;
   }
   const height = Math.max(...images.map((i) => i.px));
-  const suffix = pixelRatio === 1 ? '' : `@${pixelRatio}x`;
+  const suffix = `${theme}${pixelRatio === 1 ? '' : `@${pixelRatio}x`}`;
   await sharp({ create: { width: x, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite(images.map((i) => ({ input: i.buffer, left: i.left, top: 0 })))
     .png()
@@ -77,6 +78,9 @@ async function build(pixelRatio) {
 }
 
 fs.mkdirSync(OUT, { recursive: true });
-await build(1);
-await build(2);
+for (const [theme, colours] of Object.entries(THEMES)) {
+  ({ TREE, GRASS, MARSH, ROCK, SCRUB, HEATH } = colours);
+  await build(theme, 1);
+  await build(theme, 2);
+}
 console.log(`sprite written to ${OUT}`);

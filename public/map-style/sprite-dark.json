@@ -1,0 +1,72 @@
+{
+  "pattern-deciduous": {
+    "x": 0,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 1
+  },
+  "pattern-conifer": {
+    "x": 32,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 1
+  },
+  "pattern-mixed": {
+    "x": 64,
+    "y": 0,
+    "width": 32,
+    "height": 32,
+    "pixelRatio": 1
+  },
+  "pattern-scattered": {
+    "x": 96,
+    "y": 0,
+    "width": 44,
+    "height": 44,
+    "pixelRatio": 1
+  },
+  "pattern-scrub": {
+    "x": 140,
+    "y": 0,
+    "width": 28,
+    "height": 28,
+    "pixelRatio": 1
+  },
+  "pattern-rough": {
+    "x": 168,
+    "y": 0,
+    "width": 24,
+    "height": 24,
+    "pixelRatio": 1
+  },
+  "pattern-heath": {
+    "x": 192,
+    "y": 0,
+    "width": 22,
+    "height": 22,
+    "pixelRatio": 1
+  },
+  "pattern-marsh": {
+    "x": 214,
+    "y": 0,
+    "width": 24,
+    "height": 24,
+    "pixelRatio": 1
+  },
+  "pattern-rock": {
+    "x": 238,
+    "y": 0,
+    "width": 16,
+    "height": 16,
+    "pixelRatio": 1
+  },
+  "pattern-orchard": {
+    "x": 254,
+    "y": 0,
+    "width": 16,
+    "height": 16,
+    "pixelRatio": 1
+  }
+}
