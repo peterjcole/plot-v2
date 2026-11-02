@@ -7,7 +7,6 @@ import View from 'ol/View';
 import { defaults as defaultControls } from 'ol/control';
 import TileLayer from 'ol/layer/Tile';
 import TileGrid from 'ol/tilegrid/TileGrid';
-import { createXYZ } from 'ol/tilegrid';
 import XYZ from 'ol/source/XYZ';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -27,11 +26,10 @@ import proj4 from 'proj4';
 import { boundingExtent } from 'ol/extent';
 import Supercluster from 'supercluster';
 import {
-  OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
-  HILLSHADE_TILE_URL, NGD_TILE_URL, PROW_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
+  OS_PROJECTION, OS_VIEW_RESOLUTIONS, OS_TILE_URL, OS_DARK_TILE_URL, TOPO_TILE_URL, TOPO_DARK_TILE_URL, SATELLITE_TILE_URL,
+  HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
-import { getNgdStyle } from '@/lib/ngd-style';
-import { DETAIL_MAX_RESOLUTION, DETAIL_SOURCE, DETAIL_TILE_ZOOM, getDetailStyle } from '@/lib/map-style/detail-layers';
+import { createBaseLayer, createDetailLayer, styleBaseLayer, styleDetailLayer } from '@/lib/map-layers/vector';
 import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
 import { isAwaitingRoute } from '@/lib/route-actions';
 import { getActivityColor } from '@/lib/activity-categories';
@@ -416,26 +414,11 @@ export default function MainMap({
       zIndex: 5,
     });
 
-    // OS Vector NGD layer (MapLibre GL style via ol-mapbox-style)
-    const ngdLayer = new OlVectorTileLayer({ visible: false, zIndex: 0 });
-    applyStyle(ngdLayer, getNgdStyle(false, NGD_TILE_URL), { updateSource: true }).catch(() => {});
+    // OS Vector base map: ngd-base tiles plus tile-provider's path/rights-of-way
+    // detail. Both are styled by the effects that sync theme and base layer.
+    const ngdLayer = createBaseLayer();
     ngdLayerRef.current = ngdLayer;
-
-    // Paths, rights of way & field boundaries from tile-provider (OS NGD Features API).
-    // Only z15 tiles exist, so the grid has that single zoom and OL reuses them at every
-    // view zoom. Styled by the syncing effect below; source built here so restyling
-    // never has to wait on ol-mapbox-style's async source setup.
-    const detailLayer = new OlVectorTileLayer({
-      source: new OlVectorTileSource({
-        format: new MVT(),
-        url: PROW_TILE_URL,
-        projection: 'EPSG:3857',
-        tileGrid: createXYZ({ minZoom: DETAIL_TILE_ZOOM, maxZoom: DETAIL_TILE_ZOOM, tileSize: 512 }),
-      }),
-      maxResolution: DETAIL_MAX_RESOLUTION,
-      visible: false,
-      zIndex: 0.5,
-    });
+    const detailLayer = createDetailLayer();
     detailLayerRef.current = detailLayer;
 
     // Dim overlay: semi-transparent dark fill sitting between base tiles (zIndex 0)
@@ -527,7 +510,6 @@ export default function MainMap({
     activityHighlightLayerRef.current = highlightLayer;
 
     const center = fromLonLat([OS_DEFAULT_CENTER.lng, OS_DEFAULT_CENTER.lat], OS_PROJECTION.code);
-    const viewResolutions = [...OS_PROJECTION.resolutions, 0.875, 0.4375, 0.21875];
 
     const olMap = new Map({
       target: mapRef.current,
@@ -539,7 +521,7 @@ export default function MainMap({
         zoom: OS_ZOOM.default,
         minZoom: OS_ZOOM.min,
         maxZoom: 12,
-        resolutions: viewResolutions,
+        resolutions: OS_VIEW_RESOLUTIONS,
       }),
     });
 
@@ -808,9 +790,7 @@ export default function MainMap({
     if (ovSrc) { ovSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); ovSrc.refresh(); }
     if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
     if (hsSrc) { hsSrc.setUrl(`${HILLSHADE_TILE_URL}${sp}${osDark ? '&dark=1' : ''}`); hsSrc.refresh(); }
-    if (ngdLayerRef.current) {
-      applyStyle(ngdLayerRef.current, getNgdStyle(osDark, NGD_TILE_URL), { updateSource: true }).catch(() => {});
-    }
+    if (ngdLayerRef.current) styleBaseLayer(ngdLayerRef.current, osDark).catch(() => {});
   }, [osDark]);
 
   // Hillshade visibility
@@ -827,10 +807,7 @@ export default function MainMap({
     const isVec = baseLayer === 'os-vector';
     layer.setVisible(isVec || (baseLayer === 'satellite' && showProw));
     layer.setZIndex(isVec ? 0.5 : 6);
-    applyStyle(layer, getDetailStyle(PROW_TILE_URL, { dark: osDark, overlay: !isVec }), {
-      source: DETAIL_SOURCE,
-      updateSource: false,
-    }).catch(() => {});
+    styleDetailLayer(layer, { dark: osDark, overlay: !isVec }).catch(() => {});
   }, [baseLayer, showProw, osDark]);
 
   // Owner photos — SuperCluster-based circular thumbnail layer

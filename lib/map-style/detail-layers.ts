@@ -1,3 +1,5 @@
+import { palette } from './palette';
+
 // Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
 // the OS path network (`path`) and field boundaries (`fieldboundary`).
 //
@@ -24,33 +26,6 @@ export interface DetailStyleOptions {
   overlay: boolean;
 }
 
-interface DetailPalette {
-  footpath: string;
-  bridleway: string;
-  byway: string;
-  path: string;
-  fieldBoundary: string;
-  casing: string;
-}
-
-const LIGHT: DetailPalette = {
-  footpath: '#2a8c2a',
-  bridleway: '#2a8c2a',
-  byway: '#7a5a18',
-  path: '#45453a',
-  fieldBoundary: '#9a9a88',
-  casing: 'rgba(255,255,255,0.55)',
-};
-
-const DARK: DetailPalette = {
-  footpath: '#44cc44',
-  bridleway: '#44cc44',
-  byway: '#c89848',
-  path: '#c8c0b0',
-  fieldBoundary: '#5a5448',
-  casing: 'rgba(14,21,32,0.8)',
-};
-
 // Highway dedication descriptions from OS NGD trn-rami-highwaydedication
 const FOOTPATH = ['Pedestrian Way Or Footpath'];
 const BRIDLEWAY = ['Bridleway', 'Cycle Track Or Cycle Way'];
@@ -61,9 +36,9 @@ type Filter = unknown[];
 // Shared with ngd-base's own path layer above the handover so the two match
 export function getPathPaint(dark: boolean): Record<string, unknown> {
   return {
-    'line-color': (dark ? DARK : LIGHT).path,
-    'line-width': 1,
-    'line-dasharray': [2, 2],
+    'line-color': palette(dark).path,
+    'line-width': 1.2,
+    'line-dasharray': [2.5, 2],
   };
 }
 
@@ -105,7 +80,7 @@ function line(
 }
 
 export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOptions): DetailStyle {
-  const c = dark ? DARK : LIGHT;
+  const c = palette(dark);
   const layers: LineLayer[] = [];
 
   // Field boundaries and plain paths are part of the base map below the handover;
@@ -114,27 +89,27 @@ export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOp
     layers.push(
       line('detail-fieldboundary', 'fieldboundary', {
         'line-color': c.fieldBoundary,
-        'line-width': 0.7,
+        'line-width': 1,
       }, { maxzoom: DETAIL_HANDOVER_ZOOM }),
     );
   }
 
   const pathExtra = overlay ? {} : { maxzoom: DETAIL_HANDOVER_ZOOM };
   if (overlay) {
-    layers.push(line('detail-path-casing', 'path', { 'line-color': c.casing, 'line-width': 2.5 }));
+    layers.push(line('detail-path-casing', 'path', { 'line-color': c.overlayCasing, 'line-width': 2.5 }));
   }
   layers.push(line('detail-path', 'path', getPathPaint(dark), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
   if (overlay) {
-    layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.casing, 'line-width': 3.5 }));
+    layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
   }
-  const prowWidth = overlay ? 2.2 : 1.6;
+  const prowWidth = overlay ? 2.4 : 2;
   layers.push(
     line('detail-prow-footpath', 'prow', {
       'line-color': c.footpath,
       'line-width': prowWidth,
-      'line-dasharray': [2, 1.5],
+      'line-dasharray': [2, 1.4],
     }, { filter: descIn(FOOTPATH) }),
     line('detail-prow-bridleway', 'prow', {
       'line-color': c.bridleway,
