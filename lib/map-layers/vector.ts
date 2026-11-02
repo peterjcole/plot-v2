@@ -1,3 +1,4 @@
+import LayerGroup from 'ol/layer/Group';
 import OlVectorTileLayer from 'ol/layer/VectorTile';
 import OlVectorTileSource from 'ol/source/VectorTile';
 import MVT from 'ol/format/MVT';
@@ -5,7 +6,8 @@ import { createXYZ } from 'ol/tilegrid';
 import { applyStyle } from 'ol-mapbox-style';
 import { NGD_TILE_URL, PROW_TILE_URL } from '@/lib/map-config';
 import {
-  DETAIL_MAX_RESOLUTION, DETAIL_SOURCE, DETAIL_TILE_ZOOM, getDetailStyle, type DetailStyleOptions,
+  DETAIL_MAX_RESOLUTION, DETAIL_SOURCE, DETAIL_TILE_ZOOM, OVERVIEW_MAX_RESOLUTION, OVERVIEW_TILE_ZOOM,
+  getDetailStyle, type DetailStyleOptions,
 } from '@/lib/map-style/detail-layers';
 import { getVectorStyle, NGD_SOURCE } from '@/lib/map-style';
 
@@ -36,21 +38,31 @@ export function createBaseLayer(): OlVectorTileLayer {
   });
 }
 
-// Only z15 detail tiles exist, so the grid has that single zoom and OL reuses
-// them at every view zoom.
-export function createDetailLayer(): OlVectorTileLayer {
-  return new OlVectorTileLayer({
+// Detail tiles exist at only two zooms, so each layer's grid has that single
+// zoom and OL reuses the tiles across view zooms: z15 (paths, field boundaries,
+// rights of way) close in, z13 (rights of way only) further out.
+export function createDetailLayer(): LayerGroup {
+  const detail = new OlVectorTileLayer({
     source: mvtSource(PROW_TILE_URL, DETAIL_TILE_ZOOM, DETAIL_TILE_ZOOM),
     maxResolution: DETAIL_MAX_RESOLUTION,
-    visible: false,
-    zIndex: 0.5,
   });
+  const overview = new OlVectorTileLayer({
+    source: mvtSource(PROW_TILE_URL, OVERVIEW_TILE_ZOOM, OVERVIEW_TILE_ZOOM),
+    minResolution: DETAIL_MAX_RESOLUTION,
+    maxResolution: OVERVIEW_MAX_RESOLUTION,
+    properties: { overview: true },
+  });
+  return new LayerGroup({ layers: [overview, detail], visible: false, zIndex: 0.5 });
 }
 
 export function styleBaseLayer(layer: OlVectorTileLayer, dark: boolean): Promise<unknown> {
   return applyStyle(layer, getVectorStyle(dark), { source: NGD_SOURCE, updateSource: false });
 }
 
-export function styleDetailLayer(layer: OlVectorTileLayer, options: DetailStyleOptions): Promise<unknown> {
-  return applyStyle(layer, getDetailStyle(PROW_TILE_URL, options), { source: DETAIL_SOURCE, updateSource: false });
+export function styleDetailLayer(group: LayerGroup, options: DetailStyleOptions): Promise<unknown> {
+  return Promise.all(group.getLayers().getArray().map((layer) => applyStyle(
+    layer as OlVectorTileLayer,
+    getDetailStyle(PROW_TILE_URL, { ...options, overview: layer.get('overview') === true }),
+    { source: DETAIL_SOURCE, updateSource: false },
+  )));
 }

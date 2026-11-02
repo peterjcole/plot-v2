@@ -107,8 +107,8 @@ export function reliefLayers(c: Palette): StyleLayer[] {
 
 export function boundaryLayers(c: Palette): StyleLayer[] {
   return [
-    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(16, 0.9, 19, 1.6) }, NGD_FROM),
-    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(16, 0.6, 19, 1.2), 'line-opacity': 0.85 }, NGD_FROM),
+    line('ngd-fieldboundary', 'str_fts_fieldboundary', { 'line-color': c.fieldBoundary, 'line-width': zoom(16, 1.6, 19, 2.6) }, NGD_FROM),
+    line('ngd-structureline', 'str_fts_structureline', { 'line-color': c.wall, 'line-width': zoom(16, 1.1, 19, 2) }, NGD_FROM),
   ];
 }
 

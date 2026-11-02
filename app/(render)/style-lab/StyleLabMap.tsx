@@ -12,6 +12,7 @@ import { register } from 'ol/proj/proj4';
 import proj4 from 'proj4';
 import { OS_PROJECTION, OS_TILE_URL, OS_DARK_TILE_URL, OS_VIEW_RESOLUTIONS } from '@/lib/map-config';
 import { createBaseLayer, createDetailLayer, styleBaseLayer, styleDetailLayer } from '@/lib/map-layers/vector';
+import { bindGridLayer, createGridLayer, styleGridLayer } from '@/lib/map-layers/grid';
 import 'ol/ol.css';
 
 declare global {
@@ -36,6 +37,7 @@ export default function StyleLabMap() {
     const projection = getProjection(OS_PROJECTION.code)!;
 
     const layers = [];
+    const grid = createGridLayer();
     if (showRef) {
       layers.push(new TileLayer({
         source: new XYZ({
@@ -51,7 +53,9 @@ export default function StyleLabMap() {
       detail.setVisible(true);
       styleBaseLayer(base, dark).catch(() => {});
       styleDetailLayer(detail, { dark, overlay: false }).catch(() => {});
-      layers.push(base, detail);
+      grid.setVisible(true);
+      styleGridLayer(grid, dark);
+      layers.push(base, detail, grid);
     }
 
     const map = new Map({
@@ -66,6 +70,8 @@ export default function StyleLabMap() {
       }),
     });
 
+    const unbindGrid = bindGridLayer(map, grid);
+
     // Styles apply asynchronously; wait for a render with everything loaded
     let timer: ReturnType<typeof setTimeout>;
     map.on('rendercomplete', () => {
@@ -73,7 +79,7 @@ export default function StyleLabMap() {
       timer = setTimeout(() => { window.__LAB_READY__ = true; }, 1500);
     });
 
-    return () => { clearTimeout(timer); map.setTarget(undefined); };
+    return () => { clearTimeout(timer); unbindGrid(); map.setTarget(undefined); };
   }, []);
 
   return <div ref={ref} style={{ width: '100vw', height: '100vh', background: '#fff' }} />;

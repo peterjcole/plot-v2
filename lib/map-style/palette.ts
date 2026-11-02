@@ -43,6 +43,8 @@ export interface Palette {
   bridleway: string;
   byway: string;
   overlayCasing: string;
+  grid: string;
+  gridLabel: string;
   label: string;
   labelMinor: string;
   labelWater: string;
@@ -73,8 +75,8 @@ export const LIGHT: Palette = {
   slope: '#9c7a5c',
   building: '#efc996',
   buildingEdge: '#2b2621',
-  fieldBoundary: '#3b3832',
-  wall: '#3b3832',
+  fieldBoundary: '#1f1d1a',
+  wall: '#1f1d1a',
   motorway: ['#1d3f73', '#4f9fe0'],
   primary: ['#1c3d26', '#4fae6c'],
   aRoad: ['#3a1a28', '#ec5f96'],
@@ -91,6 +93,8 @@ export const LIGHT: Palette = {
   bridleway: '#2a8c2a',
   byway: '#7a5a18',
   overlayCasing: 'rgba(255,255,255,0.55)',
+  grid: 'rgba(38,150,214,0.75)',
+  gridLabel: '#1c86c6',
   label: '#1f1d1a',
   labelMinor: '#4a463f',
   labelWater: '#1f6fa8',
@@ -139,6 +143,8 @@ export const DARK: Palette = {
   bridleway: '#44cc44',
   byway: '#c89848',
   overlayCasing: 'rgba(14,21,32,0.8)',
+  grid: 'rgba(70,140,200,0.4)',
+  gridLabel: '#6fa8d8',
   label: '#d8d0c0',
   labelMinor: '#b0a898',
   labelWater: '#6fa8d8',

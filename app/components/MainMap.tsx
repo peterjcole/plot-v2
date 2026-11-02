@@ -6,6 +6,7 @@ import Map from 'ol/Map';
 import View from 'ol/View';
 import { defaults as defaultControls } from 'ol/control';
 import TileLayer from 'ol/layer/Tile';
+import LayerGroup from 'ol/layer/Group';
 import TileGrid from 'ol/tilegrid/TileGrid';
 import XYZ from 'ol/source/XYZ';
 import VectorLayer from 'ol/layer/Vector';
@@ -30,11 +31,11 @@ import {
   HILLSHADE_TILE_URL, OS_DEFAULT_CENTER, OS_ZOOM,
 } from '@/lib/map-config';
 import { createBaseLayer, createDetailLayer, styleBaseLayer, styleDetailLayer } from '@/lib/map-layers/vector';
+import { bindGridLayer, createGridLayer, styleGridLayer } from '@/lib/map-layers/grid';
 import { ActivitySummary, ActivityPhoto, PhotoItem, Waypoint, RouteSegment } from '@/lib/types';
 import { isAwaitingRoute } from '@/lib/route-actions';
 import { getActivityColor } from '@/lib/activity-categories';
 import type { RouteAction } from '@/app/(main)/planner/useRouteHistory';
-import { applyStyle } from 'ol-mapbox-style';
 import 'ol/ol.css';
 
 export type MapLayer = 'topo' | 'satellite' | 'os-vector';
@@ -294,7 +295,8 @@ export default function MainMap({
   const satelliteLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const hillshadeLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const ngdLayerRef = useRef<OlVectorTileLayer | null>(null);
-  const detailLayerRef = useRef<OlVectorTileLayer | null>(null);
+  const detailLayerRef = useRef<LayerGroup | null>(null);
+  const gridLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const dimLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
   const personalHeatmapLayerRef = useRef<OlVectorTileLayer | null>(null);
   const globalHeatmapLayerRef = useRef<TileLayer<XYZ> | null>(null);
@@ -420,6 +422,9 @@ export default function MainMap({
     ngdLayerRef.current = ngdLayer;
     const detailLayer = createDetailLayer();
     detailLayerRef.current = detailLayer;
+    // Explorer-style 1km National Grid, drawn on OS Vector only (the OS raster prints its own)
+    const gridLayer = createGridLayer();
+    gridLayerRef.current = gridLayer;
 
     // Dim overlay: semi-transparent dark fill sitting between base tiles (zIndex 0)
     // and all overlay layers (zIndex 3.4+). Toggled visible by dimBaseMap prop.
@@ -514,7 +519,7 @@ export default function MainMap({
     const olMap = new Map({
       target: mapRef.current,
       controls: defaultControls({ zoom: false, rotate: false, attribution: false }),
-      layers: [ngdLayer, detailLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, rotateLayer, elevHoverLayer],
+      layers: [ngdLayer, detailLayer, gridLayer, topoLayer, osOverviewLayer, os25kLayer, satelliteLayer, dimLayer, hillshadeLayer, routeLayer, highlightLayer, selectedRouteLayer, photoLayer, plannerRouteLayer, plannerWpLayer, rotateLayer, elevHoverLayer],
       view: new View({
         projection,
         center,
@@ -531,9 +536,11 @@ export default function MainMap({
     });
 
     mapInstanceRef.current = olMap;
+    const unbindGrid = bindGridLayer(olMap, gridLayer);
     onMapReady?.(olMap);
 
     return () => {
+      unbindGrid();
       olMap.setTarget(undefined);
       mapInstanceRef.current = null;
       routeSourceRef.current = null;
@@ -548,6 +555,7 @@ export default function MainMap({
       hillshadeLayerRef.current = null;
       ngdLayerRef.current = null;
       detailLayerRef.current = null;
+      gridLayerRef.current = null;
       dimLayerRef.current = null;
       photoLayerRef.current = null;
       plannerWpSourceRef.current = null;
@@ -777,6 +785,7 @@ export default function MainMap({
     os25kLayerRef.current?.setVisible(!isSat && !isVec);
     satelliteLayerRef.current?.setVisible(isSat);
     ngdLayerRef.current?.setVisible(isVec);
+    gridLayerRef.current?.setVisible(isVec);
   }, [baseLayer]);
 
   // Swap OS tile URLs when dark/light theme changes
@@ -791,6 +800,7 @@ export default function MainMap({
     if (hkSrc) { hkSrc.setUrl(osDark ? OS_DARK_TILE_URL : OS_TILE_URL); hkSrc.refresh(); }
     if (hsSrc) { hsSrc.setUrl(`${HILLSHADE_TILE_URL}${sp}${osDark ? '&dark=1' : ''}`); hsSrc.refresh(); }
     if (ngdLayerRef.current) styleBaseLayer(ngdLayerRef.current, osDark).catch(() => {});
+    if (gridLayerRef.current) styleGridLayer(gridLayerRef.current, osDark);
   }, [osDark]);
 
   // Hillshade visibility

@@ -20,10 +20,17 @@ export const DETAIL_HANDOVER_ZOOM = 16;
 // One step coarser (7 m/px) needs ~4x as many z15 tiles for the same viewport.
 export const DETAIL_MAX_RESOLUTION = 4;
 
+// Zoomed out beyond that, rights of way alone come from z13 overview tiles,
+// down to view zoom 6 (14 m/px).
+export const OVERVIEW_TILE_ZOOM = 13;
+export const OVERVIEW_MAX_RESOLUTION = 16;
+
 export interface DetailStyleOptions {
   dark: boolean;
-  // Over satellite/topo rather than as part of the OS Vector base map
+  // Over satellite rather than as part of the OS Vector base map
   overlay: boolean;
+  // Style for the z13 overview tiles, which only carry rights of way
+  overview?: boolean;
 }
 
 // Highway dedication descriptions from OS NGD trn-rami-highwaydedication
@@ -79,32 +86,32 @@ function line(
   };
 }
 
-export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOptions): DetailStyle {
+export function getDetailStyle(tileUrl: string, { dark, overlay, overview = false }: DetailStyleOptions): DetailStyle {
   const c = palette(dark);
   const layers: LineLayer[] = [];
 
   // Field boundaries and plain paths are part of the base map below the handover;
   // as an overlay only paths are drawn (field boundaries add noise over imagery).
-  if (!overlay) {
+  if (!overlay && !overview) {
     layers.push(
       line('detail-fieldboundary', 'fieldboundary', {
         'line-color': c.fieldBoundary,
-        'line-width': 1,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.1, 16, 1.6],
       }, { maxzoom: DETAIL_HANDOVER_ZOOM }),
     );
   }
 
   const pathExtra = overlay ? {} : { maxzoom: DETAIL_HANDOVER_ZOOM };
-  if (overlay) {
+  if (overlay && !overview) {
     layers.push(line('detail-path-casing', 'path', { 'line-color': c.overlayCasing, 'line-width': 2.5 }));
   }
-  layers.push(line('detail-path', 'path', getPathPaint(dark), pathExtra));
+  if (!overview) layers.push(line('detail-path', 'path', getPathPaint(dark), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
   if (overlay) {
     layers.push(line('detail-prow-casing', 'prow', { 'line-color': c.overlayCasing, 'line-width': 3.5 }));
   }
-  const prowWidth = overlay ? 2.4 : 2;
+  const prowWidth = (overlay ? 2.4 : 2) - (overview ? 0.4 : 0);
   layers.push(
     line('detail-prow-footpath', 'prow', {
       'line-color': c.footpath,
@@ -129,8 +136,8 @@ export function getDetailStyle(tileUrl: string, { dark, overlay }: DetailStyleOp
       [DETAIL_SOURCE]: {
         type: 'vector',
         tiles: [tileUrl],
-        minzoom: DETAIL_TILE_ZOOM,
-        maxzoom: DETAIL_TILE_ZOOM,
+        minzoom: overview ? OVERVIEW_TILE_ZOOM : DETAIL_TILE_ZOOM,
+        maxzoom: overview ? OVERVIEW_TILE_ZOOM : DETAIL_TILE_ZOOM,
       },
     },
     layers,
