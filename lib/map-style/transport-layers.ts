@@ -1,4 +1,5 @@
 import type { Palette } from './palette';
+import { getPathPaint } from './detail-layers';
 import {
   type Expr, type StyleLayer, NGD_MIN_ZOOM, ZOOMSTACK_MAX_ZOOM, ZS,
   descIs, fill, line, sym, zoom,
@@ -33,8 +34,12 @@ export function transportLayers(c: Palette): StyleLayer[] {
   return [
     // Street-level surfaces (NGD polygons); Zoomstack centrelines draw on top until they run out
     fill('ngd-road', 'trn_fts_roadtrackorpath', { 'fill-color': c.roadSurface, 'fill-outline-color': c.roadEdge }, { minzoom: NGD_MIN_ZOOM, filter: descIs('Road', 'Traffic Calming', 'Level Crossing', 'Shared Use Carriageway') }),
-    fill('ngd-track', 'trn_fts_roadtrackorpath', { 'fill-color': c.rough, 'fill-outline-color': c.track }, { minzoom: NGD_MIN_ZOOM, filter: descIs('Track') }),
+    fill('ngd-track', 'trn_fts_roadtrackorpath', { 'fill-color': c.rough }, { minzoom: NGD_MIN_ZOOM, filter: descIs('Track') }),
     fill('ngd-pavement', 'trn_fts_roadtrackorpath', { 'fill-color': c.site }, { minzoom: NGD_MIN_ZOOM, filter: descIs('Pavement', 'Path', 'Cycle Way') }),
+    // Track and path edges dashed, as Explorer draws unfenced ways
+    line('ngd-way-edge', 'trn_fts_roadtrackorpath', { 'line-color': c.track, 'line-width': zoom(16, 0.8, 19, 1.3), 'line-dasharray': [4, 2] }, { minzoom: NGD_MIN_ZOOM, filter: descIs('Track', 'Path', 'Cycle Way') }),
+    // Path centrelines continue the detail layer's dashed paths at street zoom
+    line('ngd-path', 'trn_ntwk_pathlink', getPathPaint(c), { minzoom: NGD_MIN_ZOOM }),
 
     line('road-tunnel', 'Roads', { 'line-color': c.roadEdge, 'line-width': zoom(12, 1, 16, 4), 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 }, { minzoom: 12, maxzoom: ZOOMSTACK_MAX_ZOOM, filter: sym(ZS.roads.tunnel) }),
     ...classes.map((r) => line(`road-${r.id}-casing`, 'Roads', {

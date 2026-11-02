@@ -1,4 +1,4 @@
-import { palette } from './palette';
+import { palette, type Palette } from './palette';
 
 // Styles for tile-provider's /prow detail tiles: OS NGD rights of way (`prow`),
 // the OS path network (`path`) and field boundaries (`fieldboundary`).
@@ -41,11 +41,11 @@ const BYWAY = ['Restricted Byway', 'Byway Open To All Traffic'];
 type Filter = unknown[];
 
 // Shared with ngd-base's own path layer above the handover so the two match
-export function getPathPaint(dark: boolean): Record<string, unknown> {
+export function getPathPaint(c: Palette): Record<string, unknown> {
   return {
-    'line-color': palette(dark).path,
-    'line-width': 1.2,
-    'line-dasharray': [2.5, 2],
+    'line-color': c.path,
+    'line-width': ['interpolate', ['linear'], ['zoom'], 13, 1.2, 16, 1.7, 19, 2.2],
+    'line-dasharray': [2.5, 1.6],
   };
 }
 
@@ -105,7 +105,7 @@ export function getDetailStyle(tileUrl: string, { dark, overlay, overview = fals
   if (overlay && !overview) {
     layers.push(line('detail-path-casing', 'path', { 'line-color': c.overlayCasing, 'line-width': 2.5 }));
   }
-  if (!overview) layers.push(line('detail-path', 'path', getPathPaint(dark), pathExtra));
+  if (!overview) layers.push(line('detail-path', 'path', getPathPaint(c), pathExtra));
 
   // Rights of way sit on top of the path network they usually overlap
   if (overlay) {
